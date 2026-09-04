@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.26'
+export const APP_VERSION = '1.9.27'
 export const APP_VERSION_DATE = '2026-09-04'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.27',
+    date: '2026-09-04',
+    title: 'Locandina convocazioni — orario di ritrovo personalizzabile',
+    features: [
+      'Nella scheda convocazione, sopra il bottone verde "Genera locandina per WhatsApp", trovi ora un campo "Orario ritrovo · locandina": se lo lasci vuoto viene calcolato in automatico come 1 ora prima del calcio d\u2019inizio (come prima), se invece scrivi un orario diverso (es. 15:30) sarà quello a comparire nella locandina',
+      'Il campo è precompilato con l\u2019orario automatico solo come hint sotto l\u2019input; per usare l\u2019automatico basta lasciarlo vuoto, per tornare all\u2019automatico dopo aver inserito un valore c\u2019è il pulsante "Usa automatico" a fianco',
+    ],
+    notes: [
+      'Modifica utile per trasferte lontane (ritrovo 2h prima) o partite molto vicine (ritrovo 30 min prima)',
+    ],
+  },
   {
     version: '1.9.26',
     date: '2026-09-04',

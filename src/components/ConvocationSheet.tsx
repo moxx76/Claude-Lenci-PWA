@@ -77,6 +77,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
   const [generating, setGenerating] = useState(false)
   const [posterOpen, setPosterOpen] = useState(false)
   const [posterData, setPosterData] = useState<ConvocationPosterData | null>(null)
+  const [meetingTimeOverride, setMeetingTimeOverride] = useState('')
 
   useEffect(() => {
     if (!open || !match) return
@@ -364,9 +365,15 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
       ? null
       : `${String(md.getHours()).padStart(2, '0')}:${String(md.getMinutes()).padStart(2, '0')}`
 
-    // Ora ritrovo: 1 ora prima del calcio d'inizio
+    // Ora ritrovo: se l'utente ha specificato un orario custom lo usa,
+    // altrimenti calcola 1 ora prima del calcio d'inizio (default automatico)
     let meetingTimeStr: string | null = null
-    if (!isNaN(md.getTime())) {
+    const override = meetingTimeOverride.trim()
+    if (override && /^\d{1,2}:\d{2}$/.test(override)) {
+      // Normalizzo a HH:MM (aggiunge zero iniziale se manca)
+      const [h, m] = override.split(':')
+      meetingTimeStr = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`
+    } else if (!isNaN(md.getTime())) {
       const meet = new Date(md.getTime() - 60 * 60 * 1000)
       meetingTimeStr = `${String(meet.getHours()).padStart(2, '0')}:${String(meet.getMinutes()).padStart(2, '0')}`
     }
@@ -670,6 +677,63 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
 
             {/* Bottoni azione */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Orario ritrovo per la locandina (opzionale) */}
+              {(() => {
+                const md = match?.match_date ? new Date(match.match_date) : null
+                let autoMeeting: string | null = null
+                if (md && !isNaN(md.getTime())) {
+                  const meet = new Date(md.getTime() - 60 * 60 * 1000)
+                  autoMeeting = `${String(meet.getHours()).padStart(2, '0')}:${String(meet.getMinutes()).padStart(2, '0')}`
+                }
+                return (
+                  <div style={{
+                    padding: '10px 12px', borderRadius: 10,
+                    background: '#f0f7ff', border: '1px solid #cfe3f7',
+                  }}>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 11.5, fontWeight: 700, color: '#004a78',
+                      textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6,
+                    }}>
+                      <Icon name="schedule" size={14} color="#004a78" />
+                      Orario ritrovo · locandina
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="time"
+                        value={meetingTimeOverride}
+                        onChange={e => setMeetingTimeOverride(e.target.value)}
+                        step={300}
+                        style={{
+                          flex: '0 0 auto', padding: '8px 10px', borderRadius: 8,
+                          border: '1px solid #b3d2ee', background: '#fff',
+                          fontSize: 14, fontWeight: 700, color: '#004a78',
+                        }}
+                      />
+                      {meetingTimeOverride && (
+                        <button
+                          type="button"
+                          onClick={() => setMeetingTimeOverride('')}
+                          style={{
+                            padding: '6px 10px', borderRadius: 8,
+                            border: '1px solid #cfe3f7', background: '#fff',
+                            color: '#004a78', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          }}
+                        >
+                          Usa automatico
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#5c7a95', marginTop: 6 }}>
+                      {meetingTimeOverride
+                        ? `Verrà stampato: ritrovo alle ${meetingTimeOverride}`
+                        : autoMeeting
+                          ? `Se lasciato vuoto viene calcolato ${autoMeeting} (1h prima del kickoff)`
+                          : 'Se lasciato vuoto viene calcolato 1h prima del calcio d\u2019inizio'}
+                    </div>
+                  </div>
+                )
+              })()}
               <button
                 onClick={handleGeneratePdf}
                 disabled={saving || generating || acceptedCount === 0}
