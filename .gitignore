@@ -1,0 +1,59 @@
+# Dipendenze
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+
+# Env variables (mai committare credenziali locali)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Netlify local
+.netlify/
+
+# Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Coverage / test
+coverage/
+*.lcov
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# Cache
+.eslintcache
+.parcel-cache
+.turbo
+.rpt2_cache/
+
+# Uploads temporanei (script generatori icone Pillow, esperimenti)
+*.tmp
+scratch/
+tmp/

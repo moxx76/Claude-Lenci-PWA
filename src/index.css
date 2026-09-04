@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    font-family: 'Lexend', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #f7f9ff;
+    color: #181c20;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior-y: none;
+  }
+  * { -webkit-tap-highlight-color: transparent; }
+  button, a { -webkit-user-select: none; user-select: none; }
+  input, textarea, select { font-size: 16px; }
+}
+
+/* === Material Symbols Outlined === */
+.msi {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  display: inline-block;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* === Animazioni Lenci === */
+@keyframes lenciFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes lenciSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes lenciFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lenci-scroll::-webkit-scrollbar { width: 0px; }
+.lenci-scroll { scrollbar-width: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
