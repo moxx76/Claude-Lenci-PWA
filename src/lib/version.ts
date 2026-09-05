@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.27'
+export const APP_VERSION = '1.9.28'
 export const APP_VERSION_DATE = '2026-09-04'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.28',
+    date: '2026-09-04',
+    title: 'Locandina convocazioni — fino a 30 giocatori (Prima Squadra)',
+    features: [
+      'La locandina WhatsApp ora accetta fino a 30 convocati (prima il limite era 20, sufficiente per giovanili ma stretto per la Prima Squadra che spesso convoca 22-28 giocatori tra portieri, difensori, centrocampisti e attaccanti)',
+      'Layout adattivo: fino a 22 giocatori la griglia resta a 2 colonne come prima, da 23 in su passa automaticamente a 3 colonne con dimensioni del chevron numero e del font leggermente ridotte per stare comodi nel formato quadrato',
+      'Auto-fit del nome giocatore migliorato: si adatta alla larghezza della colonna riducendo il font se serve (utile con cognomi lunghi in modalità 3 colonne)',
+    ],
+    notes: [
+      'Nessun cambiamento richiesto lato utente: basta convocare i giocatori normalmente dalla scheda convocazione, la locandina si adatta',
+    ],
+  },
   {
     version: '1.9.27',
     date: '2026-09-04',

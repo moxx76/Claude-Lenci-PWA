@@ -221,56 +221,62 @@ export async function generateConvocationPoster(
   ctx.fillStyle = COL.blueBrand
   ctx.fillRect(W - 48, gridY, 8, gridH)
 
-  const playersToShow = data.players.slice(0, 20)
-  const perCol = Math.max(9, Math.ceil(playersToShow.length / 2))
-  const colWidth = (W - 80 - 40) / 2
+  // Limite 30 (per Prima Squadra) — sotto 22 layout a 2 colonne, sopra 3 colonne
+  const playersToShow = data.players.slice(0, 30)
+  const N = playersToShow.length
+  const cols = N > 22 ? 3 : 2
+  const perCol = Math.max(9, Math.ceil(N / cols))
+  const colWidth = (W - 80 - 40) / cols
   const rowH = (gridH - 40) / perCol
-  const padX = 30
+  const padX = cols === 3 ? 20 : 30
 
-  for (let i = 0; i < playersToShow.length; i++) {
+  for (let i = 0; i < N; i++) {
     const p = playersToShow[i]
-    const col = i < perCol ? 0 : 1
+    const col = Math.floor(i / perCol)
     const row = i - col * perCol
     const cx = 40 + padX + col * colWidth + 5
     const cy = gridY + 25 + row * rowH + rowH / 2
     const num = i + 1
 
-    // Badge numero (chevron blu)
+    // Badge numero (chevron blu) — un po' più piccolo se 3 colonne
+    const chevW = cols === 3 ? 50 : 62
+    const chevH = cols === 3 ? 16 : 20
     ctx.save()
     ctx.fillStyle = COL.numberBadge
     ctx.beginPath()
-    ctx.moveTo(cx, cy - 20)
-    ctx.lineTo(cx + 50, cy - 20)
-    ctx.lineTo(cx + 62, cy)
-    ctx.lineTo(cx + 50, cy + 20)
-    ctx.lineTo(cx, cy + 20)
+    ctx.moveTo(cx, cy - chevH)
+    ctx.lineTo(cx + chevW - 12, cy - chevH)
+    ctx.lineTo(cx + chevW, cy)
+    ctx.lineTo(cx + chevW - 12, cy + chevH)
+    ctx.lineTo(cx, cy + chevH)
     ctx.closePath()
     ctx.fill()
     ctx.fillStyle = COL.white
-    ctx.font = '900 24px "Anybody", "Arial Black", sans-serif'
+    ctx.font = cols === 3 ? '900 20px "Anybody", "Arial Black", sans-serif' : '900 24px "Anybody", "Arial Black", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(num), cx + 27, cy + 1)
+    ctx.fillText(String(num), cx + (chevW - 6) / 2, cy + 1)
     ctx.restore()
 
     // Linea sotto il nome
-    const nameStartX = cx + 74
+    const nameStartX = cx + chevW + 12
     const nameEndX = cx + colWidth - 25
     ctx.strokeStyle = '#c0c7d2'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(nameStartX, cy + 22)
-    ctx.lineTo(nameEndX, cy + 22)
+    ctx.moveTo(nameStartX, cy + (cols === 3 ? 18 : 22))
+    ctx.lineTo(nameEndX, cy + (cols === 3 ? 18 : 22))
     ctx.stroke()
 
-    // Nome giocatore - font auto-scaling
+    // Nome giocatore - font auto-scaling (min più basso se 3 colonne)
     const name = `${(p.lastName || '').toUpperCase()} ${p.firstName || ''}`.trim()
     const nameToDraw = p.isCaptain ? `(C) ${name}` : name
-    const availWidth = nameEndX - nameStartX - 20  // -20 per riservare spazio al numero maglia
+    const availWidth = nameEndX - nameStartX - (cols === 3 ? 26 : 20)
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     drawAutoSizedText(
-      ctx, nameToDraw, nameStartX, cy + 3, availWidth, 24, 18,
+      ctx, nameToDraw, nameStartX, cy + 3, availWidth,
+      cols === 3 ? 20 : 24, cols === 3 ? 15 : 18,
       'system-ui, Arial, sans-serif', p.isCaptain ? '900' : '700', COL.slate,
       { alignLeft: true }
     )
@@ -278,7 +284,7 @@ export async function generateConvocationPoster(
     // Numero maglia (piccolo, a destra)
     if (p.number != null) {
       ctx.fillStyle = COL.red
-      ctx.font = '900 18px "Anybody", Arial, sans-serif'
+      ctx.font = cols === 3 ? '900 15px "Anybody", Arial, sans-serif' : '900 18px "Anybody", Arial, sans-serif'
       ctx.textAlign = 'right'
       ctx.fillText(`#${p.number}`, nameEndX, cy + 3)
     }
