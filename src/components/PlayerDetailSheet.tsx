@@ -52,6 +52,17 @@ interface DisciplinaryEntry {
   created_at: string
 }
 
+interface PlayerGoalEntry {
+  match_id: string
+  match_date: string
+  opponent: string
+  venue: 'home' | 'away' | null
+  home_score: number | null
+  away_score: number | null
+  goals: number
+  penalties_scored: number
+}
+
 const NOTE_TYPE_STYLE: Record<NoteType, { bg: string; color: string; label: string; icon: string }> = {
   note:        { bg: '#cfe5ff', color: '#004a78', label: 'Nota',        icon: 'edit_note' },
   yellow:      { bg: 'rgba(255,209,0,0.30)', color: '#8e6300', label: 'Ammonizione', icon: 'square' },
@@ -67,15 +78,19 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
   const [saving, setSaving] = useState(false)
   const [history, setHistory] = useState<DisciplinaryEntry[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [goals, setGoals] = useState<PlayerGoalEntry[]>([])
+  const [loadingGoals, setLoadingGoals] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [assessOpen, setAssessOpen] = useState(false)
 
   useEffect(() => {
     if (!open || !player || player.source === 'lead') {
       setHistory([])
+      setGoals([])
       return
     }
     loadHistory()
+    loadGoals()
   }, [open, player?.id])
 
   const loadHistory = async () => {
@@ -96,6 +111,37 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
       author_name: r.author?.full_name || 'Staff',
     })))
     setLoadingHistory(false)
+  }
+
+  const loadGoals = async () => {
+    if (!player) return
+    setLoadingGoals(true)
+    const { data } = await supabase
+      .from('match_player_stats')
+      .select('goals, penalties_scored, match:matches!inner(id, match_date, opponent, venue, home_score, away_score)')
+      .eq('player_id', player.id)
+    const rows: PlayerGoalEntry[] = (data ?? [])
+      .map((r: any) => {
+        const m = Array.isArray(r.match) ? r.match[0] : r.match
+        if (!m) return null
+        const goals = Number(r.goals || 0)
+        const pens = Number(r.penalties_scored || 0)
+        if (goals + pens <= 0) return null
+        return {
+          match_id: m.id,
+          match_date: m.match_date,
+          opponent: m.opponent,
+          venue: m.venue,
+          home_score: m.home_score,
+          away_score: m.away_score,
+          goals,
+          penalties_scored: pens,
+        } as PlayerGoalEntry
+      })
+      .filter((x: any): x is PlayerGoalEntry => x !== null)
+      .sort((a, b) => (a.match_date > b.match_date ? -1 : 1))
+    setGoals(rows)
+    setLoadingGoals(false)
   }
 
   if (!player) return null
@@ -238,6 +284,103 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
             <InfoTile label="Email" value={player.parentEmail} action={`mailto:${player.parentEmail}`} icon="mail" />
           )}
         </div>
+
+        {/* Gol stagione — solo per giocatori */}
+        {!isLead && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Icon name="sports_soccer" size={18} color="#005f98" />
+              <h3 style={{ fontFamily: 'Anybody', fontWeight: 800, fontSize: 14, color: '#181c20', margin: 0 }}>
+                Gol stagione
+              </h3>
+            </div>
+            {loadingGoals ? (
+              <div style={{ padding: 14, background: '#f7f9ff', borderRadius: 12, fontSize: 12, color: '#404751', textAlign: 'center' }}>
+                Caricamento…
+              </div>
+            ) : goals.length === 0 ? (
+              <div style={{ padding: 14, background: '#f7f9ff', borderRadius: 12, fontSize: 12, color: '#7a8290', textAlign: 'center' }}>
+                Nessun gol registrato in referto partita
+              </div>
+            ) : (() => {
+              const totGoals = goals.reduce((s, g) => s + g.goals, 0)
+              const totPens = goals.reduce((s, g) => s + g.penalties_scored, 0)
+              const totalNet = totGoals + totPens
+              return (
+                <div>
+                  {/* Riepilogo top */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #005f98 0%, #003c5e 100%)',
+                    borderRadius: 14, padding: '14px 16px', color: '#fff',
+                    marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14,
+                  }}>
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'Anybody', fontWeight: 900, fontSize: 26,
+                    }}>
+                      {totalNet}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.9 }}>
+                        Totale marcature
+                      </div>
+                      <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+                        {totGoals} su azione{totPens > 0 ? ` · ${totPens} su rigore` : ''} · in {goals.length} partit{goals.length === 1 ? 'a' : 'e'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista partite con gol */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {goals.map(g => {
+                      const dateStr = formatDate(g.match_date)
+                      const scoreStr = (g.home_score != null && g.away_score != null)
+                        ? (g.venue === 'home'
+                            ? `${g.home_score}-${g.away_score}`
+                            : g.venue === 'away'
+                              ? `${g.away_score}-${g.home_score}`
+                              : `${g.home_score}-${g.away_score}`)
+                        : null
+                      const netGoals = g.goals + g.penalties_scored
+                      return (
+                        <div key={g.match_id} style={{
+                          background: '#f7f9ff', border: '1px solid #dfe6ef',
+                          borderRadius: 10, padding: '10px 12px',
+                          display: 'flex', alignItems: 'center', gap: 10,
+                        }}>
+                          <div style={{
+                            minWidth: 32, height: 32, borderRadius: 8,
+                            background: '#005f98', color: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: 'Anybody', fontWeight: 900, fontSize: 16,
+                          }}>
+                            {netGoals}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#181c20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {g.venue === 'home' ? 'vs ' : g.venue === 'away' ? '@ ' : ''}{g.opponent}
+                              {scoreStr && <span style={{ marginLeft: 6, color: '#5c6773', fontWeight: 600 }}>({scoreStr})</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#7a8290', marginTop: 1 }}>
+                              {dateStr}
+                              {g.penalties_scored > 0 && (
+                                <span style={{ marginLeft: 6, color: '#004a78', fontWeight: 700 }}>
+                                  · {g.penalties_scored} rig.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
 
         {/* Storico disciplinare - solo per giocatori (non lead) */}
         {!isLead ? (

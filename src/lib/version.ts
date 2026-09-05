@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.28'
-export const APP_VERSION_DATE = '2026-09-04'
+export const APP_VERSION = '1.9.29'
+export const APP_VERSION_DATE = '2026-09-05'
 
 export interface Release {
   version: string
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.29',
+    date: '2026-09-05',
+    title: 'Gol in scheda giocatore + terzo dirigente per squadra',
+    features: [
+      'Nella scheda personale di ogni giocatore ora è visibile la sezione "Gol stagione": totale marcature (gol su azione + gol su rigore) in evidenza, elenco delle partite in cui ha segnato con data, avversario, risultato finale, quanti gol e quanti su rigore. Dati aggregati automaticamente dai referti partita, nessun inserimento manuale richiesto',
+      'Terzo slot dirigenziale sulle squadre: da "Modifica squadra" è ora possibile assegnare fino a 3 dirigenti accompagnatori (prima solo 2). Il terzo dirigente ha gli stessi permessi operativi degli altri due: accesso completo a gestione squadra, calendario, presenze, valutazioni. Compare correttamente in convocazione e distinta FIGC come "Terzo Dirigente Accompagnatore"',
+    ],
+    notes: [
+      'La sezione Gol appare solo se il giocatore ha almeno una marcatura registrata in un referto partita — altrimenti mostra "Nessun gol registrato"',
+    ],
+  },
   {
     version: '1.9.28',
     date: '2026-09-04',

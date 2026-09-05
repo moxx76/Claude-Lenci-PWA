@@ -5,7 +5,7 @@ export interface StaffMember {
   profile_id: string
   full_name: string
   role_label: string   // etichetta italiana del ruolo
-  role_key: 'head_coach' | 'assistant_coach' | 'helper_coach' | 'team_manager' | 'second_manager' | 'linesman' | 'masseur'
+  role_key: 'head_coach' | 'assistant_coach' | 'helper_coach' | 'team_manager' | 'second_manager' | 'third_manager' | 'linesman' | 'masseur'
   order_num: number    // per ordinamento nella UI
 }
 
@@ -30,6 +30,7 @@ export function useTeamStaff(teamId: string | null | undefined) {
             helper_coach:profiles!teams_helper_coach_id_fkey(id, full_name),
             team_manager:profiles!teams_team_manager_id_fkey(id, full_name),
             second_manager:profiles!teams_second_manager_id_fkey(id, full_name),
+            third_manager:profiles!teams_third_manager_id_fkey(id, full_name),
             linesman:profiles!teams_linesman_id_fkey(id, full_name),
             masseur:profiles!teams_masseur_id_fkey(id, full_name)
           `)
@@ -53,8 +54,9 @@ export function useTeamStaff(teamId: string | null | undefined) {
         add(data.helper_coach,    'helper_coach',    'Aiuto allenatore',                  3)
         add(data.team_manager,    'team_manager',    'Dirigente Accompagnatore',          4)
         add(data.second_manager,  'second_manager',  'Secondo Dirigente Accompagnatore',  5)
-        add(data.linesman,        'linesman',        'Guardalinee di casa',               6)
-        add(data.masseur,         'masseur',         'Massaggiatore',                     7)
+        add(data.third_manager,   'third_manager',   'Terzo Dirigente Accompagnatore',    6)
+        add(data.linesman,        'linesman',        'Guardalinee di casa',               7)
+        add(data.masseur,         'masseur',         'Massaggiatore',                     8)
 
         setStaff(out)
       } catch {

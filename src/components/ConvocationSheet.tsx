@@ -106,6 +106,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
           helper_coach:profiles!teams_helper_coach_id_fkey(full_name),
           team_manager:profiles!teams_team_manager_id_fkey(full_name),
           second_manager:profiles!teams_second_manager_id_fkey(full_name),
+          third_manager:profiles!teams_third_manager_id_fkey(full_name),
           linesman:profiles!teams_linesman_id_fkey(full_name),
           masseur:profiles!teams_masseur_id_fkey(full_name)
         `)
@@ -149,6 +150,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
     pushIfPresent(tData?.helper_coach, 'Aiuto allenatore')
     pushIfPresent(tData?.team_manager, 'Dirigente Accompagnatore')
     pushIfPresent(tData?.second_manager, 'Secondo Dirigente Accompagnatore')
+    pushIfPresent(tData?.third_manager, 'Terzo Dirigente Accompagnatore')
     pushIfPresent(tData?.linesman, 'Guardalinee di casa')
     pushIfPresent(tData?.masseur, 'Massaggiatore')
     setStaff(staffList)

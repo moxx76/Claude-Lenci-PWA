@@ -17,6 +17,7 @@ interface ExistingTeam {
   helper_coach_id?: string | null
   linesman_id?: string | null
   second_manager_id?: string | null
+  third_manager_id?: string | null
   masseur_id?: string | null
   default_shirt_color?: string | null
   default_gk_shirt_color?: string | null
@@ -55,6 +56,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
   const [helperCoachId, setHelperCoachId] = useState<string>('')
   const [linesmanId, setLinesmanId] = useState<string>('')
   const [secondManagerId, setSecondManagerId] = useState<string>('')
+  const [thirdManagerId, setThirdManagerId] = useState<string>('')
   const [masseurId, setMasseurId] = useState<string>('')
   const [publicPresence, setPublicPresence] = useState(false)
   const [coaches, setCoaches] = useState<Profile[]>([])
@@ -90,6 +92,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setHelperCoachId(existingTeam.helper_coach_id || '')
       setLinesmanId(existingTeam.linesman_id || '')
       setSecondManagerId(existingTeam.second_manager_id || '')
+      setThirdManagerId(existingTeam.third_manager_id || '')
       setMasseurId(existingTeam.masseur_id || '')
       setPublicPresence(!!existingTeam.public_presence_enabled)
     } else {
@@ -107,6 +110,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setHelperCoachId('')
       setLinesmanId('')
       setSecondManagerId('')
+      setThirdManagerId('')
       setMasseurId('')
       setPublicPresence(false)
     }
@@ -119,7 +123,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
     if (!open || !existingTeam?.id) return
     if (existingTeam.home_shirt_color != null && existingTeam.assistant_coach_id !== undefined) return
     supabase.from('teams')
-      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, masseur_id')
+      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, third_manager_id, masseur_id')
       .eq('id', existingTeam.id)
       .single()
       .then(({ data }) => {
@@ -135,6 +139,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         if (data.helper_coach_id) setHelperCoachId(data.helper_coach_id)
         if (data.linesman_id) setLinesmanId(data.linesman_id)
         if (data.second_manager_id) setSecondManagerId(data.second_manager_id)
+        if (data.third_manager_id) setThirdManagerId(data.third_manager_id)
         if (data.masseur_id) setMasseurId(data.masseur_id)
       })
   }, [open, existingTeam?.id])
@@ -164,6 +169,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         helper_coach_id: helperCoachId || null,
         linesman_id: linesmanId || null,
         second_manager_id: secondManagerId || null,
+        third_manager_id: thirdManagerId || null,
         masseur_id: masseurId || null,
         public_presence_enabled: publicPresence,
       }
@@ -377,6 +383,13 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
 
           <Field label="Secondo dirigente accompagnatore">
             <select value={secondManagerId} onChange={e => setSecondManagerId(e.target.value)} style={inputStyle}>
+              <option value="">— Nessuno —</option>
+              {coaches.map(c => <option key={c.id} value={c.id}>{coachName(c)}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Terzo dirigente accompagnatore">
+            <select value={thirdManagerId} onChange={e => setThirdManagerId(e.target.value)} style={inputStyle}>
               <option value="">— Nessuno —</option>
               {coaches.map(c => <option key={c.id} value={c.id}>{coachName(c)}</option>)}
             </select>
