@@ -28,6 +28,43 @@ interface Props {
 
 type NewRoleType = 'coach' | 'manager' | 'admin_marketing' | 'admin_secretary' | 'admin'
 
+// Ruolo dell'utente su una singola squadra (dropdown a 7 opzioni)
+type TeamRoleAssignment = '' | 'head' | 'assistant' | 'helper' | 'team_manager' | 'second_manager' | 'third_manager'
+
+// Etichette IT per il dropdown
+const TEAM_ROLE_LABELS: Record<TeamRoleAssignment, string> = {
+  '': '— Non assegnato —',
+  'head': 'Allenatore',
+  'assistant': 'Vice allenatore',
+  'helper': 'Aiuto allenatore',
+  'team_manager': 'Dirigente accompagnatore',
+  'second_manager': '2° Dirigente',
+  'third_manager': '3° Dirigente',
+}
+
+// Mapping ruolo → colonna DB in teams
+const TEAM_ROLE_COLUMN: Record<Exclude<TeamRoleAssignment, ''>, string> = {
+  'head': 'head_coach_id',
+  'assistant': 'assistant_coach_id',
+  'helper': 'helper_coach_id',
+  'team_manager': 'team_manager_id',
+  'second_manager': 'second_manager_id',
+  'third_manager': 'third_manager_id',
+}
+
+const TEAM_ROLE_COLUMNS_ALL = Object.values(TEAM_ROLE_COLUMN)
+
+// Calcola il ruolo di un utente su una squadra (priorità: head > assistant > helper > team_manager > 2nd > 3rd)
+function detectRoleOnTeam(userId: string, team: any): TeamRoleAssignment {
+  if (team?.head_coach_id === userId) return 'head'
+  if (team?.assistant_coach_id === userId) return 'assistant'
+  if (team?.helper_coach_id === userId) return 'helper'
+  if (team?.team_manager_id === userId) return 'team_manager'
+  if (team?.second_manager_id === userId) return 'second_manager'
+  if (team?.third_manager_id === userId) return 'third_manager'
+  return ''
+}
+
 const ROLE_OPTIONS: Array<{ key: NewRoleType; label: string; desc: string; icon: string; color: string }> = [
   { key: 'coach', label: 'Allenatore (Mister)', desc: 'Guida una squadra in campo', icon: 'sports', color: '#005f98' },
   { key: 'manager', label: 'Dirigente accompagnatore', desc: 'Gestisce logistica e presenze di una squadra', icon: 'assignment_ind', color: '#7a0071' },
@@ -50,8 +87,13 @@ export function StaffManagementSheet({ open, onClose }: Props) {
   const [newRoleType, setNewRoleType] = useState<NewRoleType>('coach')
   const [teamHeadCoachOf, setTeamHeadCoachOf] = useState<string>('')
   const [teamManagerOf, setTeamManagerOf] = useState<string>('')
-  // Edit mode: mappa team_id -> 'coach' | 'manager' | ''
-  const [teamAssignments, setTeamAssignments] = useState<Record<string, '' | 'coach' | 'manager'>>({})
+  // Edit mode: mappa team_id -> TeamRoleAssignment (7 opzioni)
+  const [teamAssignments, setTeamAssignments] = useState<Record<string, TeamRoleAssignment>>({})
+  // Se il salvataggio comporta sovrascritture di altri utenti, le raccolgo qui
+  // per mostrare un banner di conferma prima di procedere
+  const [pendingOverwrites, setPendingOverwrites] = useState<Array<{
+    teamName: string; roleLabel: string; currentUserName: string
+  }> | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,24 +121,25 @@ export function StaffManagementSheet({ open, onClose }: Props) {
     else if (m.role === 'admin') setNewRoleType('admin')
     else if (m.role === 'coach' && m.is_manager) setNewRoleType('manager')
     else setNewRoleType('coach')
-    // Costruisco mappa assegnazioni squadre
-    const assignments: Record<string, '' | 'coach' | 'manager'> = {}
+    // Costruisco mappa assegnazioni squadre — auto-detect ruolo attuale
+    // per ognuno dei 6 slot (head/assistant/helper/team_mgr/2nd/3rd)
+    const assignments: Record<string, TeamRoleAssignment> = {}
     teams.forEach(t => {
-      if (m.teams_coached.includes(t.name)) assignments[t.id] = 'coach'
-      else if (m.teams_managed.includes(t.name)) assignments[t.id] = 'manager'
-      else assignments[t.id] = ''
+      assignments[t.id] = detectRoleOnTeam(m.id, t)
     })
     setTeamAssignments(assignments)
     setMode('edit')
     setError(null)
     setSuccess(null)
+    setPendingOverwrites(null)
   }
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (overwriteConfirmed: boolean = false) => {
     if (!editingId) return
     if (!fullName.trim()) { setError('Nome obbligatorio'); return }
     setSaving(true)
     setError(null)
+    if (!overwriteConfirmed) setPendingOverwrites(null)
     try {
       // 1) Update profile
       const profilePayload: any = {
@@ -138,30 +181,76 @@ export function StaffManagementSheet({ open, onClose }: Props) {
       const { error: pErr } = await supabase.from('profiles').update(profilePayload).eq('id', editingId)
       if (pErr) throw pErr
 
-      // 2) Update team assignments (per ogni team, applica quello che serve)
+      // 2) Update team assignments: per ogni team, se il ruolo dell'utente su
+      //    quel team è cambiato, azzeriamo il vecchio slot e settiamo il nuovo.
+      //    Se il nuovo slot è occupato da un ALTRO utente, lo mostriamo in un
+      //    banner di conferma per evitare sovrascritture silenziose.
+
+      // Passo A: costruisci il piano di modifiche (per team → diff)
+      type PlannedChange = {
+        teamId: string
+        teamName: string
+        oldRole: TeamRoleAssignment
+        newRole: TeamRoleAssignment
+        newSlotCurrentOccupantId: string | null  // chi è già nel nuovo slot (se diverso da editingId)
+        newSlotCurrentOccupantName: string | null
+      }
+      const plan: PlannedChange[] = []
       for (const teamId of Object.keys(teamAssignments)) {
-        const assignment = teamAssignments[teamId]
-        // Prendo la squadra corrente per capire cosa cambiare
         const currentTeam = teams.find(t => t.id === teamId) as any
-        const isAlreadyHeadCoach = currentTeam?.head_coach_id === editingId
-        const isAlreadyManager = currentTeam?.team_manager_id === editingId
+        if (!currentTeam) continue
+        const oldRole = detectRoleOnTeam(editingId, currentTeam)
+        const newRole = teamAssignments[teamId]
+        if (oldRole === newRole) continue  // nulla da fare
 
-        const updates: any = {}
-        // Se ora è coach e non lo era → assegna
-        if (assignment === 'coach' && !isAlreadyHeadCoach) updates.head_coach_id = editingId
-        // Se ora è manager e non lo era → assegna
-        if (assignment === 'manager' && !isAlreadyManager) updates.team_manager_id = editingId
-        // Se ora è vuoto/altro ma era head_coach → rimuovi
-        if (assignment !== 'coach' && isAlreadyHeadCoach) updates.head_coach_id = null
-        // Se ora è vuoto/altro ma era manager → rimuovi
-        if (assignment !== 'manager' && isAlreadyManager) updates.team_manager_id = null
-
-        if (Object.keys(updates).length > 0) {
-          const { data: udata, error: uerr } = await supabase.from('teams').update(updates).eq('id', teamId).select('id')
-          if (uerr) throw uerr
-          if (!udata || udata.length === 0) {
-            throw new Error('Non hai i permessi per modificare l\'assegnazione della squadra. Solo un amministratore o il tuo mister di squadra può farlo.')
+        let occupantId: string | null = null
+        let occupantName: string | null = null
+        if (newRole !== '') {
+          const col = TEAM_ROLE_COLUMN[newRole]
+          const currentOccupantId = currentTeam[col] as string | null
+          if (currentOccupantId && currentOccupantId !== editingId) {
+            occupantId = currentOccupantId
+            const occupant = staff.find(s => s.id === currentOccupantId)
+            occupantName = occupant?.full_name || occupant?.email || 'un altro utente'
           }
+        }
+
+        plan.push({
+          teamId,
+          teamName: currentTeam.name,
+          oldRole,
+          newRole,
+          newSlotCurrentOccupantId: occupantId,
+          newSlotCurrentOccupantName: occupantName,
+        })
+      }
+
+      // Passo B: se ci sono sovrascritture non ancora confermate, chiedi conferma
+      const overwrites = plan.filter(p => p.newSlotCurrentOccupantId !== null)
+      if (overwrites.length > 0 && !overwriteConfirmed) {
+        setPendingOverwrites(overwrites.map(o => ({
+          teamName: o.teamName,
+          roleLabel: TEAM_ROLE_LABELS[o.newRole],
+          currentUserName: o.newSlotCurrentOccupantName!,
+        })))
+        setSaving(false)
+        return  // aspetta conferma dell'utente
+      }
+
+      // Passo C: applica gli update — un UPDATE per team, con azzeramento
+      // dello slot vecchio e assegnazione del nuovo slot in un colpo
+      for (const change of plan) {
+        const updates: any = {}
+        if (change.oldRole !== '') {
+          updates[TEAM_ROLE_COLUMN[change.oldRole]] = null
+        }
+        if (change.newRole !== '') {
+          updates[TEAM_ROLE_COLUMN[change.newRole]] = editingId
+        }
+        const { data: udata, error: uerr } = await supabase.from('teams').update(updates).eq('id', change.teamId).select('id')
+        if (uerr) throw uerr
+        if (!udata || udata.length === 0) {
+          throw new Error(`Non hai i permessi per modificare le assegnazioni della squadra "${change.teamName}". Solo un amministratore o il tuo mister di squadra può farlo.`)
         }
       }
 
@@ -207,7 +296,7 @@ export function StaffManagementSheet({ open, onClose }: Props) {
         .select('id, full_name, email, phone, role, is_manager, is_marketing, is_director, is_supervisor, is_readonly, is_secretary')
         .in('role', ['coach', 'admin'])
         .order('full_name'),
-      supabase.from('teams').select('id, name, category, age_range, color, head_coach_id, team_manager_id'),
+      supabase.from('teams').select('id, name, category, age_range, color, head_coach_id, assistant_coach_id, helper_coach_id, team_manager_id, second_manager_id, third_manager_id'),
     ])
     const teamsList = sortTeamsByAge((tms ?? []) as any[])
     const enriched: StaffMember[] = (profs ?? []).map((p: any) => ({
@@ -585,21 +674,62 @@ export function StaffManagementSheet({ open, onClose }: Props) {
                           {t.name}
                         </div>
                         <select value={val}
-                          onChange={e => setTeamAssignments(prev => ({ ...prev, [t.id]: e.target.value as any }))}
+                          onChange={e => setTeamAssignments(prev => ({ ...prev, [t.id]: e.target.value as TeamRoleAssignment }))}
                           style={{
                             fontSize: 11, padding: '4px 8px', borderRadius: 6,
                             border: '1px solid #c0c7d2', background: '#fff',
                             fontFamily: 'inherit',
                           }}>
-                          <option value="">— Non assegnato —</option>
-                          <option value="coach">Allenatore</option>
-                          <option value="manager">Dirigente</option>
+                          {(Object.keys(TEAM_ROLE_LABELS) as TeamRoleAssignment[]).map(r => (
+                            <option key={r} value={r}>{TEAM_ROLE_LABELS[r]}</option>
+                          ))}
                         </select>
                       </div>
                     )
                   })}
                 </div>
               </Field>
+            )}
+
+            {pendingOverwrites && pendingOverwrites.length > 0 && (
+              <div style={{
+                marginTop: 14, padding: 12, borderRadius: 10,
+                background: '#fff8e1', border: '1px solid #ffd54f',
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#b26a00', marginTop: 1 }}>warning</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#7a4c00', marginBottom: 4 }}>
+                      Attenzione: sostituirai altri utenti
+                    </div>
+                    <div style={{ fontSize: 12.5, color: '#7a4c00', lineHeight: 1.5 }}>
+                      Confermando, <strong>{fullName || 'questa persona'}</strong> prenderà il posto di:
+                      <ul style={{ margin: '4px 0 0 0', paddingLeft: 18 }}>
+                        {pendingOverwrites.map((o, i) => (
+                          <li key={i}>
+                            <strong>{o.currentUserName}</strong> come <em>{o.roleLabel}</em> di <strong>{o.teamName}</strong>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button onClick={() => setPendingOverwrites(null)} type="button"
+                    style={{
+                      padding: '8px 14px', borderRadius: 8,
+                      border: '1px solid #c0c7d2', background: '#fff',
+                      fontSize: 12, fontWeight: 700, color: '#404751', cursor: 'pointer',
+                    }}>Annulla</button>
+                  <button onClick={() => handleUpdate(true)} type="button" disabled={saving}
+                    style={{
+                      padding: '8px 14px', borderRadius: 8, border: 'none',
+                      background: '#b26a00', color: '#fff',
+                      fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                    }}>Sì, sostituisci</button>
+                </div>
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
@@ -609,7 +739,7 @@ export function StaffManagementSheet({ open, onClose }: Props) {
                   border: '1px solid #c0c7d2', background: '#fff',
                   fontSize: 13, fontWeight: 700, color: '#404751', cursor: 'pointer',
                 }}>Annulla</button>
-              <button onClick={handleUpdate} disabled={saving || deleting}
+              <button onClick={() => handleUpdate(false)} disabled={saving || deleting}
                 style={{
                   flex: 2, padding: '12px 18px', borderRadius: 12, border: 'none',
                   background: '#005f98', color: '#fff',
