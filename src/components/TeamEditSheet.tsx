@@ -174,8 +174,12 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         public_presence_enabled: publicPresence,
       }
       if (isEdit) {
-        const { error: err } = await supabase.from('teams').update(payload).eq('id', existingTeam!.id)
+        const { data, error: err } = await supabase.from('teams').update(payload).eq('id', existingTeam!.id).select('id')
         if (err) throw err
+        // Silent-fail RLS: se non ho i permessi, l'UPDATE ritorna 0 righe senza errore
+        if (!data || data.length === 0) {
+          throw new Error('Non hai i permessi per modificare questa squadra. Se sei un mister assegnato a un\'altra categoria, non puoi editare questa. Contatta un amministratore.')
+        }
       } else {
         const { error: err } = await supabase.from('teams').insert(payload)
         if (err) throw err

@@ -157,7 +157,11 @@ export function StaffManagementSheet({ open, onClose }: Props) {
         if (assignment !== 'manager' && isAlreadyManager) updates.team_manager_id = null
 
         if (Object.keys(updates).length > 0) {
-          await supabase.from('teams').update(updates).eq('id', teamId)
+          const { data: udata, error: uerr } = await supabase.from('teams').update(updates).eq('id', teamId).select('id')
+          if (uerr) throw uerr
+          if (!udata || udata.length === 0) {
+            throw new Error('Non hai i permessi per modificare l\'assegnazione della squadra. Solo un amministratore o il tuo mister di squadra può farlo.')
+          }
         }
       }
 
