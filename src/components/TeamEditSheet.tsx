@@ -115,7 +115,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setPublicPresence(false)
     }
     setError(null)
-  }, [open, existingTeam])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, existingTeam?.id])
 
   // Se in edit mode e i campi divise/publicPresence/staff mancano dall'oggetto passato
   // in prop (perché venuti da hook che non li selezionano), li carico dal DB per completezza

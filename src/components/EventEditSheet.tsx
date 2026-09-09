@@ -125,7 +125,8 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
       setRepeatUntil('')
     }
     setError(null)
-  }, [open, defaultTeamId, teams, existingEvent])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, existingEvent?.id])
 
   const handleSave = async () => {
     if (!teamId) { setError('Seleziona la squadra'); return }
