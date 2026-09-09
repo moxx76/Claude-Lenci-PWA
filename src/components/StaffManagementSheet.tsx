@@ -17,6 +17,8 @@ interface StaffMember {
   is_readonly: boolean | null
   teams_coached: string[]
   teams_managed: string[]
+  // Ogni squadra dove ha un ruolo, con ruolo esatto (solo ruoli assegnati)
+  teams_with_role: Array<{ teamName: string; role: Exclude<TeamRoleAssignment, ''> }>
 }
 
 interface Team { id: string; name: string; color: string | null }
@@ -40,6 +42,16 @@ const TEAM_ROLE_LABELS: Record<TeamRoleAssignment, string> = {
   'team_manager': 'Dirigente accompagnatore',
   'second_manager': '2° Dirigente',
   'third_manager': '3° Dirigente',
+}
+
+// Etichette compatte per la lista (accanto al nome squadra)
+const TEAM_ROLE_LABELS_SHORT: Record<Exclude<TeamRoleAssignment, ''>, string> = {
+  'head': 'All.',
+  'assistant': 'Vice',
+  'helper': 'Aiuto',
+  'team_manager': 'Dirig.',
+  'second_manager': '2° Dirig.',
+  'third_manager': '3° Dirig.',
 }
 
 // Mapping ruolo → colonna DB in teams
@@ -299,11 +311,23 @@ export function StaffManagementSheet({ open, onClose }: Props) {
       supabase.from('teams').select('id, name, category, age_range, color, head_coach_id, assistant_coach_id, helper_coach_id, team_manager_id, second_manager_id, third_manager_id'),
     ])
     const teamsList = sortTeamsByAge((tms ?? []) as any[])
-    const enriched: StaffMember[] = (profs ?? []).map((p: any) => ({
-      ...p,
-      teams_coached: teamsList.filter(t => t.head_coach_id === p.id).map(t => t.name),
-      teams_managed: teamsList.filter(t => t.team_manager_id === p.id).map(t => t.name),
-    }))
+    const enriched: StaffMember[] = (profs ?? []).map((p: any) => {
+      const teams_with_role: Array<{ teamName: string; role: Exclude<TeamRoleAssignment, ''> }> = []
+      for (const t of teamsList) {
+        const role = detectRoleOnTeam(p.id, t)
+        if (role !== '') teams_with_role.push({ teamName: t.name, role })
+      }
+      // teams_coached = squadre dove è coach (head/vice/aiuto)
+      // teams_managed = squadre dove è dirigente (mgr/2°/3°)
+      const coachRoles: Array<Exclude<TeamRoleAssignment, ''>> = ['head', 'assistant', 'helper']
+      const managerRoles: Array<Exclude<TeamRoleAssignment, ''>> = ['team_manager', 'second_manager', 'third_manager']
+      return {
+        ...p,
+        teams_coached: teams_with_role.filter(x => coachRoles.includes(x.role)).map(x => x.teamName),
+        teams_managed: teams_with_role.filter(x => managerRoles.includes(x.role)).map(x => x.teamName),
+        teams_with_role,
+      }
+    })
     setStaff(enriched)
     // Salvo l'intero teamsList con head_coach_id/team_manager_id per l'edit
     setTeams(teamsList as any)
@@ -478,9 +502,13 @@ export function StaffManagementSheet({ open, onClose }: Props) {
                   <div style={{ fontSize: 10.5, color: roleColor(m), fontWeight: 700, marginTop: 2 }}>
                     {roleLabel(m)}
                   </div>
-                  {(m.teams_coached.length > 0 || m.teams_managed.length > 0) && (
+                  {m.teams_with_role.length > 0 && (
                     <div style={{ fontSize: 10, color: '#707882', marginTop: 3 }}>
-                      {[...m.teams_coached, ...m.teams_managed].join(' · ')}
+                      {m.teams_with_role.map(x =>
+                        x.role === 'head' || x.role === 'team_manager'
+                          ? x.teamName
+                          : `${x.teamName} (${TEAM_ROLE_LABELS_SHORT[x.role]})`
+                      ).join(' · ')}
                     </div>
                   )}
                 </div>
