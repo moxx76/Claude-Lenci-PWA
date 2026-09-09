@@ -127,17 +127,25 @@ export async function generateWeeklyPlannerPoster(
   ctx.fillText('SETTIMANALE', 260, 118)
   ctx.restore()
 
-  // Sottotitolo scope (categoria squadra) — rosso brand per farlo risaltare
+  // Sottotitolo scope (categoria squadra) — stesso font/size del titolo, in rosso brand
+  // Auto-shrink se il testo è troppo largo (es. 'PICCOLI AMICI 2020-21')
+  const scopeText = data.scopeLabel.toUpperCase()
+  const maxWidth = 780  // spazio disponibile a destra del logo (fino a x=1040)
+  let scopeSize = 62
+  ctx.font = `900 ${scopeSize}px "Anybody", "Arial Black", sans-serif`
+  while (ctx.measureText(scopeText).width > maxWidth && scopeSize > 34) {
+    scopeSize -= 2
+    ctx.font = `900 ${scopeSize}px "Anybody", "Arial Black", sans-serif`
+  }
   ctx.fillStyle = COL.red
-  ctx.font = '800 20px system-ui, Arial, sans-serif'
-  ctx.fillText(data.scopeLabel.toUpperCase(), 260, 190)
+  ctx.fillText(scopeText, 260, 181)
 
   // Banner range date
   const weekStartDate = new Date(data.weekStart + 'T00:00:00')
   const weekEndDate = new Date(weekStartDate.getTime() + 6 * 86400000)
   const rangeStr = formatDateRange(weekStartDate, weekEndDate)
 
-  const bannerY = 250
+  const bannerY = 270
   const bannerH = 56
   ctx.save()
   ctx.fillStyle = COL.red
