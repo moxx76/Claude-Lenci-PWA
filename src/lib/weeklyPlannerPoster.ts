@@ -127,9 +127,9 @@ export async function generateWeeklyPlannerPoster(
   ctx.fillText('SETTIMANALE', 260, 118)
   ctx.restore()
 
-  // Sottotitolo scope
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'
-  ctx.font = '600 20px system-ui, Arial, sans-serif'
+  // Sottotitolo scope (categoria squadra) — rosso brand per farlo risaltare
+  ctx.fillStyle = COL.red
+  ctx.font = '800 20px system-ui, Arial, sans-serif'
   ctx.fillText(data.scopeLabel.toUpperCase(), 260, 190)
 
   // Banner range date
