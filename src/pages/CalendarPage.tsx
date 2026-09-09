@@ -260,27 +260,24 @@ export function CalendarPage() {
     setPostMatchOpen(true)
   }
 
-  const openEdit = (event: CalendarEvent) => {
+  const openEdit = async (event: CalendarEvent) => {
     // Tournament è comunque un record 'matches' con competition=Torneo → tratto come match
     const isMatchLike = event.kind === 'match' || event.kind === 'tournament'
     if (event.kind !== 'training' && !isMatchLike) return
     const raw = event.raw || {}
     if (!raw.id) { console.error('Missing raw.id for event', event); return }
+    // Fetch fresco della row completa dal DB — così abbiamo TUTTI i campi
+    // (location_address, kickoff_field, shirt colors, etc.) anche quando la
+    // struttura in memoria è parziale
+    const table = isMatchLike ? 'matches' : 'trainings'
+    const { data, error } = await supabase.from(table).select('*').eq('id', raw.id).maybeSingle()
+    if (error || !data) {
+      console.error('Errore fetch evento per edit:', error)
+      return
+    }
     setEditExistingEvent({
       kind: isMatchLike ? 'match' : 'training',
-      id: raw.id,
-      team_id: event.teamId,
-      training_date: event.kind === 'training' ? raw.training_date : undefined,
-      match_date: isMatchLike ? raw.match_date : undefined,
-      start_time: raw.start_time,
-      end_time: raw.end_time,
-      location: event.location,
-      focus: event.focus,
-      program: raw.program,
-      notes: event.notes,
-      opponent: event.opponent,
-      venue: event.venue,
-      competition: event.competition,
+      ...(data as any),
     })
     setEditOpen(true)
   }
