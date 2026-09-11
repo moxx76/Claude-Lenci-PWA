@@ -407,7 +407,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
       .map(({ number, firstName, lastName, isCaptain }) => ({ number, firstName, lastName, isCaptain }))
 
     setPosterData({
-      teamName: match.team_category || match.team_name,
+      teamName: match.team_name || match.team_category || '',
       opponent: match.opponent,
       matchDate: match.match_date,
       matchTime: timeStr,
