@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.39'
-export const APP_VERSION_DATE = '2026-09-08'
+export const APP_VERSION = '1.9.40'
+export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
   version: string
@@ -20,6 +20,114 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.40',
+    date: '2026-09-11',
+    title: 'Ripristino dello storico delle release',
+    notes: [
+      'Nelle 10 release precedenti (dalla 1.9.30 alla 1.9.39) il changelog non era stato aggiornato. Ora sotto trovi tutte le entry ricostruite: fix di editing dei form, nuova gestione staff con 7 ruoli, distinte miste, PDF distinta più leggero, planner settimanale ottimizzato e altro',
+    ],
+  },
+  {
+    version: '1.9.39',
+    date: '2026-09-11',
+    title: 'Distinte miste: convoca giocatori da altre categorie',
+    features: [
+      'Nella scheda Convocazione, nell\u2019header dei controlli (accanto a "Convoca tutti" e "Azzera"), c\u2019è ora un nuovo bottone viola "Da altra categoria" con icona persona+. Cliccandolo si apre un picker per selezionare giocatori dalle altre squadre della società — utile per distinte miste della scuola calcio dove si accorpano annate diverse (es. torneo Piccoli Amici con giocatori 2020 + 2021, o Primi Calci con qualche ospite da annata attigua)',
+      'Il picker mostra i giocatori raggruppati per categoria di provenienza con ricerca live per nome/cognome/categoria e selezione multipla. Alla conferma i giocatori scelti vengono aggiunti alla lista principale con un badge viola "↕ Nome Squadra" accanto al nome e impostati automaticamente come convocati',
+      'I giocatori "prestati" vengono trattati normalmente nella distinta FIGC e nella locandina WhatsApp (tessera, codice fiscale, data nascita presi dal loro record originale). Alla riapertura della convocazione, i prestati vengono ricaricati automaticamente con il loro badge — non si perdono tra un salvataggio e l\u2019altro',
+    ],
+    notes: [
+      'Nessuna migrazione dati richiesta: sfrutta la struttura esistente delle convocazioni',
+    ],
+  },
+  {
+    version: '1.9.38',
+    date: '2026-09-11',
+    title: 'PDF distinta FIGC molto più leggero',
+    fixes: [
+      'Il PDF della distinta di gara pesava 1-3 MB per un semplice foglio A4 di 1 pagina con la lista giocatori — troppo per essere condiviso via WhatsApp o email senza compressione manuale. Ora l\u2019output pesa tipicamente 150-300 KB (fino a 10 volte più leggero) senza alcuna perdita di qualità visiva: logo, testo vettoriale e bordi tabelle restano identici a prima',
+    ],
+    notes: [
+      'Sono state ottimizzate tre cose in cascata: attivata compressione deflate nativa del PDF, ridotta la risoluzione del logo mascherato circolarmente (bastano 256px per il rettangolo di 16mm dell\u2019header), aggiunta compressione anche sull\u2019immagine embeddata',
+    ],
+  },
+  {
+    version: '1.9.37',
+    date: '2026-09-11',
+    title: 'Locandina convocazioni: nome squadra specifico',
+    fixes: [
+      'Nella locandina di convocazione, sotto il titolo "CONVOCAZIONI", appariva la categoria generica ("ESORDIENTI") invece del nome specifico della squadra ("ESORDIENTI 2015"). Utile distinguere quando ci sono più squadre nella stessa categoria di età',
+    ],
+  },
+  {
+    version: '1.9.36',
+    date: '2026-09-11',
+    title: 'Planner settimanale: categoria grande come titolo',
+    features: [
+      'Nella locandina del planner settimanale, il nome della categoria (es. "PULCINI 2017") sotto "PLANNER SETTIMANALE" è ora rosso brand e grande come le altre righe del titolo, non più un sottotitolo piccolo che si perdeva sullo sfondo blu. Auto-shrink automatico per i nomi più lunghi (es. "PICCOLI AMICI 2020-21")',
+    ],
+  },
+  {
+    version: '1.9.35',
+    date: '2026-09-11',
+    title: 'Planner settimanale: categoria in rosso',
+    features: [
+      'Nella locandina del planner settimanale, il nome della categoria sotto "PLANNER SETTIMANALE" ora è colorato in rosso brand per farlo risaltare (prima era biancastro trasparente, difficile da leggere)',
+    ],
+  },
+  {
+    version: '1.9.34',
+    date: '2026-09-10',
+    title: 'Fix indirizzo campo partita che spariva',
+    fixes: [
+      'Quando si modificava una partita e si inseriva l\u2019indirizzo campo nel campo "Indirizzo campo (per locandine)", riaprendo la partita l\u2019indirizzo appariva vuoto anche se era stato salvato. Ora la modifica di ogni partita ricarica sempre tutti i campi aggiornati dal database, senza rischio che scompaiano informazioni recenti',
+    ],
+    notes: [
+      'Il bug riguardava solo la visualizzazione: le informazioni erano correttamente salvate nel database — mancava solo la loro rilettura al riapertura del form',
+    ],
+  },
+  {
+    version: '1.9.33',
+    date: '2026-09-10',
+    title: 'Gestione staff: mostra squadre con ruolo specifico',
+    features: [
+      'Nella lista di Gestione staff, ogni persona ora mostra tutte le squadre dove è assegnata insieme al ruolo esatto: per esempio "Esordienti 2014 (Vice) · Esordienti 2015 (Aiuto)". Prima venivano mostrate solo le squadre dove la persona era allenatore principale o dirigente accompagnatore principale, ignorando vice/aiuto/secondo/terzo dirigente — che restavano invisibili in lista dando l\u2019impressione che la persona non fosse assegnata',
+    ],
+  },
+  {
+    version: '1.9.32',
+    date: '2026-09-10',
+    title: 'Fix modifiche che si perdevano durante l\u2019editing',
+    fixes: [
+      'Nei form di modifica partita e modifica squadra, i valori che l\u2019utente stava digitando venivano a volte silenziosamente sovrascritti con i valori originali durante l\u2019editing (era sufficiente che il sistema aggiornasse i dati in background). Ora i valori inseriti restano stabili fino al salvataggio esplicito',
+    ],
+    notes: [
+      'Questo bug era la causa principale delle "modifiche che non vengono salvate" segnalate su assegnazioni squadre, indirizzo partita e altri campi',
+    ],
+  },
+  {
+    version: '1.9.31',
+    date: '2026-09-09',
+    title: 'Gestione staff: 7 ruoli + avviso sovrascritture',
+    features: [
+      'Nel foglio di modifica di un membro dello staff, il menu di ogni squadra è passato da 3 a 7 opzioni: Non assegnato / Allenatore / Vice allenatore / Aiuto allenatore / Dirigente accompagnatore / 2° Dirigente / 3° Dirigente. Prima si poteva assegnare solo Allenatore o Dirigente principale, gli altri ruoli intermedi passavano solo dal foglio "Modifica squadra" creando confusione',
+      'Se stai per assegnare una persona a un ruolo dove c\u2019è già qualcun altro, compare un banner giallo con conferma esplicita: "Attenzione: Emanuele Cordero prenderà il posto di Alessandro Altavilla come Allenatore di Esordienti 2014". Solo dopo il "Sì, sostituisci" la modifica viene applicata',
+      'Il menu ora mostra sempre il ruolo REALE della persona sulla squadra: se sei Vice, vedi "Vice allenatore" e non più "Non assegnato" che era fuorviante',
+      'Se cambi ruolo (es. da Vice ad Allenatore) il sistema azzera automaticamente lo slot vecchio, evitando i duplicati (stessa persona head + assistant) che potevano verificarsi prima',
+    ],
+  },
+  {
+    version: '1.9.30',
+    date: '2026-09-09',
+    title: 'Messaggi di errore chiari se manca il permesso',
+    fixes: [
+      'Quando modifichi una squadra o le assegnazioni staff, se non hai il permesso di salvare (perché mister non assegnato a quella categoria, o altre restrizioni) ora compare un messaggio di errore visibile: "Non hai i permessi per modificare questa squadra". Prima il salvataggio sembrava andare a buon fine ma le modifiche restavano invisibili nel database, generando confusione ("il tasto Salva non fa nulla")',
+    ],
+    notes: [
+      'Consolidamento di alcuni account duplicati con lo stesso nome ma email diverse, per evitare situazioni ambigue di questo tipo',
+    ],
+  },
   {
     version: '1.9.29',
     date: '2026-09-05',
