@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { generateDistintaPdf, type DistintaPlayer, type DistintaStaff } from '../lib/distintaFigc'
 import { ConvocationPosterSheet } from './ConvocationPosterSheet'
 import { type ConvocationPosterData } from '../lib/convocationPoster'
+import { BorrowPlayerPickerSheet } from './BorrowPlayerPickerSheet'
 
 export interface ConvocationMatch {
   id: string
@@ -33,6 +34,10 @@ interface Player {
   card_number: string | null
   fiscal_code: string | null
   medical_expiry: string | null
+  // Se il giocatore è "prestato" da un'altra squadra (distinta mista scuola calcio),
+  // qui c'è il nome della squadra di provenienza. Undefined = del roster della squadra.
+  borrowed_from_team_id?: string
+  borrowed_from_team_name?: string
 }
 
 interface ConvocationRow {
@@ -61,6 +66,7 @@ const CLUB_NAME = 'A.S.D. Lenci Poirino'
 export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationSheetProps) {
   const [players, setPlayers] = useState<Player[]>([])
   const [rows, setRows] = useState<Record<string, ConvocationRow>>({})
+  const [borrowPickerOpen, setBorrowPickerOpen] = useState(false)
   const [responses, setResponses] = useState<Record<string, { status: string; updated_at: string }>>({})
   const [staff, setStaff] = useState<Staff[]>([])
   const [shirtColorHome, setShirtColorHome] = useState('Rosso/Blu')
@@ -135,6 +141,34 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
       }
     }
     setRows(map)
+
+    // Se ci sono convocazioni per giocatori NON nel roster della squadra
+    // (perché "prestati" da altre categorie in distinte miste), li carico
+    // separatamente e li appendo a players con badge di categoria.
+    const rosterIds = new Set((playersRes.data ?? []).map((p: any) => p.id))
+    const borrowedIds = (convRes.data ?? [])
+      .map((c: any) => c.player_id)
+      .filter((id: string) => !rosterIds.has(id))
+    if (borrowedIds.length > 0) {
+      const { data: borrowedData } = await supabase
+        .from('players')
+        .select('id,first_name,last_name,birth_date,position,jersey_number,card_number,fiscal_code,medical_expiry,team_id,team:teams(name)')
+        .in('id', borrowedIds)
+      const borrowedPlayers: Player[] = ((borrowedData ?? []) as any[]).map(p => ({
+        id: p.id,
+        first_name: p.first_name,
+        last_name: p.last_name,
+        birth_date: p.birth_date,
+        position: p.position,
+        jersey_number: p.jersey_number,
+        card_number: p.card_number,
+        fiscal_code: p.fiscal_code,
+        medical_expiry: p.medical_expiry,
+        borrowed_from_team_id: p.team_id,
+        borrowed_from_team_name: p.team?.name ?? '?',
+      }))
+      setPlayers(prev => [...prev, ...borrowedPlayers])
+    }
 
     // Staff — ordine gerarchico distinta FIGC:
     // tecnici prima, dirigenziali dopo, sanitario in fondo
@@ -554,7 +588,10 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => setBorrowPickerOpen(true)} style={miniBtn('#7b4bff', '#ece5ff')}>
+                  <Icon name="person_add" size={12} color="#7b4bff" /> Da altra categoria
+                </button>
                 <button onClick={selectAll} style={miniBtn('#005f98', '#cfe5ff')}>
                   Convoca tutti
                 </button>
@@ -616,6 +653,14 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                         <span style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20', lineHeight: 1.2 }}>
                           {p.last_name} {p.first_name}
                         </span>
+                        {p.borrowed_from_team_name && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999,
+                            background: '#ece5ff', color: '#7b4bff',
+                          }} title={`Prestato da ${p.borrowed_from_team_name}`}>
+                            ↕ {p.borrowed_from_team_name}
+                          </span>
+                        )}
                         {responses[p.id] && (
                           <span style={{
                             fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999,
@@ -793,6 +838,49 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
         onClose={() => setPosterOpen(false)}
         data={posterData}
       />
+
+      {/* Picker per convocare giocatori da altre categorie (distinte miste) */}
+      {match && (
+        <BorrowPlayerPickerSheet
+          open={borrowPickerOpen}
+          onClose={() => setBorrowPickerOpen(false)}
+          excludeTeamId={match.team_id}
+          excludePlayerIds={players.map(p => p.id)}
+          onSelect={(chosen) => {
+            // Aggiungo i selezionati al roster con badge di provenienza,
+            // e li imposto automaticamente come convocati (accepted)
+            setPlayers(prev => [
+              ...prev,
+              ...chosen.map(c => ({
+                id: c.id,
+                first_name: c.first_name,
+                last_name: c.last_name,
+                birth_date: c.birth_date,
+                position: c.position,
+                jersey_number: c.jersey_number,
+                card_number: c.card_number,
+                fiscal_code: c.fiscal_code,
+                medical_expiry: c.medical_expiry,
+                borrowed_from_team_id: c.team_id,
+                borrowed_from_team_name: c.team_name,
+              })),
+            ])
+            setRows(prev => {
+              const next = { ...prev }
+              for (const c of chosen) {
+                next[c.id] = {
+                  player_id: c.id,
+                  status: 'accepted',
+                  is_captain: false,
+                  shirt_number_override: null,
+                  note: null,
+                }
+              }
+              return next
+            })
+          }}
+        />
+      )}
     </BottomSheet>
   )
 }
