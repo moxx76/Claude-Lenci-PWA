@@ -64,7 +64,7 @@ function fmtDateShort(iso: string | null): string {
 }
 
 export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true, precision: 2 })
   const pageW = 210
   const marginX = 12
   const contentW = pageW - marginX * 2
@@ -81,7 +81,7 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
   // nessun cerchio bianco di supporto sotto.
   if (logoDataUrl) {
     try {
-      doc.addImage(logoDataUrl, 'PNG', 3, 3, 16, 16)
+      doc.addImage(logoDataUrl, 'PNG', 3, 3, 16, 16, undefined, 'FAST')
     } catch {
       // Ignoro problemi runtime del PDF sull'immagine
     }
@@ -365,7 +365,10 @@ async function loadLogoAsDataUrl(path: string): Promise<string> {
   })
 
   // Applico maschera circolare via canvas
-  const size = Math.min(img.naturalWidth, img.naturalHeight) || 512
+  // Uso una risoluzione target ragionevole: il logo appare a 16mm nel PDF,
+  // a 300dpi bastano ~190px. Uso 256 per un buon margine senza sprecare byte.
+  // (Prima usavo la risoluzione nativa del jpg = spesso 512+ px = 4x più byte)
+  const size = 256
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -378,10 +381,13 @@ async function loadLogoAsDataUrl(path: string): Promise<string> {
   ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
   ctx.closePath()
   ctx.clip()
-  // Disegno il logo centrato nel quadrato canvas
-  const dx = (size - img.naturalWidth) / 2
-  const dy = (size - img.naturalHeight) / 2
-  ctx.drawImage(img, dx, dy)
+  // Disegno il logo scalato per riempire il canvas mantenendo aspect ratio
+  const nw = img.naturalWidth || 1
+  const nh = img.naturalHeight || 1
+  const scale = Math.max(size / nw, size / nh)
+  const dw = nw * scale
+  const dh = nh * scale
+  ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh)
   ctx.restore()
 
   // Esporto come PNG (mantiene la trasparenza fuori dal cerchio)
