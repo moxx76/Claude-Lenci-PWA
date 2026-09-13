@@ -14,6 +14,7 @@ import { TeamTrainingHistorySheet } from '../components/TeamTrainingHistorySheet
 import { TrainingDetailSheet } from '../components/TrainingDetailSheet'
 import { EventEditSheet } from '../components/EventEditSheet'
 import { TeamStatsCard } from '../components/TeamStatsCard'
+import { TeamMatchHistorySheet } from '../components/TeamMatchHistorySheet'
 import { AttendanceSheet } from '../components/AttendanceSheet'
 import { useAuth } from '../store/auth'
 import { useMyTeam } from '../hooks/useMyTeam'
@@ -359,6 +360,8 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
   // Vista default: statistiche squadra (KPI + classifiche).
   // La rosa si mostra solo cliccando il pulsante "Rosa" nella toolbar.
   const [showRoster, setShowRoster] = useState(false)
+  // Se l'utente clicca su un KPI risultato, apro sheet dettaglio partite filtrate
+  const [kpiFilter, setKpiFilter] = useState<'won' | 'drawn' | 'lost' | null>(null)
 
   useEffect(() => { load() }, [team.id, reloadTick])
   const load = async () => {
@@ -482,7 +485,7 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
       </div>
 
       {/* Vista default: statistiche squadra (KPI + classifiche) */}
-      {!showRoster && <TeamStatsCard teamId={team.id} />}
+      {!showRoster && <TeamStatsCard teamId={team.id} onKpiClick={setKpiFilter} />}
 
       {/* Vista Rosa: search + filtri + lista giocatori (mostrata solo se attivata dal pulsante "Rosa") */}
       {showRoster && <>
@@ -588,6 +591,21 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
         </div>
       )}
       </>}
+
+      {/* Dettaglio partite quando l'utente clicca su un KPI (Vinte/Pareggi/Perse) */}
+      <TeamMatchHistorySheet
+        open={kpiFilter !== null}
+        onClose={() => setKpiFilter(null)}
+        teamId={team.id}
+        teamName={team.name}
+        resultFilter={kpiFilter ?? undefined}
+        titleOverride={
+          kpiFilter === 'won'   ? `Partite vinte — ${team.name}` :
+          kpiFilter === 'drawn' ? `Pareggi — ${team.name}` :
+          kpiFilter === 'lost'  ? `Partite perse — ${team.name}` :
+          undefined
+        }
+      />
 
       {/* Sheet crea/modifica giocatore (admin) */}
       <PlayerEditSheet

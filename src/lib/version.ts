@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.42'
+export const APP_VERSION = '1.9.43'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.43',
+    date: '2026-09-11',
+    title: 'KPI partite cliccabili: apre il dettaglio con marcatori',
+    features: [
+      'Nella pagina squadra, i 3 KPI risultato (Vinte, Pareggi, Perse) sono ora cliccabili. Al tap si apre l\u2019elenco delle sole partite con quell\u2019esito, ordinate dalla più recente, con avversario, casa/trasferta, competizione, data, risultato finale e la lista dei nostri marcatori con conteggio gol (es. "Rossi (2), Bianchi") — così hai il dettaglio completo di come ogni partita è andata',
+      'Da ogni riga puoi entrare direttamente nel report tattico della partita per rivedere formazione, minutaggi e gol dettagliati',
+    ],
+    notes: [
+      'La lista marcatori è aggregata dai referti partita compilati e mostra i cognomi in ordine di gol totali; l\u2019indicatore "Report da compilare" segnala le partite dove manca ancora il post-match',
+    ],
+  },
   {
     version: '1.9.42',
     date: '2026-09-11',

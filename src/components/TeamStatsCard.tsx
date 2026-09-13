@@ -29,9 +29,11 @@ interface Kpi {
 
 interface Props {
   teamId: string
+  /** Se impostato, viene invocato quando l'utente clicca su un KPI risultato */
+  onKpiClick?: (filter: 'won' | 'drawn' | 'lost') => void
 }
 
-export function TeamStatsCard({ teamId }: Props) {
+export function TeamStatsCard({ teamId, onKpiClick }: Props) {
   const [kpi, setKpi] = useState<Kpi>({ played: 0, won: 0, drawn: 0, lost: 0 })
   const [scorers, setScorers] = useState<Ranking[]>([])
   const [sentOff, setSentOff] = useState<Ranking[]>([])
@@ -142,9 +144,9 @@ export function TeamStatsCard({ teamId }: Props) {
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
       }}>
         <KpiTile label="Giocate" value={kpi.played} color="#005f98" bg="#e8f0f9" />
-        <KpiTile label="Vinte"   value={kpi.won}    color="#006e25" bg="#d4f2dd" />
-        <KpiTile label="Pareggi" value={kpi.drawn}  color="#8e6300" bg="#fff3d1" />
-        <KpiTile label="Perse"   value={kpi.lost}   color="#93000a" bg="#ffdad6" />
+        <KpiTile label="Vinte"   value={kpi.won}    color="#006e25" bg="#d4f2dd" onClick={onKpiClick ? () => onKpiClick('won') : undefined} />
+        <KpiTile label="Pareggi" value={kpi.drawn}  color="#8e6300" bg="#fff3d1" onClick={onKpiClick ? () => onKpiClick('drawn') : undefined} />
+        <KpiTile label="Perse"   value={kpi.lost}   color="#93000a" bg="#ffdad6" onClick={onKpiClick ? () => onKpiClick('lost') : undefined} />
       </div>
 
       {/* RANKING marcatori */}
@@ -180,20 +182,27 @@ export function TeamStatsCard({ teamId }: Props) {
   )
 }
 
-function KpiTile({ label, value, color, bg }: { label: string; value: number; color: string; bg: string }) {
+function KpiTile({ label, value, color, bg, onClick }: { label: string; value: number; color: string; bg: string; onClick?: () => void }) {
+  const Comp: any = onClick ? 'button' : 'div'
   return (
-    <div style={{
-      background: bg,
-      border: `1px solid ${color}22`,
-      borderRadius: 12,
-      padding: '12px 8px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-    }}>
+    <Comp
+      onClick={onClick}
+      style={{
+        background: bg,
+        border: `1px solid ${color}22`,
+        borderRadius: 12,
+        padding: '12px 8px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+        cursor: onClick ? 'pointer' : 'default',
+        fontFamily: 'inherit',
+        width: '100%',
+      }}
+    >
       <div style={{ fontSize: 24, fontWeight: 900, color, lineHeight: 1.1 }}>{value}</div>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: '#404751', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         {label}
       </div>
-    </div>
+    </Comp>
   )
 }
 

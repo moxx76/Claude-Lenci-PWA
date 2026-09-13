@@ -14,6 +14,15 @@ interface Props {
   onOpenReport?: (matchId: string) => void
   /** Chiave che se cambia riscatena il fetch (utile dopo modifiche/salvataggi) */
   reloadKey?: number
+  /** Se impostato, mostra solo le partite con questo esito */
+  resultFilter?: 'won' | 'drawn' | 'lost'
+  /** Se impostato, sostituisce il titolo del sheet */
+  titleOverride?: string
+}
+
+interface Scorer {
+  fullName: string
+  goals: number
 }
 
 interface MatchRow {
@@ -30,9 +39,10 @@ interface MatchRow {
   team_name?: string | null
   team_color?: string | null
   goals_from_stats?: number  // somma marcatori registrati (anche se report non ancora salvato)
+  scorers?: Scorer[]         // dettaglio marcatori con nome (aggregato)
 }
 
-export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenReport, reloadKey }: Props) {
+export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenReport, reloadKey, resultFilter, titleOverride }: Props) {
   const [rows, setRows] = useState<MatchRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +58,7 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
         const nowIso = new Date().toISOString()
         let q = supabase
           .from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, status, report_completed_at, team_id, team:teams(name, color), match_player_stats(goals, penalties_scored)')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, status, report_completed_at, team_id, team:teams(name, color), match_player_stats(goals, penalties_scored, player:players(first_name, last_name))')
           .order('match_date', { ascending: false })
           .limit(200)
         if (teamId) q = q.eq('team_id', teamId)
@@ -61,16 +71,31 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
           competition: string | null; home_score: number | null; away_score: number | null;
           status: string; report_completed_at: string | null; team_id: string;
           team?: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
-          match_player_stats?: Array<{ goals: number | null; penalties_scored: number | null }>;
+          match_player_stats?: Array<{
+            goals: number | null; penalties_scored: number | null;
+            player?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+          }>;
         }>
 
         if (!alive) return
         setRows(
           list.map(m => {
             const team = Array.isArray(m.team) ? m.team[0] : m.team
-            // Somma dei marcatori registrati nel report (utile come anticipazione se il report non è stato ancora salvato)
+            // Somma dei marcatori registrati nel report (anche se report non salvato)
             const goalsFromStats = (m.match_player_stats || [])
               .reduce((s, r) => s + (r.goals || 0) + (r.penalties_scored || 0), 0)
+            // Aggrego marcatori con nome, ordinati per gol totali
+            const scorersMap: Record<string, Scorer> = {}
+            for (const s of (m.match_player_stats || [])) {
+              const total = (s.goals || 0) + (s.penalties_scored || 0)
+              if (total === 0) continue
+              const pl = Array.isArray(s.player) ? s.player[0] : s.player
+              if (!pl) continue
+              const name = `${pl.last_name}`  // solo cognome per compattezza
+              if (!scorersMap[name]) scorersMap[name] = { fullName: name, goals: 0 }
+              scorersMap[name].goals += total
+            }
+            const scorers = Object.values(scorersMap).sort((a, b) => b.goals - a.goals)
             return {
               id: m.id,
               match_date: m.match_date,
@@ -85,6 +110,7 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
               team_name: team?.name ?? null,
               team_color: team?.color ?? null,
               goals_from_stats: goalsFromStats,
+              scorers,
             }
           })
         )
@@ -129,23 +155,29 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={`Partite passate${teamName ? ' — ' + teamName : ''}`}>
+    <BottomSheet
+      open={open}
+      onClose={onClose}
+      title={titleOverride || `Partite passate${teamName ? ' — ' + teamName : ''}`}
+    >
       <div style={{ padding: '10px 14px 24px' }}>
-        {/* Filtro scope */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          <button
-            onClick={() => setScope('past')}
-            style={scopeBtn(scope === 'past')}
-          >
-            Solo passate
-          </button>
-          <button
-            onClick={() => setScope('all')}
-            style={scopeBtn(scope === 'all')}
-          >
-            Tutte (anche future)
-          </button>
-        </div>
+        {/* Filtro scope - nascosto se c'è resultFilter (già filtrato per esito) */}
+        {!resultFilter && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <button
+              onClick={() => setScope('past')}
+              style={scopeBtn(scope === 'past')}
+            >
+              Solo passate
+            </button>
+            <button
+              onClick={() => setScope('all')}
+              style={scopeBtn(scope === 'all')}
+            >
+              Tutte (anche future)
+            </button>
+          </div>
+        )}
 
         {loading && <div style={{ padding: 24, textAlign: 'center', color: '#707882', fontSize: 13 }}>Carico…</div>}
 
@@ -161,13 +193,33 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
           </div>
         )}
 
-        {!loading && rows.length > 0 && (
+        {!loading && rows.length > 0 && (() => {
+          // Se c'è un filtro per esito (won/drawn/lost) applico qui il filtro
+          const visibleRows = resultFilter
+            ? rows.filter(m => {
+                if (m.home_score == null || m.away_score == null) return false
+                const our = m.venue === 'home' ? m.home_score! : m.away_score!
+                const their = m.venue === 'home' ? m.away_score! : m.home_score!
+                if (resultFilter === 'won') return our > their
+                if (resultFilter === 'lost') return our < their
+                if (resultFilter === 'drawn') return our === their
+                return true
+              })
+            : rows
+          if (visibleRows.length === 0) {
+            return (
+              <div style={{ padding: 32, textAlign: 'center', color: '#707882', fontSize: 13 }}>
+                Nessuna partita corrispondente al filtro.
+              </div>
+            )
+          }
+          return (
           <>
             <div style={{ fontSize: 11, color: '#707882', marginBottom: 8, fontWeight: 600 }}>
-              {rows.length} partit{rows.length === 1 ? 'a' : 'e'} — dalla più recente
+              {visibleRows.length} partit{visibleRows.length === 1 ? 'a' : 'e'} — dalla più recente
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
-              {rows.map(m => {
+              {visibleRows.map(m => {
                 const past = isPast(m.match_date)
                 const res = resultLabel(m)
                 const reportOk = !!m.report_completed_at
@@ -211,6 +263,17 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
                           {m.competition}
                         </div>
                       )}
+                      {/* Marcatori nostri per questa partita */}
+                      {m.scorers && m.scorers.length > 0 && (
+                        <div style={{
+                          marginTop: 5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+                        }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#005f98' }}>sports_soccer</span>
+                          <span style={{ fontSize: 11, color: '#404751', fontWeight: 600 }}>
+                            {m.scorers.map(s => s.goals > 1 ? `${s.fullName} (${s.goals})` : s.fullName).join(', ')}
+                          </span>
+                        </div>
+                      )}
                       {past && (
                         <div style={{ marginTop: 5 }}>
                           <span style={{
@@ -241,7 +304,8 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
               })}
             </div>
           </>
-        )}
+          )
+        })()}
       </div>
     </BottomSheet>
   )
