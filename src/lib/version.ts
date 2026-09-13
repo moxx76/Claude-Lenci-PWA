@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.40'
+export const APP_VERSION = '1.9.41'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.41',
+    date: '2026-09-11',
+    title: 'Top 3 marcatori nella pagina squadra',
+    features: [
+      'Nella pagina di ogni squadra, subito sotto il riepilogo (categoria e numero tesserati), è ora visibile la card "Top marcatori squadra" con la classifica dei primi 3 giocatori per gol totali (azione + rigore). Podio con medaglie oro, argento e bronzo, breakdown dettagliato "X su azione · Y su rigore" per capire come ha segnato ognuno. Aggregata automaticamente dai referti partita compilati, si aggiorna man mano che i coach registrano i tabellini',
+    ],
+    notes: [
+      'La card compare solo se almeno un giocatore ha segnato — se la squadra non ha ancora referti compilati o nessuno ha ancora segnato, la card resta nascosta',
+    ],
+  },
   {
     version: '1.9.40',
     date: '2026-09-11',

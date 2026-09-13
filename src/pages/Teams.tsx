@@ -13,6 +13,7 @@ import { AttendanceStatsSheet } from '../components/AttendanceStatsSheet'
 import { TeamTrainingHistorySheet } from '../components/TeamTrainingHistorySheet'
 import { TrainingDetailSheet } from '../components/TrainingDetailSheet'
 import { EventEditSheet } from '../components/EventEditSheet'
+import { TopScorersCard } from '../components/TopScorersCard'
 import { AttendanceSheet } from '../components/AttendanceSheet'
 import { useAuth } from '../store/auth'
 import { useMyTeam } from '../hooks/useMyTeam'
@@ -461,6 +462,9 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
         <span style={{ color: '#c0c7d2' }}>·</span>
         <span style={{ color: '#404751', fontWeight: 700 }}>{players.length} tesserati</span>
       </div>
+
+      {/* Top 3 marcatori della squadra (aggregato da referti partita) */}
+      <TopScorersCard teamId={team.id} />
 
       {/* Search */}
       <div className="relative">
