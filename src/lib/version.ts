@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.41'
+export const APP_VERSION = '1.9.42'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.42',
+    date: '2026-09-11',
+    title: 'Nuova pagina squadre con statistiche in evidenza',
+    features: [
+      'La pagina di ogni squadra è stata completamente ripensata. Ora la vista principale mostra a colpo d\u2019occhio le statistiche della squadra: KPI riepilogativi (partite Giocate / Vinte / Pareggi / Perse) e tre classifiche podio Top 3: marcatori, ammoniti ed espulsi. Tutto aggregato automaticamente dai referti partita compilati',
+      'La lista dei giocatori (rosa completa con ricerca, filtri per posizione e tutte le funzionalità di gestione) è ora accessibile tramite il nuovo pulsante blu "Rosa" in cima alla pagina — accanto ai già presenti Presenze e Storico. Un tocco per passare dalla vista statistiche alla vista rosa e viceversa',
+    ],
+    notes: [
+      'Le classifiche mostrano solo giocatori che hanno effettivamente registrato quel tipo di dato (gol, ammonizione, espulsione) nei referti partita — se nessuno rientra, appare "Nessun dato registrato". I KPI partite considerano solo le partite con risultato inserito',
+    ],
+  },
   {
     version: '1.9.41',
     date: '2026-09-11',

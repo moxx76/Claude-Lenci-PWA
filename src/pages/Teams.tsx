@@ -13,7 +13,7 @@ import { AttendanceStatsSheet } from '../components/AttendanceStatsSheet'
 import { TeamTrainingHistorySheet } from '../components/TeamTrainingHistorySheet'
 import { TrainingDetailSheet } from '../components/TrainingDetailSheet'
 import { EventEditSheet } from '../components/EventEditSheet'
-import { TopScorersCard } from '../components/TopScorersCard'
+import { TeamStatsCard } from '../components/TeamStatsCard'
 import { AttendanceSheet } from '../components/AttendanceSheet'
 import { useAuth } from '../store/auth'
 import { useMyTeam } from '../hooks/useMyTeam'
@@ -356,6 +356,9 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
   const [posFilter, setPosFilter] = useState<string>('all')
   const [playerSheetOpen, setPlayerSheetOpen] = useState(false)
   const [playerSheetEditing, setPlayerSheetEditing] = useState<PlayerDetailData | null>(null)
+  // Vista default: statistiche squadra (KPI + classifiche).
+  // La rosa si mostra solo cliccando il pulsante "Rosa" nella toolbar.
+  const [showRoster, setShowRoster] = useState(false)
 
   useEffect(() => { load() }, [team.id, reloadTick])
   const load = async () => {
@@ -393,7 +396,22 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
   return (
     <>
       {/* Barra azioni contestuali sulla squadra selezionata */}
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setShowRoster(v => !v)}
+          style={{
+            flex: 1, background: showRoster ? '#005f98' : '#fff',
+            border: '1px solid #005f98',
+            borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            fontSize: 12, fontWeight: 800,
+            color: showRoster ? '#fff' : '#005f98',
+            fontFamily: 'inherit',
+          }}
+        >
+          <Icon name="groups" size={15} color={showRoster ? '#fff' : '#005f98'} />
+          Rosa
+        </button>
         {onOpenStats && (
           <button
             onClick={onOpenStats}
@@ -463,8 +481,11 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
         <span style={{ color: '#404751', fontWeight: 700 }}>{players.length} tesserati</span>
       </div>
 
-      {/* Top 3 marcatori della squadra (aggregato da referti partita) */}
-      <TopScorersCard teamId={team.id} />
+      {/* Vista default: statistiche squadra (KPI + classifiche) */}
+      {!showRoster && <TeamStatsCard teamId={team.id} />}
+
+      {/* Vista Rosa: search + filtri + lista giocatori (mostrata solo se attivata dal pulsante "Rosa") */}
+      {showRoster && <>
 
       {/* Search */}
       <div className="relative">
@@ -566,6 +587,7 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
           ))}
         </div>
       )}
+      </>}
 
       {/* Sheet crea/modifica giocatore (admin) */}
       <PlayerEditSheet
