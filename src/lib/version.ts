@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.43'
+export const APP_VERSION = '1.9.44'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.44',
+    date: '2026-09-15',
+    title: 'Link landing pubblica presenze in evidenza nelle preferenze squadra',
+    features: [
+      'Quando in Modifica squadra si attiva il flag "Landing pubblica presenze", ora appare subito sotto un pannello dedicato con l\u2019URL della landing pubblica (lenci-poirino-presenze.netlify.app) e tre pulsanti pronti all\u2019uso: Apri (verifica visiva), Copia (mette il link negli appunti) e WhatsApp (apre la condivisione con un messaggio già scritto per il gruppo squadra). Così il coach ha sempre a portata di mano il link da condividere sul gruppo genitori — nessun ricordo da tenere a mente',
+      'Il messaggio WhatsApp pre-compilato contiene già il nome della squadra e le istruzioni per genitori/ragazzi: come selezionare il proprio nome con il tasto "Cambia" e rispondere Vengo / Non vengo / Forse per ogni impegno',
+    ],
+    notes: [
+      'La landing pubblica è un\u2019app separata dal Lenci LAB (repository dedicato) che condivide lo stesso database Supabase: le risposte finiscono direttamente nel calendario della squadra e i coach le vedono aggregate',
+    ],
+  },
   {
     version: '1.9.43',
     date: '2026-09-11',

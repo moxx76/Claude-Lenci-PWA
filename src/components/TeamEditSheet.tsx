@@ -440,6 +440,11 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
           </div>
         </label>
 
+        {/* Se abilitata: mostro il link della landing pubblica e i pulsanti per condividerlo */}
+        {publicPresence && (
+          <PublicPresenceShare teamName={existingTeam?.name || 'la squadra'} />
+        )}
+
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose} disabled={saving || deleting}
             style={{
@@ -495,6 +500,108 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </label>
       {children}
+    </div>
+  )
+}
+
+/**
+ * Pannello che appare sotto il flag "Landing pubblica presenze" quando è ON.
+ * Mostra l'URL della landing pubblica e 3 pulsanti per condividerlo:
+ *  - Apri (verifica visiva)
+ *  - Copia negli appunti
+ *  - Condividi su WhatsApp con messaggio pre-compilato per il gruppo squadra
+ * Sotto: promemoria su come funziona per genitori/ragazzi.
+ */
+function PublicPresenceShare({ teamName }: { teamName: string }) {
+  const url = 'https://lenci-poirino-presenze.netlify.app/'
+  const [copied, setCopied] = useState(false)
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // fallback (browser vecchi / permessi negati)
+      window.prompt('Copia il link:', url)
+    }
+  }
+
+  const whatsappText = encodeURIComponent(
+    `🟢 Presenze ${teamName} — segna qui partite e allenamenti:\n\n${url}\n\n` +
+    `Aprite il link, premete "CAMBIA" in alto e selezionate il nome di vostro figlio, ` +
+    `poi rispondete Vengo / Non vengo / Forse per ogni impegno.`
+  )
+
+  return (
+    <div style={{
+      marginTop: 8,
+      padding: '12px 14px',
+      background: '#eaf3fb',
+      border: '1px solid #b8d5ec',
+      borderRadius: 10,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#005f98', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        Link della landing pubblica
+      </div>
+
+      {/* URL leggibile */}
+      <div style={{
+        padding: '10px 12px', background: '#fff', borderRadius: 8,
+        border: '1px solid #b8d5ec', fontSize: 12.5, fontFamily: 'monospace',
+        color: '#181c20', wordBreak: 'break-all', userSelect: 'all',
+      }}>
+        {url}
+      </div>
+
+      {/* 3 pulsanti azione */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <a
+          href={url} target="_blank" rel="noopener noreferrer"
+          style={{
+            flex: 1, padding: '9px 8px', borderRadius: 8, border: '1px solid #005f98',
+            background: '#fff', color: '#005f98', fontSize: 11.5, fontWeight: 700,
+            textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}
+        >
+          <Icon name="open_in_new" size={14} color="#005f98" />
+          Apri
+        </a>
+        <button
+          type="button" onClick={copyLink}
+          style={{
+            flex: 1, padding: '9px 8px', borderRadius: 8, border: '1px solid #005f98',
+            background: copied ? '#dcf1e2' : '#fff',
+            color: copied ? '#006e25' : '#005f98',
+            fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}
+        >
+          <Icon name={copied ? 'check' : 'content_copy'} size={14} color={copied ? '#006e25' : '#005f98'} />
+          {copied ? 'Copiato' : 'Copia'}
+        </button>
+        <a
+          href={`https://wa.me/?text=${whatsappText}`} target="_blank" rel="noopener noreferrer"
+          style={{
+            flex: 1, padding: '9px 8px', borderRadius: 8, border: 'none',
+            background: '#25d366', color: '#fff', fontSize: 11.5, fontWeight: 700,
+            textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}
+        >
+          <Icon name="share" size={14} color="#fff" />
+          WhatsApp
+        </a>
+      </div>
+
+      {/* Promemoria uso */}
+      <div style={{
+        fontSize: 10.5, color: '#404751', lineHeight: 1.5,
+        padding: '6px 2px 0', borderTop: '1px dashed #b8d5ec',
+      }}>
+        Condividi il link sul gruppo WhatsApp della squadra: chi lo apre sceglie il proprio nome con
+        il tasto "Cambia" e risponde Vengo / Non vengo / Forse per ogni impegno, senza dover creare un account.
+      </div>
     </div>
   )
 }
