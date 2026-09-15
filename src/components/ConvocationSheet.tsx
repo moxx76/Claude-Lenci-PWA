@@ -601,6 +601,9 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
               </div>
             </div>
 
+            {/* Card riassuntiva delle risposte dalla landing pubblica presenze */}
+            <PresenzeSummaryCard players={players} responses={responses} />
+
             {/* Lista giocatori */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
               {players.map(p => {
@@ -909,3 +912,106 @@ const presetPillStyle = (active: boolean, color: string): React.CSSProperties =>
   fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
   whiteSpace: 'nowrap',
 })
+
+/**
+ * Card riassuntiva delle risposte dei giocatori dalla landing pubblica presenze.
+ * Mostra 4 KPI (Sì / Forse / No / Non risposto) cliccabili per espandere l'elenco nomi.
+ * Analoga alla card presenze del TrainingDetailSheet ma pesca da event_responses
+ * (che riceve i dati dalla landing lenci-poirino-presenze.netlify.app).
+ */
+function PresenzeSummaryCard({
+  players, responses,
+}: {
+  players: Player[]
+  responses: Record<string, { status: string; updated_at: string }>
+}) {
+  const [expanded, setExpanded] = useState<'yes' | 'no' | 'maybe' | 'none' | null>(null)
+
+  // Aggrego giocatori per status della risposta
+  const groups = { yes: [] as Player[], maybe: [] as Player[], no: [] as Player[], none: [] as Player[] }
+  for (const p of players) {
+    const r = responses[p.id]
+    if (!r) groups.none.push(p)
+    else if (r.status === 'yes') groups.yes.push(p)
+    else if (r.status === 'maybe') groups.maybe.push(p)
+    else if (r.status === 'no') groups.no.push(p)
+    else groups.none.push(p)
+  }
+  const totalResponded = groups.yes.length + groups.maybe.length + groups.no.length
+  const nome = (p: Player) => `${p.last_name} ${p.first_name}`
+
+  return (
+    <div style={{
+      marginBottom: 12,
+      padding: 12,
+      background: '#f6f8fc',
+      border: '1px solid #e0e2e9',
+      borderRadius: 12,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#005f98' }}>how_to_reg</span>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: '#181c20' }}>
+          Disponibilità dai ragazzi
+        </div>
+        <div style={{ marginLeft: 'auto', fontSize: 10.5, color: '#707882', fontWeight: 600 }}>
+          {totalResponded} di {players.length} hanno risposto
+        </div>
+      </div>
+
+      {/* 4 KPI cliccabili */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        <PresenzeKpi label="Vengono" value={groups.yes.length}   color="#006e25" bg="#d4f2dd" active={expanded==='yes'}   onClick={() => setExpanded(expanded==='yes'?null:'yes')} />
+        <PresenzeKpi label="Forse"    value={groups.maybe.length} color="#8e6300" bg="#fff3d1" active={expanded==='maybe'} onClick={() => setExpanded(expanded==='maybe'?null:'maybe')} />
+        <PresenzeKpi label="Non vengono" value={groups.no.length} color="#93000a" bg="#ffdad6" active={expanded==='no'}    onClick={() => setExpanded(expanded==='no'?null:'no')} />
+        <PresenzeKpi label="Non risposto" value={groups.none.length} color="#404751" bg="#e6e8ee" active={expanded==='none'} onClick={() => setExpanded(expanded==='none'?null:'none')} />
+      </div>
+
+      {/* Elenco nomi del gruppo selezionato */}
+      {expanded && (
+        <div style={{
+          padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #e0e2e9',
+          fontSize: 12, color: '#181c20', lineHeight: 1.7,
+        }}>
+          {groups[expanded].length === 0 ? (
+            <span style={{ fontStyle: 'italic', color: '#707882' }}>Nessun giocatore in questo stato</span>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {groups[expanded].map(p => (
+                <span key={p.id} style={{
+                  padding: '3px 8px', background: '#f1f3fa', borderRadius: 6,
+                  fontSize: 11.5, fontWeight: 600,
+                }}>{nome(p)}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Nota per il coach */}
+      {totalResponded === 0 && (
+        <div style={{ fontSize: 10.5, color: '#707882', fontStyle: 'italic', textAlign: 'center', padding: '4px 0' }}>
+          Nessuna risposta ancora. Condividi il link della landing pubblica sul gruppo WhatsApp.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PresenzeKpi({
+  label, value, color, bg, active, onClick,
+}: { label: string; value: number; color: string; bg: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      background: bg,
+      border: active ? `2px solid ${color}` : `1px solid ${color}22`,
+      borderRadius: 10, padding: '8px 4px', cursor: 'pointer', fontFamily: 'inherit',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+    }}>
+      <div style={{ fontSize: 20, fontWeight: 900, color, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#404751', textTransform: 'uppercase', letterSpacing: 0.3, textAlign: 'center' }}>
+        {label}
+      </div>
+    </button>
+  )
+}

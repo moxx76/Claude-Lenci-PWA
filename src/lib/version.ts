@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.44'
+export const APP_VERSION = '1.9.45'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.45',
+    date: '2026-09-15',
+    title: 'Nella scheda partita ora vedi le risposte dei ragazzi dalla landing presenze',
+    features: [
+      'Aprendo la scheda partita (dal calendario) il coach ora vede in cima una nuova card "Disponibilità dai ragazzi" con 4 KPI cliccabili: quanti Vengono / Forse / Non vengono / Non hanno risposto. Cliccando su un KPI si espande l\u2019elenco dei nomi in quello stato — così hai subito il quadro di chi ha risposto sulla landing pubblica presenze prima di procedere con la convocazione',
+      'Le risposte inline accanto al singolo giocatore restano visibili come prima; la card in cima aggiunge la vista aggregata che mancava, in stile simile alla card presenze degli allenamenti',
+    ],
+    notes: [
+      'Se nessuno ha ancora risposto compare un promemoria che invita a condividere il link della landing pubblica sul gruppo WhatsApp della squadra (il link si copia comodamente da Modifica squadra → Landing pubblica presenze)',
+    ],
+  },
   {
     version: '1.9.44',
     date: '2026-09-15',
