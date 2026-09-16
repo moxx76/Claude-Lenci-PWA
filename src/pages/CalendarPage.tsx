@@ -100,8 +100,11 @@ export function CalendarPage() {
   const [postMatchData, setPostMatchData] = useState<PostMatchData | null>(null)
 
   // Se coach con squadra assegnata → filtro automatico e nascondi chips
-  const isCoachWithTeam = isCoach(profile?.role) && myTeam
-  const effectiveTeamId = isCoachWithTeam ? myTeam.id : teamFilter
+  // È un membro staff (coach o dirigente) associato a una singola squadra?
+  // I dirigenti hanno is_manager=true ma role diverso da 'coach': vanno inclusi qui
+  // altrimenti il planner e altri strumenti team-scoped non filtrano la loro squadra.
+  const isCoachWithTeam = (isCoach(profile?.role) || !!profile?.is_manager) && !!myTeam
+  const effectiveTeamId = isCoachWithTeam ? myTeam!.id : teamFilter
 
   const isStaff = isAdmin(profile?.role) || isCoach(profile?.role)
   const canWrite = isStaff && !profile?.is_readonly
@@ -680,11 +683,12 @@ export function CalendarPage() {
         }}
       />
 
-      {/* Planner settimanale */}
+      {/* Planner settimanale — usa effectiveTeamId così coach/dirigenti
+          con una sola squadra vedono SOLO la loro (evita mix tra annate). */}
       <WeeklyPlannerSheet
         open={plannerOpen}
         onClose={() => setPlannerOpen(false)}
-        teamFilter={teamFilter}
+        teamFilter={effectiveTeamId}
         teams={teams.map(t => ({ id: t.id, name: t.name, color: t.color, category: t.category }))}
       />
 

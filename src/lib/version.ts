@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.45'
+export const APP_VERSION = '1.9.46'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.46',
+    date: '2026-09-15',
+    title: 'Fix: dirigenti vedono nel planner solo la loro annata',
+    features: [
+      'Corretto un bug per cui il dirigente di una squadra (per esempio Pulcini 2016) apriva il Planner settimanale e vedeva un mix di impegni delle annate vicine (2016 + 2017) invece della sola sua squadra. Ora il planner rispetta sempre la squadra di appartenenza del dirigente/allenatore, come già faceva il filtro calendario',
+    ],
+    notes: [
+      'Il baco era duplice: da un lato il selettore automatico della squadra riconosceva solo gli allenatori (role=coach) e non i dirigenti (is_manager=true); dall\u2019altro il planner riceveva il filtro manuale invece dell\u2019id di squadra effettivo. Entrambi corretti in questa release',
+    ],
+  },
   {
     version: '1.9.45',
     date: '2026-09-15',
