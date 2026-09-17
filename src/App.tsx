@@ -10,6 +10,7 @@ import { CalendarPage } from './pages/CalendarPage'
 import { Profile } from './pages/Profile'
 import { AnnouncementsPage } from './pages/AnnouncementsPage'
 import { MarketingPage } from './pages/Marketing'
+import { JournalistPage } from './pages/Journalist'
 import { ComunicatiPage } from './pages/Comunicati'
 import { EserciziPage } from './pages/EserciziPage'
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
@@ -31,6 +32,17 @@ function TeamAssignedGuard({ children }: { children: React.ReactNode }) {
   if (isCoach(profile?.role) && myTeams.length === 0) {
     return <Navigate to="/" replace />
   }
+  return <>{children}</>
+}
+
+/**
+ * Se l'utente è un giornalista (profile.is_journalist=true), qualsiasi pagina
+ * della normale app viene reindirizzata a /giornalisti (unica pagina permessa
+ * insieme al profilo). I tab di navigazione sono già ridotti dal Layout.
+ */
+function NotForJournalist({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
+  if (profile?.is_journalist === true) return <Navigate to="/giornalisti" replace />
   return <>{children}</>
 }
 
@@ -77,7 +89,7 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Dashboard />} />
+          <Route index element={<NotForJournalist><Dashboard /></NotForJournalist>} />
           <Route path="teams" element={<TeamAssignedGuard><Teams /></TeamAssignedGuard>} />
           {/* Alias per compatibilità con vecchi bookmark */}
           <Route path="atleti" element={<Navigate to="/teams" replace />} />
@@ -86,6 +98,7 @@ export default function App() {
           <Route path="annunci" element={<TeamAssignedGuard><AnnouncementsPage /></TeamAssignedGuard>} />
           <Route path="comunicati" element={<TeamAssignedGuard><ComunicatiPage /></TeamAssignedGuard>} />
           <Route path="marketing" element={<MarketingPage />} />
+          <Route path="giornalisti" element={<JournalistPage />} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>

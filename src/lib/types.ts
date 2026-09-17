@@ -22,6 +22,7 @@ export interface Profile {
   can_switch_to_parent: boolean | null
   is_supervisor: boolean | null
   is_readonly: boolean | null
+  is_journalist?: boolean | null
   created_at: string
   updated_at: string
 }

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.46'
+export const APP_VERSION = '1.9.47'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.47',
+    date: '2026-09-15',
+    title: 'Vista Giornalisti: distinte, risultati e marcatori',
+    features: [
+      'Nuovo tipo di account "Giornalista" pensato per i giornalisti locali che chiedono distinte e risultati partite. Un account con questo permesso entra in una vista dedicata (menu ridotto) dove vede: selettore squadra, elenco partite giocate della squadra scelta con risultato ordinate dalla più recente, e tap sulla singola partita apre il dettaglio con formazione titolare, panchina e subentrati, marcatori con numero rigori, autoreti, cartellini gialli e rossi',
+      'Il giornalista NON ha accesso a dashboard, calendario, comunicazioni, comunicati LND, gestione squadre o giocatori: la sua vista è completamente separata e read-only sui soli dati partita non sensibili. I dati anagrafici privati (email, telefono, data di nascita, medico) restano protetti dalle policy database, non vengono mai serviti a questi account',
+    ],
+    notes: [
+      'Per creare un account giornalista: l\u2019admin registra l\u2019utente come normale, poi imposta il flag is_journalist=true sul suo profilo. Le policy Supabase filtrano automaticamente cosa può leggere. Prossimo passo: gestione visuale del flag direttamente dallo staff sheet',
+    ],
+  },
   {
     version: '1.9.46',
     date: '2026-09-15',

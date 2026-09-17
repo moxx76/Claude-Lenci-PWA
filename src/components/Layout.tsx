@@ -36,6 +36,7 @@ const DESKTOP_TABS_BASE: NavTab[] = [
 const MARKETING_TAB: NavTab = { to: '/marketing', label: 'Marketing', icon: 'campaign', accent: '#7a0071' }
 const COMUNICATI_TAB: NavTab = { to: '/comunicati', label: 'Comunicati LND', labelShort: 'Comunicati', icon: 'article', accent: '#005f98' }
 const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labelShort: 'Esercizi', icon: 'fitness_center', accent: '#c73434' }
+const GIORNALISTI_TAB: NavTab = { to: '/giornalisti', label: 'Risultati e distinte', labelShort: 'Distinte', icon: 'article_person', accent: '#005f98' }
 
 export function Layout() {
   const [notifOpen, setNotifOpen] = useState(false)
@@ -48,6 +49,7 @@ export function Layout() {
 
   // Vista parent forzata: menu semplificato senza Marketing/Squadre admin
   const isParentView = profile?.can_switch_to_parent === true && mode === 'parent'
+  const isJournalist = profile?.is_journalist === true && !isParentView
   const isMarketing = profile?.is_marketing === true && !isParentView
   const isStaff = (isAdmin(profile?.role) || isCoach(profile?.role)) && !isParentView
 
@@ -56,7 +58,9 @@ export function Layout() {
   const isCoachOnly = isCoach(profile?.role) && !isAdmin(profile?.role) && !isParentView
   const isCoachWithoutTeam = isCoachOnly && !teamsLoading && myTeams.length === 0
 
-  const MOBILE_TABS: NavTab[] = isCoachWithoutTeam
+  const MOBILE_TABS: NavTab[] = isJournalist
+    ? [GIORNALISTI_TAB, { to: '/profilo', label: 'Profilo', icon: 'person' }]
+    : isCoachWithoutTeam
     ? [MOBILE_TABS_BASE[0], MOBILE_TABS_BASE[4]] // Solo Dashboard + Profilo
     : [
         MOBILE_TABS_BASE[0], // Dashboard
@@ -69,7 +73,9 @@ export function Layout() {
         MOBILE_TABS_BASE[4], // Profilo
       ]
 
-  const DESKTOP_TABS: NavTab[] = isCoachWithoutTeam
+  const DESKTOP_TABS: NavTab[] = isJournalist
+    ? [GIORNALISTI_TAB, { to: '/profilo', label: 'Profilo', icon: 'person' }]
+    : isCoachWithoutTeam
     ? [DESKTOP_TABS_BASE[0], { to: '/profilo', label: 'Profilo', icon: 'person' }] // Solo Dashboard + Profilo
     : [
         ...DESKTOP_TABS_BASE,
