@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.47'
+export const APP_VERSION = '1.9.48'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.48',
+    date: '2026-09-15',
+    title: 'Vista giornalisti: dirigenti compilano il referto e flaggano la pubblicazione',
+    features: [
+      'I dirigenti (is_manager=true) ora hanno gli stessi permessi degli allenatori sulle proprie squadre: possono creare, modificare ed eliminare partite, compilare la convocazione (titolari e panchina), scrivere il referto post-gara con formazione, marcatori, ammonizioni, espulsioni, subentri e note arbitrali. Prima queste operazioni erano riservate ai soli coach; ora anche i team_manager/second_manager/third_manager della squadra possono compilarle',
+      'Nel referto post-partita è comparso un nuovo interruttore "Pubblica su vista giornalisti". Quando attivo, la partita compare nell\u2019elenco letto dagli account giornalista con formazione titolare, panchina, marcatori, cartellini e subentri. Disattivo di default: la partita resta interna finché il dirigente non decide che il referto è pronto per la comunicazione esterna',
+      'La vista giornalisti ora mostra solo le partite pubblicate: nessuna partita esce accidentalmente prima che il dirigente ne dia il via libera',
+    ],
+    notes: [
+      'Account di test creato: giornalista@matchos.it (password provvisoria: LenciGiornalista2026!). Fare login per verificare come i giornalisti vedono l\u2019app',
+    ],
+  },
   {
     version: '1.9.47',
     date: '2026-09-15',

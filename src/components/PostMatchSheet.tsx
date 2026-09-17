@@ -95,6 +95,8 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [reportGeneral, setReportGeneral] = useState('')
   const [weather, setWeather] = useState('')
   const [refereeNotes, setRefereeNotes] = useState('')
+  // Flag "pubblica per giornalisti": se true, la partita compare nella vista giornalisti
+  const [publishedForJournalists, setPublishedForJournalists] = useState(false)
 
   useEffect(() => {
     if (!open || !match) return
@@ -115,19 +117,20 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         .select('*')
         .eq('match_id', match.id),
       supabase.from('matches')
-        .select('formation, report_positive, report_negative, report_general, weather, referee_notes')
+        .select('formation, report_positive, report_negative, report_general, weather, referee_notes, published_for_journalists')
         .eq('id', match.id)
         .maybeSingle(),
     ])
 
     // Pre-compila report tattico
-    const mRow = matchRes.data as { formation?: string | null; report_positive?: string | null; report_negative?: string | null; report_general?: string | null; weather?: string | null; referee_notes?: string | null } | null
+    const mRow = matchRes.data as { formation?: string | null; report_positive?: string | null; report_negative?: string | null; report_general?: string | null; weather?: string | null; referee_notes?: string | null; published_for_journalists?: boolean | null } | null
     setFormation(mRow?.formation ?? '')
     setReportPositive(mRow?.report_positive ?? '')
     setReportNegative(mRow?.report_negative ?? '')
     setReportGeneral(mRow?.report_general ?? '')
     setWeather(mRow?.weather ?? '')
     setRefereeNotes(mRow?.referee_notes ?? '')
+    setPublishedForJournalists(mRow?.published_for_journalists === true)
 
     const convPlayers: Player[] = ((convRes.data ?? []) as any[])
       .filter(c => c.player)
@@ -251,6 +254,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         report_general: reportGeneral.trim() || null,
         weather: weather.trim() || null,
         referee_notes: refereeNotes.trim() || null,
+        published_for_journalists: publishedForJournalists,
         report_completed_at: hasReport ? new Date().toISOString() : null,
         report_completed_by: hasReport ? uid : null,
       }).eq('id', match.id)
@@ -711,6 +715,29 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
 
             {/* Presenze staff (mister + dirigenti che erano in panchina) */}
             <StaffAttendanceSection eventKind="match" eventId={match.id} />
+
+            {/* Flag pubblicazione per la vista giornalisti */}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '12px 14px',
+              background: publishedForJournalists ? '#e8f0f9' : '#f8f9fc',
+              border: `1px solid ${publishedForJournalists ? '#005f98' : '#e0e2e9'}`,
+              borderRadius: 10, cursor: 'pointer',
+            }}>
+              <input type="checkbox" checked={publishedForJournalists}
+                onChange={e => setPublishedForJournalists(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20' }}>
+                  Pubblica su vista giornalisti
+                </div>
+                <div style={{ fontSize: 11, color: '#707882', marginTop: 2 }}>
+                  Quando attivo, questa partita compare nell'elenco letto dai giornalisti locali
+                  con formazione, marcatori, ammonizioni ed espulsioni. Disattiva se il referto
+                  non è ancora pronto per la comunicazione esterna.
+                </div>
+              </div>
+            </label>
 
             {/* Salva */}
             <button

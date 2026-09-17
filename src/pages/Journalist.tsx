@@ -64,6 +64,7 @@ export function JournalistPage() {
       const { data } = await supabase.from('matches')
         .select('id, match_date, opponent, venue, competition, home_score, away_score, location')
         .eq('team_id', selectedTeamId)
+        .eq('published_for_journalists', true)   // solo partite flaggate dal dirigente
         .not('home_score', 'is', null)
         .not('away_score', 'is', null)
         .order('match_date', { ascending: false })
@@ -143,7 +144,8 @@ export function JournalistPage() {
         </div>
       ) : matches.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: '#707882', fontSize: 13 }}>
-          Nessuna partita giocata con risultato registrato per questa squadra.
+          Nessuna partita pubblicata per questa squadra. Le partite compaiono qui
+          quando dirigenti o allenatori le flaggano come "pubblicata per giornalisti".
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
