@@ -14,11 +14,16 @@ import { Icon } from '../components/Icon'
  * Non ha pulsanti di modifica: read-only.
  */
 
-interface TeamRow {
+interface TeamSummary {
   id: string
   name: string
   category: string | null
   color: string | null
+  n_published: number
+  last_match_date: string | null
+  last_result: string | null   // es. "3-1", "0-2"
+  last_result_class: 'win' | 'draw' | 'loss' | null
+  last_opponent: string | null
 }
 interface MatchRow {
   id: string
@@ -29,6 +34,7 @@ interface MatchRow {
   home_score: number | null
   away_score: number | null
   location: string | null
+  formation?: string | null
 }
 interface PlayerLite {
   id: string
@@ -39,32 +45,72 @@ interface PlayerLite {
 }
 
 export function JournalistPage() {
-  const [teams, setTeams] = useState<TeamRow[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('')
+  const [summaries, setSummaries] = useState<TeamSummary[]>([])
+  const [loadingSummaries, setLoadingSummaries] = useState(true)
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [loading, setLoading] = useState(false)
   const [openMatchId, setOpenMatchId] = useState<string | null>(null)
 
-  // Carico squadre disponibili al giornalista
+  // Homepage: carico tutte le squadre + calcolo n. partite pubblicate + ultima
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('teams')
-        .select('id, name, category, color')
-        .order('name')
-      setTeams((data ?? []) as TeamRow[])
-      if (data && data.length > 0 && !selectedTeamId) setSelectedTeamId(data[0].id)
+      setLoadingSummaries(true)
+      const [teamsRes, matchesRes] = await Promise.all([
+        supabase.from('teams').select('id, name, category, color').order('name'),
+        supabase.from('matches')
+          .select('id, team_id, match_date, opponent, venue, home_score, away_score')
+          .eq('published_for_journalists', true)
+          .not('home_score', 'is', null)
+          .not('away_score', 'is', null)
+          .order('match_date', { ascending: false }),
+      ])
+      const teams = (teamsRes.data ?? []) as TeamRow[]
+      const allMatches = (matchesRes.data ?? []) as Array<{
+        id: string; team_id: string; match_date: string; opponent: string;
+        venue: 'home'|'away'; home_score: number; away_score: number
+      }>
+
+      const rows: TeamSummary[] = teams.map(t => {
+        const teamMatches = allMatches.filter(m => m.team_id === t.id)
+        const last = teamMatches[0] || null
+        let lastResult: string | null = null
+        let lastClass: TeamSummary['last_result_class'] = null
+        if (last) {
+          const our = last.venue === 'home' ? last.home_score : last.away_score
+          const their = last.venue === 'home' ? last.away_score : last.home_score
+          lastResult = last.venue === 'home' ? `${last.home_score}-${last.away_score}` : `${last.away_score}-${last.home_score}`
+          lastClass = our > their ? 'win' : our < their ? 'loss' : 'draw'
+        }
+        return {
+          id: t.id, name: t.name, category: t.category, color: t.color,
+          n_published: teamMatches.length,
+          last_match_date: last?.match_date ?? null,
+          last_result: lastResult,
+          last_result_class: lastClass,
+          last_opponent: last?.opponent ?? null,
+        }
+      })
+      // Ordino: prima quelle con dati pubblicati, poi le altre
+      rows.sort((a, b) => {
+        if (a.n_published > 0 && b.n_published === 0) return -1
+        if (a.n_published === 0 && b.n_published > 0) return 1
+        return a.name.localeCompare(b.name)
+      })
+      setSummaries(rows)
+      setLoadingSummaries(false)
     })()
   }, [])
 
-  // Carico partite giocate della squadra selezionata
+  // Detail squadra: carico partite pubblicate della squadra scelta
   useEffect(() => {
-    if (!selectedTeamId) return
+    if (!selectedTeamId) { setMatches([]); return }
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
         .select('id, match_date, opponent, venue, competition, home_score, away_score, location')
         .eq('team_id', selectedTeamId)
-        .eq('published_for_journalists', true)   // solo partite flaggate dal dirigente
+        .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
         .not('away_score', 'is', null)
         .order('match_date', { ascending: false })
@@ -74,65 +120,136 @@ export function JournalistPage() {
     })()
   }, [selectedTeamId])
 
-  const selectedTeam = teams.find(t => t.id === selectedTeamId) || null
+  const selectedTeam = summaries.find(t => t.id === selectedTeamId) || null
 
+  // === HOMEPAGE: dashboard a card per annata ===
+  if (!selectedTeamId) {
+    return (
+      <div style={{ padding: '16px 14px 80px', maxWidth: 780, margin: '0 auto' }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{
+            fontSize: 11, fontWeight: 800, color: '#005f98', letterSpacing: 0.6,
+            textTransform: 'uppercase', marginBottom: 4,
+          }}>
+            Vista giornalisti
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: '#181c20' }}>
+            ASD Lenci Poirino — Risultati e distinte
+          </div>
+          <div style={{ fontSize: 12, color: '#707882', marginTop: 4 }}>
+            Panoramica di tutte le squadre. Tocca una card per vedere le partite pubblicate,
+            distinta e marcatori.
+          </div>
+        </div>
+
+        {loadingSummaries ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#707882', fontSize: 13 }}>
+            Caricamento squadre…
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {summaries.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTeamId(t.id)}
+                style={{
+                  background: '#fff', border: '1px solid #e0e2e9', borderRadius: 12,
+                  padding: 14, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                  borderLeft: `4px solid ${t.color || '#005f98'}`,
+                }}
+              >
+                {/* Riga 1: nome squadra + badge count */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#181c20' }}>{t.name}</div>
+                    {t.category && (
+                      <div style={{ fontSize: 11, color: '#707882', marginTop: 1 }}>{t.category}</div>
+                    )}
+                  </div>
+                  <div style={{
+                    padding: '4px 10px', borderRadius: 999,
+                    background: t.n_published > 0 ? '#e8f0f9' : '#f1f3fa',
+                    color: t.n_published > 0 ? '#005f98' : '#707882',
+                    fontSize: 11, fontWeight: 800,
+                  }}>
+                    {t.n_published} partit{t.n_published === 1 ? 'a' : 'e'}
+                  </div>
+                </div>
+
+                {/* Riga 2: ultima partita disponibile o placeholder */}
+                {t.n_published === 0 ? (
+                  <div style={{
+                    padding: '8px 10px', background: '#f8f9fc', borderRadius: 8,
+                    fontSize: 11.5, color: '#707882', fontStyle: 'italic',
+                  }}>
+                    Nessuna partita pubblicata al momento
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '8px 10px', background: '#f8f9fc', borderRadius: 8,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10.5, color: '#707882', fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                        Ultima partita ·{' '}
+                        {t.last_match_date && new Date(t.last_match_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20', marginTop: 2 }}>
+                        vs {t.last_opponent}
+                      </div>
+                    </div>
+                    <div style={{
+                      minWidth: 54, textAlign: 'center', padding: '4px 8px', borderRadius: 8,
+                      background: t.last_result_class === 'win' ? '#d4f2dd'
+                        : t.last_result_class === 'loss' ? '#ffdad6' : '#fff3d1',
+                      color: t.last_result_class === 'win' ? '#006e25'
+                        : t.last_result_class === 'loss' ? '#93000a' : '#8e6300',
+                      fontSize: 13, fontWeight: 900,
+                    }}>
+                      {t.last_result}
+                    </div>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // === DETTAGLIO SQUADRA: lista partite ===
   return (
     <div style={{ padding: '16px 14px 80px', maxWidth: 780, margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{
-          fontSize: 11, fontWeight: 800, color: '#005f98', letterSpacing: 0.6,
-          textTransform: 'uppercase', marginBottom: 4,
-        }}>
-          Vista giornalisti
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 900, color: '#181c20' }}>
-          ASD Lenci Poirino — Risultati e distinte
-        </div>
-        <div style={{ fontSize: 12, color: '#707882', marginTop: 4 }}>
-          Seleziona una squadra per vedere l'elenco delle partite giocate con distinta e marcatori.
-        </div>
-      </div>
-
-      {/* Selettore squadra */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 11, fontWeight: 700, color: '#404751', letterSpacing: 0.3 }}>
-          SQUADRA
-        </label>
-        <select
-          value={selectedTeamId}
-          onChange={e => setSelectedTeamId(e.target.value)}
-          style={{
-            width: '100%', marginTop: 6,
-            padding: '11px 12px', borderRadius: 10, border: '1px solid #c0c7d2',
-            fontSize: 14, fontWeight: 600, color: '#181c20', background: '#fff',
-            fontFamily: 'inherit',
-          }}
-        >
-          {teams.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.name}{t.category ? ` · ${t.category}` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Torna alla dashboard */}
+      <button
+        onClick={() => setSelectedTeamId(null)}
+        style={{
+          background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+          fontSize: 12.5, color: '#005f98', fontWeight: 700, padding: '4px 0 10px',
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}
+      >
+        <Icon name="arrow_back" size={16} color="#005f98" /> Tutte le squadre
+      </button>
 
       {/* Header squadra selezionata */}
       {selectedTeam && (
         <div style={{
-          padding: '10px 14px', background: '#f6f8fc',
+          padding: '12px 14px', background: '#f6f8fc',
           border: '1px solid #e0e2e9', borderRadius: 10,
           marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10,
+          borderLeft: `4px solid ${selectedTeam.color || '#005f98'}`,
         }}>
-          <div style={{
-            width: 10, height: 10, borderRadius: 999,
-            background: selectedTeam.color || '#005f98',
-          }} />
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#181c20' }}>
-            {selectedTeam.name}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: '#181c20' }}>{selectedTeam.name}</div>
+            {selectedTeam.category && (
+              <div style={{ fontSize: 11, color: '#707882', marginTop: 1 }}>{selectedTeam.category}</div>
+            )}
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: 11, color: '#707882', fontWeight: 600 }}>
-            {matches.length} partit{matches.length === 1 ? 'a' : 'e'} giocat{matches.length === 1 ? 'a' : 'e'}
+          <div style={{ fontSize: 11, color: '#707882', fontWeight: 600 }}>
+            {matches.length} partit{matches.length === 1 ? 'a' : 'e'} pubblicat{matches.length === 1 ? 'a' : 'e'}
           </div>
         </div>
       )}
@@ -144,8 +261,7 @@ export function JournalistPage() {
         </div>
       ) : matches.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', color: '#707882', fontSize: 13 }}>
-          Nessuna partita pubblicata per questa squadra. Le partite compaiono qui
-          quando dirigenti o allenatori le flaggano come "pubblicata per giornalisti".
+          Nessuna partita pubblicata per questa squadra.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -206,6 +322,13 @@ export function JournalistPage() {
   )
 }
 
+interface TeamRow {
+  id: string
+  name: string
+  category: string | null
+  color: string | null
+}
+
 /* ---------------- Dettaglio partita: distinta + tabellino ---------------- */
 
 interface Convoc {
@@ -239,7 +362,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     ;(async () => {
       const [mRes, cRes, sRes] = await Promise.all([
         supabase.from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, location')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation')
           .eq('id', matchId).maybeSingle(),
         supabase.from('convocations')
           .select('player_id, is_captain, shirt_number_override')
@@ -320,6 +443,15 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             {match.location && (
               <div style={{ fontSize: 12, opacity: 0.85 }}>📍 {match.location}</div>
             )}
+            {match.formation && (
+              <div style={{
+                marginTop: 4, display: 'inline-flex', alignSelf: 'flex-start',
+                padding: '3px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.2)',
+                fontSize: 12, fontWeight: 800, letterSpacing: 0.3,
+              }}>
+                MODULO {match.formation}
+              </div>
+            )}
           </div>
 
           {/* Marcatori */}
@@ -370,9 +502,16 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   <span style={{ fontSize: 11, fontWeight: 800, color: '#005f98', minWidth: 30 }}>
                     {numero(c.player_id, c.shirt_number_override)}
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
-                    {nome(c.player_id)} {c.is_captain && <span title="Capitano" style={{ color: '#8e6300' }}>(C)</span>}
-                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      {nome(c.player_id)} {c.is_captain && <span title="Capitano" style={{ color: '#8e6300' }}>(C)</span>}
+                    </div>
+                    {s?.position_played && (
+                      <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
+                        {s.position_played}
+                      </div>
+                    )}
+                  </div>
                   {s?.minute_out != null && (
                     <span style={{ fontSize: 11, color: '#707882' }}>→ uscito {s.minute_out}'</span>
                   )}

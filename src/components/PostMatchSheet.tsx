@@ -53,7 +53,25 @@ interface PostMatchSheetProps {
   onSaved?: () => void
 }
 
-const POSITIONS = ['Portiere', 'Difensore', 'Centrocampista', 'Attaccante']
+// Moduli tattici standard usati nei referti FIGC/LND (dilettanti e giovanili)
+const MODULES = [
+  '4-4-2', '4-3-3', '4-2-3-1', '4-3-1-2', '4-1-4-1', '4-5-1',
+  '3-5-2', '3-4-3', '3-4-1-2', '3-4-2-1',
+  '5-3-2', '5-4-1',
+  // Formati ridotti (Esordienti/Pulcini a 7 e 9)
+  '2-3-1 (a 7)', '3-3 (a 7)',
+  '3-3-2 (a 9)', '3-2-3 (a 9)', '2-4-2 (a 9)',
+]
+const POSITIONS = [
+  'Portiere',
+  'Difensore centrale', 'Terzino destro', 'Terzino sinistro',
+  'Mediano', 'Centrocampista centrale',
+  'Interno destro', 'Interno sinistro',
+  'Trequartista',
+  'Esterno destro', 'Esterno sinistro',
+  'Ala destra', 'Ala sinistra',
+  'Punta centrale', 'Seconda punta',
+]
 
 function emptyStats(player_id: string): Stats {
   return {
@@ -268,12 +286,18 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           s.yellow_cards > 0 || s.red_card || s.rating != null || s.is_mvp || (s.notes && s.notes.trim()) ||
           s.own_goals > 0 || s.penalties_scored > 0 || s.penalties_missed > 0
         )
-        .map(s => ({
-          ...s,
-          match_id: match.id,
-          rating: s.rating != null ? Number(s.rating) : null,
-          notes: s.notes ? s.notes.trim() : null,
-        }))
+        .map(s => {
+          // Se lo stato contiene campi provenienti dal SELECT precedente (id vuoto/valorizzato,
+          // created_at, updated_at) li scarto: dopo il DELETE la INSERT deve lasciare che il DB
+          // generi id via gen_random_uuid() e i timestamp via default now().
+          const { id: _drop_id, created_at: _drop_ca, updated_at: _drop_ua, ...clean } = s as any
+          return {
+            ...clean,
+            match_id: match.id,
+            rating: s.rating != null ? Number(s.rating) : null,
+            notes: s.notes ? s.notes.trim() : null,
+          }
+        })
       if (rows.length > 0) {
         const { error } = await supabase.from('match_player_stats').insert(rows)
         if (error) throw error
@@ -431,11 +455,15 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                   <div>
                     <SmallLabel>Modulo / formazione</SmallLabel>
                     <input
+                      list="lenci-modules"
                       value={formation}
                       onChange={e => setFormation(e.target.value)}
-                      placeholder="es. 4-3-3"
+                      placeholder="es. 4-3-3 (scegli o scrivi)"
                       style={compactInput}
                     />
+                    <datalist id="lenci-modules">
+                      {MODULES.map(m => <option key={m} value={m} />)}
+                    </datalist>
                   </div>
                   <div>
                     <SmallLabel>Meteo</SmallLabel>

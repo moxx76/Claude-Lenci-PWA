@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.48'
+export const APP_VERSION = '1.9.49'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.49',
+    date: '2026-09-15',
+    title: 'Fix salvataggio referto + modulo tattico + dashboard giornalisti',
+    features: [
+      'Nella scheda partita del referto post-gara ora il modulo tattico si sceglie da un elenco standard (4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 3-4-3 e molti altri incluse le formazioni ridotte a 7 e a 9 per Esordienti/Pulcini). Si può anche digitare liberamente. I ruoli giocati passano da 4 generici (Portiere/Difensore/Centrocampista/Attaccante) a 15 posizioni specifiche (Terzino destro/sinistro, Mediano, Interno, Trequartista, Ala, Punta centrale, Seconda punta e altri)',
+      'La vista giornalisti ora mostra in cima al dettaglio partita il modulo scelto (badge azzurro sotto il risultato) e, per ogni titolare, il ruolo specifico assegnato — così i giornalisti hanno subito il quadro tattico corretto senza dover chiedere',
+      'Nuova homepage giornalisti a card per squadra: al login l\u2019utente vede subito tutte le annate con quante partite sono pubblicate, la data dell\u2019ultima partita, l\u2019avversario e il risultato colorato. Le squadre con dati disponibili appaiono prima, quelle senza dati mostrano un placeholder chiaro',
+    ],
+    notes: [
+      'Corretto un bug per cui il salvataggio del referto post-gara falliva con errore SQL "null value in column id violates not-null constraint": lo stato del referto conservava l\u2019UUID precedente delle statistiche e lo reinseriva dopo la cancellazione. Ora la INSERT lascia sempre generare l\u2019id al database, come previsto',
+    ],
+  },
   {
     version: '1.9.48',
     date: '2026-09-15',
