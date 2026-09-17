@@ -95,7 +95,14 @@ export function JournalistPage() {
         }
         // Ordino i minuti crescenti per rendering pulito
         for (const k of Object.keys(map)) map[k].minutes.sort((a, b) => a - b)
-        return Object.values(map).sort((a, b) => b.goals - a.goals)
+        // Ordino i marcatori in ordine cronologico: chi ha segnato prima appare prima.
+        // Chi non ha minuti registrati va in fondo (per il totale gol desc come tiebreaker).
+        return Object.values(map).sort((a, b) => {
+          const fa = a.minutes[0] ?? Infinity
+          const fb = b.minutes[0] ?? Infinity
+          if (fa !== fb) return fa - fb
+          return b.goals - a.goals
+        })
       }
 
       const rows: TeamSummary[] = teams.map(t => {
@@ -165,7 +172,12 @@ export function JournalistPage() {
           id: m.id, match_date: m.match_date, opponent: m.opponent, venue: m.venue,
           competition: m.competition, home_score: m.home_score, away_score: m.away_score,
           location: m.location, formation: m.formation,
-          scorers: Object.values(scorersMap).sort((a, b) => b.goals - a.goals),
+          scorers: Object.values(scorersMap).sort((a, b) => {
+            const fa = a.minutes[0] ?? Infinity
+            const fb = b.minutes[0] ?? Infinity
+            if (fa !== fb) return fa - fb
+            return b.goals - a.goals
+          }),
         }
       })
       setMatches(rows)
@@ -478,12 +490,22 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
 
   const scorers = stats
     .filter(s => (s.goals ?? 0) + (s.penalties_scored ?? 0) > 0)
-    .map(s => ({ ...s, tot: (s.goals ?? 0) + (s.penalties_scored ?? 0) }))
-    .sort((a, b) => b.tot - a.tot)
+    .map(s => {
+      const allMin = [...(s.goal_minutes ?? []), ...(s.penalty_minutes ?? [])].sort((a, b) => a - b)
+      return { ...s, tot: (s.goals ?? 0) + (s.penalties_scored ?? 0), firstMin: allMin[0] ?? Infinity }
+    })
+    // Ordine cronologico: chi ha segnato prima appare prima; senza minuti in fondo per gol totali desc
+    .sort((a, b) => {
+      if (a.firstMin !== b.firstMin) return a.firstMin - b.firstMin
+      return b.tot - a.tot
+    })
 
   const yellowCards = stats.filter(s => (s.yellow_cards ?? 0) > 0)
   const redCards = stats.filter(s => s.red_card)
-  const ownGoals = stats.filter(s => (s.own_goals ?? 0) > 0)
+  const ownGoals = stats
+    .filter(s => (s.own_goals ?? 0) > 0)
+    .map(s => ({ ...s, firstMin: (s.own_goal_minutes ?? []).slice().sort((a, b) => a - b)[0] ?? Infinity }))
+    .sort((a, b) => a.firstMin - b.firstMin)
 
   // Ordine posizionale dal portiere in avanti (segue la logica del modulo tattico)
   const POSITION_ORDER: Record<string, number> = {

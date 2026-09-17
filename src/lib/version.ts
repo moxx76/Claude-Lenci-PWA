@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.53'
+export const APP_VERSION = '1.9.54'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.54',
+    date: '2026-09-15',
+    title: 'Vista giornalisti: marcatori in ordine cronologico',
+    features: [
+      'Nella vista giornalisti i marcatori sono ora ordinati in ordine cronologico dalla marcatura più antica alla più recente, in tutti i punti in cui appaiono: card home, elenco partite, sezione marcatori del dettaglio partita, sezione autoreti. Chi ha segnato il primo gol della partita compare per primo. I giocatori il cui minuto non è stato inserito restano in fondo, ordinati per numero di gol come prima',
+    ],
+  },
   {
     version: '1.9.53',
     date: '2026-09-15',
