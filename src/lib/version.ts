@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.51'
+export const APP_VERSION = '1.9.52'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.52',
+    date: '2026-09-15',
+    title: 'Vista giornalisti: marcatori visibili anche nell\u2019elenco partite e nelle card',
+    features: [
+      'I marcatori Lenci ora appaiono anche nelle liste, non solo nel dettaglio partita. Nella dashboard homepage, sotto il risultato dell\u2019ultima partita di ogni squadra, compare l\u2019elenco dei marcatori (es. "Rossi (2), Bianchi"). Stessa cosa nella lista partite dentro il dettaglio squadra: sotto ogni riga vedi subito chi ha segnato e quanti gol per giocatore. Così il giornalista ha il quadro dei marcatori a colpo d\u2019occhio senza dover aprire ogni partita',
+    ],
+  },
   {
     version: '1.9.51',
     date: '2026-09-15',

@@ -24,7 +24,10 @@ interface TeamSummary {
   last_result: string | null   // es. "3-1", "0-2"
   last_result_class: 'win' | 'draw' | 'loss' | null
   last_opponent: string | null
+  last_scorers: Scorer[]       // marcatori dell'ultima partita pubblicata
 }
+interface Scorer { name: string; goals: number }
+
 interface MatchRow {
   id: string
   match_date: string
@@ -35,6 +38,7 @@ interface MatchRow {
   away_score: number | null
   location: string | null
   formation?: string | null
+  scorers?: Scorer[]
 }
 interface PlayerLite {
   id: string
@@ -59,7 +63,7 @@ export function JournalistPage() {
       const [teamsRes, matchesRes] = await Promise.all([
         supabase.from('teams').select('id, name, category, color').order('name'),
         supabase.from('matches')
-          .select('id, team_id, match_date, opponent, venue, home_score, away_score')
+          .select('id, team_id, match_date, opponent, venue, home_score, away_score, match_player_stats(goals, penalties_scored, player:players_public(first_name, last_name))')
           .eq('published_for_journalists', true)
           .not('home_score', 'is', null)
           .not('away_score', 'is', null)
@@ -68,19 +72,40 @@ export function JournalistPage() {
       const teams = (teamsRes.data ?? []) as TeamRow[]
       const allMatches = (matchesRes.data ?? []) as Array<{
         id: string; team_id: string; match_date: string; opponent: string;
-        venue: 'home'|'away'; home_score: number; away_score: number
+        venue: 'home'|'away'; home_score: number; away_score: number;
+        match_player_stats?: Array<{
+          goals: number | null; penalties_scored: number | null;
+          player?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+        }>;
       }>
+
+      // Aggrego marcatori per ogni partita (usando solo il cognome)
+      const scorersOf = (mps: any[]): Scorer[] => {
+        const map: Record<string, Scorer> = {}
+        for (const s of (mps || [])) {
+          const tot = (s.goals ?? 0) + (s.penalties_scored ?? 0)
+          if (tot === 0) continue
+          const pl = Array.isArray(s.player) ? s.player[0] : s.player
+          if (!pl) continue
+          const name = pl.last_name
+          if (!map[name]) map[name] = { name, goals: 0 }
+          map[name].goals += tot
+        }
+        return Object.values(map).sort((a, b) => b.goals - a.goals)
+      }
 
       const rows: TeamSummary[] = teams.map(t => {
         const teamMatches = allMatches.filter(m => m.team_id === t.id)
         const last = teamMatches[0] || null
         let lastResult: string | null = null
         let lastClass: TeamSummary['last_result_class'] = null
+        let lastScorers: Scorer[] = []
         if (last) {
           const our = last.venue === 'home' ? last.home_score : last.away_score
           const their = last.venue === 'home' ? last.away_score : last.home_score
           lastResult = last.venue === 'home' ? `${last.home_score}-${last.away_score}` : `${last.away_score}-${last.home_score}`
           lastClass = our > their ? 'win' : our < their ? 'loss' : 'draw'
+          lastScorers = scorersOf(last.match_player_stats || [])
         }
         return {
           id: t.id, name: t.name, category: t.category, color: t.color,
@@ -89,6 +114,7 @@ export function JournalistPage() {
           last_result: lastResult,
           last_result_class: lastClass,
           last_opponent: last?.opponent ?? null,
+          last_scorers: lastScorers,
         }
       })
       // Ordino: prima quelle con dati pubblicati, poi le altre
@@ -102,20 +128,40 @@ export function JournalistPage() {
     })()
   }, [])
 
-  // Detail squadra: carico partite pubblicate della squadra scelta
+  // Detail squadra: carico partite pubblicate della squadra scelta CON marcatori
   useEffect(() => {
     if (!selectedTeamId) { setMatches([]); return }
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
-        .select('id, match_date, opponent, venue, competition, home_score, away_score, location')
+        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, match_player_stats(goals, penalties_scored, player:players_public(first_name, last_name))')
         .eq('team_id', selectedTeamId)
         .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
         .not('away_score', 'is', null)
         .order('match_date', { ascending: false })
         .limit(80)
-      setMatches((data ?? []) as MatchRow[])
+      const raw = (data ?? []) as any[]
+      // Aggrego marcatori per ciascuna partita
+      const rows: MatchRow[] = raw.map(m => {
+        const scorersMap: Record<string, Scorer> = {}
+        for (const s of (m.match_player_stats || [])) {
+          const tot = (s.goals ?? 0) + (s.penalties_scored ?? 0)
+          if (tot === 0) continue
+          const pl = Array.isArray(s.player) ? s.player[0] : s.player
+          if (!pl) continue
+          const name = pl.last_name
+          if (!scorersMap[name]) scorersMap[name] = { name, goals: 0 }
+          scorersMap[name].goals += tot
+        }
+        return {
+          id: m.id, match_date: m.match_date, opponent: m.opponent, venue: m.venue,
+          competition: m.competition, home_score: m.home_score, away_score: m.away_score,
+          location: m.location, formation: m.formation,
+          scorers: Object.values(scorersMap).sort((a, b) => b.goals - a.goals),
+        }
+      })
+      setMatches(rows)
       setLoading(false)
     })()
   }, [selectedTeamId])
@@ -188,27 +234,38 @@ export function JournalistPage() {
                 ) : (
                   <div style={{
                     padding: '8px 10px', background: '#f8f9fc', borderRadius: 8,
-                    display: 'flex', alignItems: 'center', gap: 10,
+                    display: 'flex', flexDirection: 'column', gap: 5,
                   }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10.5, color: '#707882', fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-                        Ultima partita ·{' '}
-                        {t.last_match_date && new Date(t.last_match_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10.5, color: '#707882', fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                          Ultima partita ·{' '}
+                          {t.last_match_date && new Date(t.last_match_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20', marginTop: 2 }}>
+                          vs {t.last_opponent}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20', marginTop: 2 }}>
-                        vs {t.last_opponent}
+                      <div style={{
+                        minWidth: 54, textAlign: 'center', padding: '4px 8px', borderRadius: 8,
+                        background: t.last_result_class === 'win' ? '#d4f2dd'
+                          : t.last_result_class === 'loss' ? '#ffdad6' : '#fff3d1',
+                        color: t.last_result_class === 'win' ? '#006e25'
+                          : t.last_result_class === 'loss' ? '#93000a' : '#8e6300',
+                        fontSize: 13, fontWeight: 900,
+                      }}>
+                        {t.last_result}
                       </div>
                     </div>
-                    <div style={{
-                      minWidth: 54, textAlign: 'center', padding: '4px 8px', borderRadius: 8,
-                      background: t.last_result_class === 'win' ? '#d4f2dd'
-                        : t.last_result_class === 'loss' ? '#ffdad6' : '#fff3d1',
-                      color: t.last_result_class === 'win' ? '#006e25'
-                        : t.last_result_class === 'loss' ? '#93000a' : '#8e6300',
-                      fontSize: 13, fontWeight: 900,
-                    }}>
-                      {t.last_result}
-                    </div>
+                    {/* Marcatori Lenci dell'ultima partita */}
+                    {t.last_scorers.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#c73434' }}>sports_soccer</span>
+                        <span style={{ fontSize: 11, color: '#404751', fontWeight: 600 }}>
+                          {t.last_scorers.map(s => s.goals > 1 ? `${s.name} (${s.goals})` : s.name).join(', ')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </button>
@@ -294,6 +351,17 @@ export function JournalistPage() {
                   {m.competition && (
                     <div style={{ fontSize: 11, color: '#707882', marginTop: 2, fontStyle: 'italic' }}>
                       {m.competition}
+                    </div>
+                  )}
+                  {/* Marcatori Lenci per questa partita */}
+                  {m.scorers && m.scorers.length > 0 && (
+                    <div style={{
+                      marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+                    }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#c73434' }}>sports_soccer</span>
+                      <span style={{ fontSize: 11, color: '#404751', fontWeight: 600 }}>
+                        {m.scorers.map(s => s.goals > 1 ? `${s.name} (${s.goals})` : s.name).join(', ')}
+                      </span>
                     </div>
                   )}
                 </div>
