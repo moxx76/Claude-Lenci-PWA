@@ -401,8 +401,44 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
   const redCards = stats.filter(s => s.red_card)
   const ownGoals = stats.filter(s => (s.own_goals ?? 0) > 0)
 
-  const starters = convocs.filter(c => stats.find(s => s.player_id === c.player_id)?.was_starter)
-  const bench = convocs.filter(c => !stats.find(s => s.player_id === c.player_id)?.was_starter)
+  // Ordine posizionale dal portiere in avanti (segue la logica del modulo tattico)
+  const POSITION_ORDER: Record<string, number> = {
+    'Portiere': 1,
+    'Difensore centrale': 10,
+    'Terzino destro': 11,
+    'Terzino sinistro': 12,
+    'Mediano': 20,
+    'Centrocampista centrale': 21,
+    'Interno destro': 22,
+    'Interno sinistro': 23,
+    'Esterno destro': 24,
+    'Esterno sinistro': 25,
+    'Trequartista': 30,
+    'Ala destra': 40,
+    'Ala sinistra': 41,
+    'Punta centrale': 50,
+    'Seconda punta': 51,
+  }
+  const positionRank = (posName: string | null | undefined): number => {
+    if (!posName) return 999
+    return POSITION_ORDER[posName] ?? 999
+  }
+  const sortByRole = (a: Convoc, b: Convoc) => {
+    const sa = stats.find(x => x.player_id === a.player_id)
+    const sb = stats.find(x => x.player_id === b.player_id)
+    const ra = positionRank(sa?.position_played)
+    const rb = positionRank(sb?.position_played)
+    if (ra !== rb) return ra - rb
+    // Fallback su numero maglia
+    const na = a.shirt_number_override ?? players[a.player_id]?.jersey_number ?? 999
+    const nb = b.shirt_number_override ?? players[b.player_id]?.jersey_number ?? 999
+    if (na !== nb) return na - nb
+    // Ultimo fallback: cognome
+    return (players[a.player_id]?.last_name ?? '').localeCompare(players[b.player_id]?.last_name ?? '')
+  }
+
+  const starters = convocs.filter(c => stats.find(s => s.player_id === c.player_id)?.was_starter).sort(sortByRole)
+  const bench = convocs.filter(c => !stats.find(s => s.player_id === c.player_id)?.was_starter).sort(sortByRole)
   const nome = (pid: string) => {
     const p = players[pid]
     return p ? `${p.last_name} ${p.first_name}` : '?'

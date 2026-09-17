@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.50'
+export const APP_VERSION = '1.9.51'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.51',
+    date: '2026-09-15',
+    title: 'Vista giornalisti: formazione ordinata per ruolo dal portiere in poi',
+    features: [
+      'Nella vista giornalisti la formazione titolare e la panchina vengono ora ordinate seguendo la logica del modulo tattico: dal portiere ai difensori (centrali e terzini), poi centrocampisti (mediani, interni, esterni, trequartista), poi ali e attaccanti. Se due giocatori hanno lo stesso ruolo l\u2019ordine è per numero di maglia; giocatori senza ruolo assegnato appaiono in fondo. Prima erano nell\u2019ordine grezzo del database',
+    ],
+  },
   {
     version: '1.9.50',
     date: '2026-09-15',
