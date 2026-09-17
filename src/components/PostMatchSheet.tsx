@@ -34,9 +34,12 @@ interface Stats {
   minute_out: number | null
   position_played: string | null
   goals: number
+  goal_minutes: number[]
   assists: number
   own_goals: number
+  own_goal_minutes: number[]
   penalties_scored: number
+  penalty_minutes: number[]
   penalties_missed: number
   yellow_cards: number
   red_card: boolean
@@ -81,9 +84,12 @@ function emptyStats(player_id: string): Stats {
     minute_out: null,
     position_played: null,
     goals: 0,
+    goal_minutes: [],
     assists: 0,
     own_goals: 0,
+    own_goal_minutes: [],
     penalties_scored: 0,
+    penalty_minutes: [],
     penalties_missed: 0,
     yellow_cards: 0,
     red_card: false,
@@ -639,17 +645,46 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                         )}
 
                         {/* Gol / Assist / Autogol */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
                           <Counter label="Gol" value={s.goals} onChange={v => updateStat(p.id, { goals: v })} icon="sports_soccer" color="#005f98" />
                           <Counter label="Assist" value={s.assists} onChange={v => updateStat(p.id, { assists: v })} icon="volunteer_activism" color="#006e25" />
                           <Counter label="Autogol" value={s.own_goals} onChange={v => updateStat(p.id, { own_goals: v })} icon="dangerous" color="#93000a" />
                         </div>
+                        {/* Minuti gol / autogol (facoltativi, per la vista giornalisti) */}
+                        {(s.goals > 0 || s.own_goals > 0) && (
+                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 12 }}>
+                            {s.goals > 0 && (
+                              <MinutesInput
+                                label="Minuti gol (es. 12, 45+2, 78)"
+                                value={s.goal_minutes}
+                                onChange={arr => updateStat(p.id, { goal_minutes: arr })}
+                              />
+                            )}
+                            {s.own_goals > 0 && (
+                              <MinutesInput
+                                label="Minuti autogol"
+                                value={s.own_goal_minutes}
+                                onChange={arr => updateStat(p.id, { own_goal_minutes: arr })}
+                              />
+                            )}
+                          </div>
+                        )}
 
                         {/* Rigori */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                           <Counter label="Rigori segnati" value={s.penalties_scored} onChange={v => updateStat(p.id, { penalties_scored: v })} icon="gps_fixed" color="#006e25" />
                           <Counter label="Rigori sbagliati" value={s.penalties_missed} onChange={v => updateStat(p.id, { penalties_missed: v })} icon="gps_off" color="#8e6300" />
                         </div>
+                        {/* Minuti rigori segnati */}
+                        {s.penalties_scored > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <MinutesInput
+                              label="Minuti rigori segnati"
+                              value={s.penalty_minutes}
+                              onChange={arr => updateStat(p.id, { penalty_minutes: arr })}
+                            />
+                          </div>
+                        )}
 
                         {/* Cartellini */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
@@ -902,4 +937,52 @@ const counterBtn: React.CSSProperties = {
   width: 28, height: 28, borderRadius: 6, border: '1px solid #c0c7d2',
   background: '#fff', color: '#404751', fontSize: 15, fontWeight: 800,
   cursor: 'pointer', flexShrink: 0,
+}
+
+/**
+ * Input per una lista di minuti (es. "12, 45+2, 78"). Salva un int[] normalizzato
+ * (i tempi di recupero "45+2" diventano 47). L'utente vede sempre la stringa che
+ * ha digitato finché è in focus, così può correggere liberamente.
+ */
+function MinutesInput({
+  label, value, onChange,
+}: { label: string; value: number[]; onChange: (arr: number[]) => void }) {
+  const [text, setText] = useState<string>(value.join(', '))
+  // Se il parent aggiorna value da fuori (es. dopo load), risincronizzo il testo
+  useEffect(() => {
+    setText(value.join(', '))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.length])
+
+  const parse = (raw: string): number[] => raw
+    .split(/[,;\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(s => {
+      // Supporta forme "45+2" → 47, "12" → 12
+      const m = s.match(/^(\d+)(?:\+(\d+))?$/)
+      if (!m) return NaN
+      return parseInt(m[1], 10) + (m[2] ? parseInt(m[2], 10) : 0)
+    })
+    .filter(n => Number.isFinite(n) && n >= 0 && n <= 130)
+
+  return (
+    <div>
+      <SmallLabel>{label}</SmallLabel>
+      <input
+        value={text}
+        onChange={e => {
+          setText(e.target.value)
+          onChange(parse(e.target.value))
+        }}
+        placeholder="es. 12, 45+2, 78"
+        style={{
+          width: '100%', padding: '8px 10px', borderRadius: 8,
+          border: '1px solid #c0c7d2', background: '#fff',
+          fontFamily: 'inherit', fontSize: 13, color: '#181c20',
+          boxSizing: 'border-box',
+        }}
+      />
+    </div>
+  )
 }

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.52'
+export const APP_VERSION = '1.9.53'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.53',
+    date: '2026-09-15',
+    title: 'Minuti dei gol: si registrano nel referto e appaiono ai giornalisti',
+    features: [
+      'Nel referto post-gara, quando indichi che un giocatore ha segnato gol, autoreti o rigori, subito sotto compare un campo dove puoi scrivere i minuti delle marcature separati da virgola (es. "12, 45+2, 78"). Il formato "45+2" viene interpretato come 47\u00b0 minuto. I minuti si salvano insieme al referto e sono opzionali: se non li conosci puoi lasciare il campo vuoto e resta solo il conteggio dei gol come prima',
+      'La vista giornalisti ora mostra i minuti in ogni punto in cui compaiono i marcatori: nella dashboard homepage sotto ogni card squadra ("Rossi 12\', 45+2\'"), nell\u2019elenco partite della squadra e nel dettaglio partita sotto il nome del marcatore. Se i minuti non sono stati inseriti resta il conteggio a moltiplicatore (es. "Rossi ×2")',
+    ],
+  },
   {
     version: '1.9.52',
     date: '2026-09-15',

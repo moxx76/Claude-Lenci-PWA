@@ -26,7 +26,7 @@ interface TeamSummary {
   last_opponent: string | null
   last_scorers: Scorer[]       // marcatori dell'ultima partita pubblicata
 }
-interface Scorer { name: string; goals: number }
+interface Scorer { name: string; goals: number; minutes: number[] }
 
 interface MatchRow {
   id: string
@@ -63,7 +63,7 @@ export function JournalistPage() {
       const [teamsRes, matchesRes] = await Promise.all([
         supabase.from('teams').select('id, name, category, color').order('name'),
         supabase.from('matches')
-          .select('id, team_id, match_date, opponent, venue, home_score, away_score, match_player_stats(goals, penalties_scored, player:players_public(first_name, last_name))')
+          .select('id, team_id, match_date, opponent, venue, home_score, away_score, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
           .eq('published_for_journalists', true)
           .not('home_score', 'is', null)
           .not('away_score', 'is', null)
@@ -79,7 +79,7 @@ export function JournalistPage() {
         }>;
       }>
 
-      // Aggrego marcatori per ogni partita (usando solo il cognome)
+      // Aggrego marcatori per ogni partita (usando solo il cognome + tutti i minuti)
       const scorersOf = (mps: any[]): Scorer[] => {
         const map: Record<string, Scorer> = {}
         for (const s of (mps || [])) {
@@ -88,9 +88,13 @@ export function JournalistPage() {
           const pl = Array.isArray(s.player) ? s.player[0] : s.player
           if (!pl) continue
           const name = pl.last_name
-          if (!map[name]) map[name] = { name, goals: 0 }
+          if (!map[name]) map[name] = { name, goals: 0, minutes: [] }
           map[name].goals += tot
+          if (Array.isArray(s.goal_minutes)) map[name].minutes.push(...s.goal_minutes)
+          if (Array.isArray(s.penalty_minutes)) map[name].minutes.push(...s.penalty_minutes)
         }
+        // Ordino i minuti crescenti per rendering pulito
+        for (const k of Object.keys(map)) map[k].minutes.sort((a, b) => a - b)
         return Object.values(map).sort((a, b) => b.goals - a.goals)
       }
 
@@ -134,7 +138,7 @@ export function JournalistPage() {
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
-        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, match_player_stats(goals, penalties_scored, player:players_public(first_name, last_name))')
+        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
         .eq('team_id', selectedTeamId)
         .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
@@ -151,9 +155,12 @@ export function JournalistPage() {
           const pl = Array.isArray(s.player) ? s.player[0] : s.player
           if (!pl) continue
           const name = pl.last_name
-          if (!scorersMap[name]) scorersMap[name] = { name, goals: 0 }
+          if (!scorersMap[name]) scorersMap[name] = { name, goals: 0, minutes: [] }
           scorersMap[name].goals += tot
+          if (Array.isArray(s.goal_minutes)) scorersMap[name].minutes.push(...s.goal_minutes)
+          if (Array.isArray(s.penalty_minutes)) scorersMap[name].minutes.push(...s.penalty_minutes)
         }
+        for (const k of Object.keys(scorersMap)) scorersMap[k].minutes.sort((a, b) => a - b)
         return {
           id: m.id, match_date: m.match_date, opponent: m.opponent, venue: m.venue,
           competition: m.competition, home_score: m.home_score, away_score: m.away_score,
@@ -262,7 +269,10 @@ export function JournalistPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#c73434' }}>sports_soccer</span>
                         <span style={{ fontSize: 11, color: '#404751', fontWeight: 600 }}>
-                          {t.last_scorers.map(s => s.goals > 1 ? `${s.name} (${s.goals})` : s.name).join(', ')}
+                          {t.last_scorers.map(s => {
+                            const min = s.minutes.length > 0 ? ` ${s.minutes.map(m => `${m}'`).join(', ')}` : (s.goals > 1 ? ` (${s.goals})` : '')
+                            return `${s.name}${min}`
+                          }).join(' · ')}
                         </span>
                       </div>
                     )}
@@ -360,7 +370,10 @@ export function JournalistPage() {
                     }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#c73434' }}>sports_soccer</span>
                       <span style={{ fontSize: 11, color: '#404751', fontWeight: 600 }}>
-                        {m.scorers.map(s => s.goals > 1 ? `${s.name} (${s.goals})` : s.name).join(', ')}
+                        {m.scorers.map(s => {
+                          const min = s.minutes.length > 0 ? ` ${s.minutes.map(x => `${x}'`).join(', ')}` : (s.goals > 1 ? ` (${s.goals})` : '')
+                          return `${s.name}${min}`
+                        }).join(' · ')}
                       </span>
                     </div>
                   )}
@@ -407,8 +420,11 @@ interface Convoc {
 interface Stats {
   player_id: string
   goals: number | null
+  goal_minutes: number[] | null
   penalties_scored: number | null
+  penalty_minutes: number[] | null
   own_goals: number | null
+  own_goal_minutes: number[] | null
   yellow_cards: number | null
   red_card: boolean | null
   minute_in: number | null
@@ -436,7 +452,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           .select('player_id, is_captain, shirt_number_override')
           .eq('match_id', matchId).eq('status', 'accepted'),
         supabase.from('match_player_stats')
-          .select('player_id, goals, penalties_scored, own_goals, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played')
+          .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played')
           .eq('match_id', matchId),
       ])
       setMatch((mRes.data as MatchRow) || null)
@@ -564,7 +580,9 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
               <ScorerRow key={s.player_id}
                 name={nome(s.player_id)}
                 total={s.tot}
-                penalties={s.penalties_scored ?? 0} />
+                penalties={s.penalties_scored ?? 0}
+                minutes={[...(s.goal_minutes ?? []), ...(s.penalty_minutes ?? [])].sort((a, b) => a - b)}
+              />
             ))}
           </Section>
 
@@ -572,7 +590,9 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           {ownGoals.length > 0 && (
             <Section title="Autoreti Lenci" icon="warning" empty="">
               {ownGoals.map(s => (
-                <ScorerRow key={s.player_id} name={nome(s.player_id)} total={s.own_goals ?? 0} penalties={0} suffix=" (aut.)" />
+                <ScorerRow key={s.player_id} name={nome(s.player_id)} total={s.own_goals ?? 0} penalties={0}
+                  minutes={[...(s.own_goal_minutes ?? [])].sort((a, b) => a - b)}
+                  suffix=" (aut.)" />
               ))}
             </Section>
           )}
@@ -686,13 +706,23 @@ function Section({
   )
 }
 
-function ScorerRow({ name, total, penalties, suffix }: { name: string; total: number; penalties?: number; suffix?: string }) {
+function ScorerRow({ name, total, penalties, minutes, suffix }: {
+  name: string; total: number; penalties?: number; minutes?: number[]; suffix?: string
+}) {
+  const mins = minutes && minutes.length > 0 ? minutes.map(m => `${m}'`).join(', ') : ''
   return (
     <div style={rowStyle}>
       <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c73434' }}>sports_soccer</span>
-      <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
-        {name}{suffix || ''}
-      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          {name}{suffix || ''}
+        </div>
+        {mins && (
+          <div style={{ fontSize: 11, color: '#707882', marginTop: 1, fontWeight: 600 }}>
+            {mins}
+          </div>
+        )}
+      </div>
       <span style={{ fontSize: 13, fontWeight: 900, color: '#181c20' }}>
         {total > 1 ? `×${total}` : ''}
         {penalties ? ` (${penalties} rig.)` : ''}
