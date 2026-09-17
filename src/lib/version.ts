@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.49'
+export const APP_VERSION = '1.9.50'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.50',
+    date: '2026-09-15',
+    title: 'Fix: pulsante "Subentrato" nel referto post-gara',
+    features: [
+      'Corretto il pulsante "Subentrato" che nel referto post-gara non si accendeva al tocco: ora premendolo il giocatore viene marcato come subentrato con minuto di ingresso 46 di default (inizio secondo tempo, valore modificabile subito sotto). Il flusso Titolare / Subentrato / Non entrato ora funziona come atteso',
+    ],
+  },
   {
     version: '1.9.49',
     date: '2026-09-15',

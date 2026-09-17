@@ -222,10 +222,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     if (role === 'starter') {
       updateStat(pid, { was_starter: true,  minute_in: 0,    minute_out: null })
     } else if (role === 'sub') {
-      // Manteniamo minute_in se già valorizzato (>0); altrimenti forziamo null per far
-      // apparire il campo vuoto in modo che l'utente digiti esplicitamente il minuto ingresso
+      // Serve un minute_in > 0 perché roleOf riconosca il ruolo 'sub': se il giocatore
+      // non ha ancora un ingresso valorizzato, uso 46 come default ragionevole
+      // (inizio secondo tempo per una partita da 90'); l'utente poi lo modifica.
       const current = stats[pid]
-      const keepIn = (current?.minute_in && current.minute_in > 0) ? current.minute_in : null
+      const keepIn = (current?.minute_in && current.minute_in > 0) ? current.minute_in : 46
       updateStat(pid, { was_starter: false, minute_in: keepIn, minute_out: current?.minute_out ?? null })
     } else {
       updateStat(pid, { was_starter: false, minute_in: null,  minute_out: null })
