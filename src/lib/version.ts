@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.54'
+export const APP_VERSION = '1.9.55'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.55',
+    date: '2026-09-15',
+    title: 'Referto: ora puoi registrare gli autogol degli avversari a favore Lenci',
+    features: [
+      'Nel referto post-gara, sopra la lista giocatori, compare una nuova card "Autogol avversari a favore Lenci" con contatore + campo minuti opzionali. \u00c8 per quei gol Lenci che nascono da un autogol dell\u2019avversario e che prima non trovavano posto nel referto: prima potevi solo alzare manualmente il punteggio disattivando la somma automatica, adesso li registri esplicitamente e il contatore Nostri gol si aggiorna da solo',
+      'Il campo "Autogol" gi\u00e0 presente nel form del singolo giocatore resta com\u2019era e continua a valere per il caso opposto (un nostro giocatore che segna nella propria porta, a favore avversario)',
+      'La vista giornalisti riporta questi autogol come voce speciale "aut. avversario" in corsivo nella sezione Marcatori Lenci, inserita cronologicamente insieme agli altri marcatori. La stessa voce compare anche nella card homepage e nell\u2019elenco partite della squadra, sempre coi minuti se inseriti',
+    ],
+  },
   {
     version: '1.9.54',
     date: '2026-09-15',

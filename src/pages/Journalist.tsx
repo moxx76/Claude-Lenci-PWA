@@ -39,6 +39,8 @@ interface MatchRow {
   location: string | null
   formation?: string | null
   scorers?: Scorer[]
+  opponent_own_goals?: number | null
+  opponent_own_goal_minutes?: number[] | null
 }
 interface PlayerLite {
   id: string
@@ -73,14 +75,41 @@ export function JournalistPage() {
       const allMatches = (matchesRes.data ?? []) as Array<{
         id: string; team_id: string; match_date: string; opponent: string;
         venue: 'home'|'away'; home_score: number; away_score: number;
+        opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null;
         match_player_stats?: Array<{
           goals: number | null; penalties_scored: number | null;
+          goal_minutes?: number[] | null; penalty_minutes?: number[] | null;
           player?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
         }>;
       }>
 
-      // Aggrego marcatori per ogni partita (usando solo il cognome + tutti i minuti)
-      const scorersOf = (mps: any[]): Scorer[] => {
+      // Query separata resiliente per autogol avversari (migration v1.9.55 opzionale)
+      try {
+        const matchIds = allMatches.map(m => m.id)
+        if (matchIds.length > 0) {
+          const { data: oogData } = await supabase.from('matches')
+            .select('id, opponent_own_goals, opponent_own_goal_minutes')
+            .in('id', matchIds)
+          const oogMap: Record<string, { g: number | null; m: number[] | null }> = {}
+          for (const r of (oogData ?? []) as any[]) {
+            oogMap[r.id] = { g: r.opponent_own_goals, m: r.opponent_own_goal_minutes }
+          }
+          for (const m of allMatches) {
+            const rec = oogMap[m.id]
+            if (rec) {
+              m.opponent_own_goals = rec.g
+              m.opponent_own_goal_minutes = rec.m
+            }
+          }
+        }
+      } catch (err) {
+        // Silenzioso: se la migration non c'è, procediamo senza autogol avversari
+        console.warn('[Journalist] opponent_own_goals non caricato', err)
+      }
+
+      // Aggrego marcatori per ogni partita (usando solo il cognome + tutti i minuti).
+      // Aggiungo anche gli autogol avversari a favore Lenci come voce speciale.
+      const scorersOf = (mps: any[], oogMinutes: number[] | null | undefined, oogCount: number | null | undefined): Scorer[] => {
         const map: Record<string, Scorer> = {}
         for (const s of (mps || [])) {
           const tot = (s.goals ?? 0) + (s.penalties_scored ?? 0)
@@ -93,10 +122,18 @@ export function JournalistPage() {
           if (Array.isArray(s.goal_minutes)) map[name].minutes.push(...s.goal_minutes)
           if (Array.isArray(s.penalty_minutes)) map[name].minutes.push(...s.penalty_minutes)
         }
+        // Autogol avversario: unico entry "aut. avv."
+        const oog = oogCount ?? 0
+        if (oog > 0) {
+          map['__aut_avv__'] = {
+            name: 'aut. avversario',
+            goals: oog,
+            minutes: Array.isArray(oogMinutes) ? [...oogMinutes] : [],
+          }
+        }
         // Ordino i minuti crescenti per rendering pulito
         for (const k of Object.keys(map)) map[k].minutes.sort((a, b) => a - b)
-        // Ordino i marcatori in ordine cronologico: chi ha segnato prima appare prima.
-        // Chi non ha minuti registrati va in fondo (per il totale gol desc come tiebreaker).
+        // Ordine cronologico: chi ha segnato prima appare prima; senza minuti in fondo per gol desc
         return Object.values(map).sort((a, b) => {
           const fa = a.minutes[0] ?? Infinity
           const fb = b.minutes[0] ?? Infinity
@@ -116,7 +153,7 @@ export function JournalistPage() {
           const their = last.venue === 'home' ? last.away_score : last.home_score
           lastResult = last.venue === 'home' ? `${last.home_score}-${last.away_score}` : `${last.away_score}-${last.home_score}`
           lastClass = our > their ? 'win' : our < their ? 'loss' : 'draw'
-          lastScorers = scorersOf(last.match_player_stats || [])
+          lastScorers = scorersOf(last.match_player_stats || [], last.opponent_own_goal_minutes, last.opponent_own_goals)
         }
         return {
           id: t.id, name: t.name, category: t.category, color: t.color,
@@ -145,7 +182,7 @@ export function JournalistPage() {
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
-        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
+        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
         .eq('team_id', selectedTeamId)
         .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
@@ -153,7 +190,30 @@ export function JournalistPage() {
         .order('match_date', { ascending: false })
         .limit(80)
       const raw = (data ?? []) as any[]
-      // Aggrego marcatori per ciascuna partita
+
+      // Query separata resiliente per autogol avversari
+      try {
+        const matchIds = raw.map(m => m.id)
+        if (matchIds.length > 0) {
+          const { data: oogData } = await supabase.from('matches')
+            .select('id, opponent_own_goals, opponent_own_goal_minutes')
+            .in('id', matchIds)
+          const oogMap: Record<string, { g: number | null; m: number[] | null }> = {}
+          for (const r of (oogData ?? []) as any[]) {
+            oogMap[r.id] = { g: r.opponent_own_goals, m: r.opponent_own_goal_minutes }
+          }
+          for (const m of raw) {
+            const rec = oogMap[m.id]
+            if (rec) {
+              m.opponent_own_goals = rec.g
+              m.opponent_own_goal_minutes = rec.m
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Journalist] opponent_own_goals non caricato (detail)', err)
+      }
+      // Aggrego marcatori per ciascuna partita (con autogol avversari come voce speciale)
       const rows: MatchRow[] = raw.map(m => {
         const scorersMap: Record<string, Scorer> = {}
         for (const s of (m.match_player_stats || [])) {
@@ -167,11 +227,20 @@ export function JournalistPage() {
           if (Array.isArray(s.goal_minutes)) scorersMap[name].minutes.push(...s.goal_minutes)
           if (Array.isArray(s.penalty_minutes)) scorersMap[name].minutes.push(...s.penalty_minutes)
         }
+        const oog = m.opponent_own_goals ?? 0
+        if (oog > 0) {
+          scorersMap['__aut_avv__'] = {
+            name: 'aut. avversario',
+            goals: oog,
+            minutes: Array.isArray(m.opponent_own_goal_minutes) ? [...m.opponent_own_goal_minutes] : [],
+          }
+        }
         for (const k of Object.keys(scorersMap)) scorersMap[k].minutes.sort((a, b) => a - b)
         return {
           id: m.id, match_date: m.match_date, opponent: m.opponent, venue: m.venue,
           competition: m.competition, home_score: m.home_score, away_score: m.away_score,
           location: m.location, formation: m.formation,
+          opponent_own_goals: m.opponent_own_goals, opponent_own_goal_minutes: m.opponent_own_goal_minutes,
           scorers: Object.values(scorersMap).sort((a, b) => {
             const fa = a.minutes[0] ?? Infinity
             const fb = b.minutes[0] ?? Infinity
@@ -467,7 +536,24 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played')
           .eq('match_id', matchId),
       ])
-      setMatch((mRes.data as MatchRow) || null)
+      // Query separata resiliente per autogol avversari
+      let matchRow = (mRes.data as MatchRow) || null
+      try {
+        const { data: oogData } = await supabase.from('matches')
+          .select('opponent_own_goals, opponent_own_goal_minutes')
+          .eq('id', matchId)
+          .maybeSingle()
+        if (matchRow && oogData) {
+          matchRow = {
+            ...matchRow,
+            opponent_own_goals: (oogData as any).opponent_own_goals,
+            opponent_own_goal_minutes: (oogData as any).opponent_own_goal_minutes,
+          }
+        }
+      } catch (err) {
+        console.warn('[Journalist] opponent_own_goals non caricato (match sheet)', err)
+      }
+      setMatch(matchRow)
       setConvocs((cRes.data ?? []) as Convoc[])
       setStats((sRes.data ?? []) as Stats[])
 
@@ -492,13 +578,31 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     .filter(s => (s.goals ?? 0) + (s.penalties_scored ?? 0) > 0)
     .map(s => {
       const allMin = [...(s.goal_minutes ?? []), ...(s.penalty_minutes ?? [])].sort((a, b) => a - b)
-      return { ...s, tot: (s.goals ?? 0) + (s.penalties_scored ?? 0), firstMin: allMin[0] ?? Infinity }
+      return {
+        kind: 'player' as const,
+        player_id: s.player_id,
+        tot: (s.goals ?? 0) + (s.penalties_scored ?? 0),
+        penalties_scored: s.penalties_scored ?? 0,
+        goal_minutes: s.goal_minutes,
+        penalty_minutes: s.penalty_minutes,
+        firstMin: allMin[0] ?? Infinity,
+      }
     })
-    // Ordine cronologico: chi ha segnato prima appare prima; senza minuti in fondo per gol totali desc
-    .sort((a, b) => {
-      if (a.firstMin !== b.firstMin) return a.firstMin - b.firstMin
-      return b.tot - a.tot
-    })
+  // Aggiungo eventuale autogol avversario come voce speciale
+  const oogCount = match?.opponent_own_goals ?? 0
+  const oogMinutes = (match?.opponent_own_goal_minutes ?? []).slice().sort((a, b) => a - b)
+  const scorersAll: Array<
+    | { kind: 'player'; player_id: string; tot: number; penalties_scored: number; goal_minutes?: number[] | null; penalty_minutes?: number[] | null; firstMin: number }
+    | { kind: 'oog'; tot: number; minutes: number[]; firstMin: number }
+  > = [...scorers]
+  if (oogCount > 0) {
+    scorersAll.push({ kind: 'oog', tot: oogCount, minutes: oogMinutes, firstMin: oogMinutes[0] ?? Infinity })
+  }
+  // Ordine cronologico: chi ha segnato prima appare prima; senza minuti in fondo per gol totali desc
+  scorersAll.sort((a, b) => {
+    if (a.firstMin !== b.firstMin) return a.firstMin - b.firstMin
+    return b.tot - a.tot
+  })
 
   const yellowCards = stats.filter(s => (s.yellow_cards ?? 0) > 0)
   const redCards = stats.filter(s => s.red_card)
@@ -598,14 +702,27 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
 
           {/* Marcatori */}
           <Section title="Marcatori Lenci" icon="sports_soccer" empty="Nessun marcatore registrato">
-            {scorers.length === 0 ? null : scorers.map(s => (
-              <ScorerRow key={s.player_id}
-                name={nome(s.player_id)}
-                total={s.tot}
-                penalties={s.penalties_scored ?? 0}
-                minutes={[...(s.goal_minutes ?? []), ...(s.penalty_minutes ?? [])].sort((a, b) => a - b)}
-              />
-            ))}
+            {scorersAll.length === 0 ? null : scorersAll.map((s, idx) => {
+              if (s.kind === 'oog') {
+                return (
+                  <ScorerRow key={'oog-' + idx}
+                    name="aut. avversario"
+                    total={s.tot}
+                    penalties={0}
+                    minutes={s.minutes}
+                    italic
+                  />
+                )
+              }
+              return (
+                <ScorerRow key={s.player_id}
+                  name={nome(s.player_id)}
+                  total={s.tot}
+                  penalties={s.penalties_scored ?? 0}
+                  minutes={[...(s.goal_minutes ?? []), ...(s.penalty_minutes ?? [])].sort((a, b) => a - b)}
+                />
+              )
+            })}
           </Section>
 
           {/* Autoreti */}
@@ -728,15 +845,15 @@ function Section({
   )
 }
 
-function ScorerRow({ name, total, penalties, minutes, suffix }: {
-  name: string; total: number; penalties?: number; minutes?: number[]; suffix?: string
+function ScorerRow({ name, total, penalties, minutes, suffix, italic }: {
+  name: string; total: number; penalties?: number; minutes?: number[]; suffix?: string; italic?: boolean
 }) {
   const mins = minutes && minutes.length > 0 ? minutes.map(m => `${m}'`).join(', ') : ''
   return (
     <div style={rowStyle}>
       <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#c73434' }}>sports_soccer</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, fontStyle: italic ? 'italic' : 'normal' }}>
           {name}{suffix || ''}
         </div>
         {mins && (

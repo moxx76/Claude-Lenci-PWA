@@ -121,6 +121,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [refereeNotes, setRefereeNotes] = useState('')
   // Flag "pubblica per giornalisti": se true, la partita compare nella vista giornalisti
   const [publishedForJournalists, setPublishedForJournalists] = useState(false)
+  // Autogol degli avversari a favore di Lenci (contano nel nostro punteggio, no giocatore associato)
+  const [opponentOwnGoals, setOpponentOwnGoals] = useState<number>(0)
+  const [opponentOwnGoalMinutes, setOpponentOwnGoalMinutes] = useState<number[]>([])
 
   useEffect(() => {
     if (!open || !match) return
@@ -155,6 +158,21 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setWeather(mRow?.weather ?? '')
     setRefereeNotes(mRow?.referee_notes ?? '')
     setPublishedForJournalists(mRow?.published_for_journalists === true)
+
+    // Carico autogol avversari in query separata resiliente (le colonne potrebbero non esistere
+    // se la migration v1.9.55 non è ancora stata applicata al DB).
+    try {
+      const { data: oogData } = await supabase.from('matches')
+        .select('opponent_own_goals, opponent_own_goal_minutes')
+        .eq('id', match.id)
+        .maybeSingle()
+      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null } | null
+      setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
+      setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
+    } catch {
+      setOpponentOwnGoals(0)
+      setOpponentOwnGoalMinutes([])
+    }
 
     const convPlayers: Player[] = ((convRes.data ?? []) as any[])
       .filter(c => c.player)
@@ -250,8 +268,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     Object.values(stats).filter(s => s.was_starter || (s.minute_in != null)).length,
     [stats])
   const totalGoals = useMemo(() =>
-    Object.values(stats).reduce((sum, s) => sum + (s.goals || 0) + (s.penalties_scored || 0), 0),
-    [stats])
+    Object.values(stats).reduce((sum, s) => sum + (s.goals || 0) + (s.penalties_scored || 0), 0)
+    + opponentOwnGoals,
+    [stats, opponentOwnGoals])
 
   // Auto-sync: se autoScore attivo, ourScore segue sempre la somma marcatori
   useEffect(() => {
@@ -283,6 +302,18 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         report_completed_at: hasReport ? new Date().toISOString() : null,
         report_completed_by: hasReport ? uid : null,
       }).eq('id', match.id)
+
+      // 1b. Autogol avversari a favore Lenci: UPDATE separato in try/catch
+      // (colonne aggiunte con la migration v1.9.55: se il DB non le ha ancora
+      // il campo non viene salvato ma il resto del referto sì).
+      try {
+        await supabase.from('matches').update({
+          opponent_own_goals: opponentOwnGoals,
+          opponent_own_goal_minutes: opponentOwnGoalMinutes,
+        }).eq('id', match.id)
+      } catch (err) {
+        console.warn('[PostMatchSheet] opponent_own_goals non salvato (migration mancante?)', err)
+      }
 
       // 2. Sostituisce match_player_stats: delete + insert
       await supabase.from('match_player_stats').delete().eq('match_id', match.id)
@@ -540,6 +571,49 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               }}>
                 Tocca un giocatore per aprire il form
               </span>
+            </div>
+
+            {/* Autogol degli avversari a favore Lenci: contano nel nostro risultato ma non hanno
+                un giocatore Lenci a cui essere attribuiti. */}
+            <div style={{
+              marginBottom: 12, padding: 12,
+              background: opponentOwnGoals > 0 ? '#f0f9ff' : '#f8f9fc',
+              border: `1px solid ${opponentOwnGoals > 0 ? '#005f98' : '#e0e2e9'}`,
+              borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#005f98' }}>swap_horiz</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#181c20' }}>
+                    Autogol avversari a favore Lenci
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
+                    Ogni autogol dell'avversario che vale come nostro gol. Entra nel punteggio Lenci.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                <Counter
+                  label="Numero"
+                  value={opponentOwnGoals}
+                  onChange={n => {
+                    setOpponentOwnGoals(n)
+                    // Se riduco il count sotto la lunghezza dei minuti, taglio i minuti in eccesso
+                    if (n < opponentOwnGoalMinutes.length) {
+                      setOpponentOwnGoalMinutes(opponentOwnGoalMinutes.slice(0, n))
+                    }
+                  }}
+                  icon="sports_soccer"
+                  color="#005f98"
+                />
+                {opponentOwnGoals > 0 && (
+                  <MinutesInput
+                    label="Minuti (facoltativi)"
+                    value={opponentOwnGoalMinutes}
+                    onChange={setOpponentOwnGoalMinutes}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Lista giocatori */}
