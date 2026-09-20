@@ -894,6 +894,18 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               <Icon name={savedOk ? 'check_circle' : 'save'} size={17} color="#fff" />
               {savedOk ? 'Referto salvato!' : (saving ? 'Salvo…' : 'Salva referto post-gara')}
             </button>
+
+            {/* Recap condivisibile — sempre disponibile, comodo dopo il salvataggio */}
+            <RecapExport
+              match={match}
+              formation={formation}
+              players={players}
+              stats={stats}
+              opponentOwnGoals={opponentOwnGoals}
+              opponentOwnGoalMinutes={opponentOwnGoalMinutes}
+              ourScore={parseInt(ourScore, 10) || 0}
+              theirScore={parseInt(theirScore, 10) || 0}
+            />
           </>
         )}
       </div>
@@ -1057,6 +1069,230 @@ function MinutesInput({
           boxSizing: 'border-box',
         }}
       />
+    </div>
+  )
+}
+
+/* ---------------- Recap post-gara: copia/condividi messaggio ---------------- */
+
+// Ordine ruoli standard per la formazione (dal portiere in poi)
+const RECAP_POSITION_ORDER: Record<string, number> = {
+  'Portiere': 1,
+  'Difensore centrale': 10, 'Terzino destro': 11, 'Terzino sinistro': 12,
+  'Mediano': 20, 'Centrocampista centrale': 21, 'Interno destro': 22, 'Interno sinistro': 23,
+  'Esterno destro': 24, 'Esterno sinistro': 25,
+  'Trequartista': 30,
+  'Ala destra': 40, 'Ala sinistra': 41,
+  'Punta centrale': 50, 'Seconda punta': 51,
+}
+const recapPositionRank = (pos: string | null | undefined): number =>
+  !pos ? 999 : (RECAP_POSITION_ORDER[pos] ?? 999)
+
+function buildRecapMessage(args: {
+  match: PostMatchData
+  formation: string
+  players: Player[]
+  stats: Record<string, Stats>
+  opponentOwnGoals: number
+  opponentOwnGoalMinutes: number[]
+  ourScore: number
+  theirScore: number
+}): string {
+  const { match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore } = args
+  const isHome = match.venue === 'home'
+  const lenci = 'Lenci Poirino'
+  const line1 = isHome
+    ? `🏆 ${lenci} ${ourScore}-${theirScore} ${match.opponent}`
+    : `🏆 ${match.opponent} ${theirScore}-${ourScore} ${lenci}`
+  const dateFmt = new Date(match.match_date).toLocaleDateString('it-IT', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  })
+  const teamLine = `🏅 ${match.team_name}${match.team_category ? ` · ${match.team_category}` : ''}`
+  const meta: string[] = [line1, `📅 ${dateFmt} · ${isHome ? 'in casa' : 'in trasferta'}`]
+  meta.push(teamLine)
+  if (match.competition) meta.push(`🏆 ${match.competition}`)
+
+  // Marcatori Lenci — un evento per riga, cronologici
+  type Event = { min: number; text: string; hasMin: boolean }
+  const events: Event[] = []
+  const nameOf = (pid: string): string => {
+    const p = players.find(x => x.id === pid)
+    return p ? `${p.last_name} ${p.first_name[0]}.` : '?'
+  }
+  for (const s of Object.values(stats)) {
+    const goalMin = s.goal_minutes ?? []
+    const penMin = s.penalty_minutes ?? []
+    const oogMin = s.own_goal_minutes ?? []
+    const nGoals = s.goals || 0
+    const nPen = s.penalties_scored || 0
+    const nOog = s.own_goals || 0
+
+    // Gol normali con minuti
+    goalMin.forEach(m => events.push({ min: m, text: `${m}' ⚽ ${nameOf(s.player_id)}`, hasMin: true }))
+    // Gol senza minuto (nGoals > goalMin.length)
+    const goalNoMin = Math.max(0, nGoals - goalMin.length)
+    for (let i = 0; i < goalNoMin; i++) {
+      events.push({ min: Infinity, text: `⚽ ${nameOf(s.player_id)}`, hasMin: false })
+    }
+    // Rigori con minuti
+    penMin.forEach(m => events.push({ min: m, text: `${m}' ⚽ ${nameOf(s.player_id)} (rig.)`, hasMin: true }))
+    const penNoMin = Math.max(0, nPen - penMin.length)
+    for (let i = 0; i < penNoMin; i++) {
+      events.push({ min: Infinity, text: `⚽ ${nameOf(s.player_id)} (rig.)`, hasMin: false })
+    }
+    // Autoreti nostro giocatore (a favore avversario)
+    oogMin.forEach(m => events.push({ min: m, text: `${m}' ⚠️ ${nameOf(s.player_id)} (aut. Lenci → ${match.opponent})`, hasMin: true }))
+    const oogNoMin = Math.max(0, nOog - oogMin.length)
+    for (let i = 0; i < oogNoMin; i++) {
+      events.push({ min: Infinity, text: `⚠️ ${nameOf(s.player_id)} (aut. Lenci → ${match.opponent})`, hasMin: false })
+    }
+  }
+  // Autogol avversari a favore Lenci
+  const oogAvvCount = opponentOwnGoals || 0
+  const oogAvvMin = opponentOwnGoalMinutes || []
+  oogAvvMin.forEach(m => events.push({ min: m, text: `${m}' ⚽ aut. avversario`, hasMin: true }))
+  const oogAvvNoMin = Math.max(0, oogAvvCount - oogAvvMin.length)
+  for (let i = 0; i < oogAvvNoMin; i++) {
+    events.push({ min: Infinity, text: `⚽ aut. avversario`, hasMin: false })
+  }
+  events.sort((a, b) => a.min - b.min)
+
+  const recapLines: string[] = [meta.join('\n')]
+  if (events.length > 0) {
+    recapLines.push('') // riga vuota separatore
+    recapLines.push(events.map(e => e.text).join('\n'))
+  }
+
+  // Formazione titolare (ordinata per ruolo tattico dal portiere in poi)
+  const sortByRole = (a: Player, b: Player) => {
+    const sa = stats[a.id]
+    const sb = stats[b.id]
+    const ra = recapPositionRank(sa?.position_played)
+    const rb = recapPositionRank(sb?.position_played)
+    if (ra !== rb) return ra - rb
+    const na = a.jersey_number ?? 999
+    const nb = b.jersey_number ?? 999
+    if (na !== nb) return na - nb
+    return a.last_name.localeCompare(b.last_name)
+  }
+  const starters = players.filter(p => stats[p.id]?.was_starter).sort(sortByRole)
+  const subs = players.filter(p => !stats[p.id]?.was_starter && stats[p.id]?.minute_in != null && stats[p.id]!.minute_in! > 0)
+    .sort((a, b) => (stats[a.id]!.minute_in! - stats[b.id]!.minute_in!))
+
+  if (starters.length > 0) {
+    recapLines.push('')
+    recapLines.push(`📋 Formazione titolare${formation ? ` (${formation})` : ''}:`)
+    for (const p of starters) {
+      const n = p.jersey_number != null ? `${p.jersey_number}. ` : '• '
+      const pos = stats[p.id]?.position_played ? ` – ${stats[p.id]!.position_played}` : ''
+      recapLines.push(`${n}${p.last_name} ${p.first_name[0]}.${pos}`)
+    }
+  }
+  if (subs.length > 0) {
+    recapLines.push('')
+    recapLines.push('🔄 Subentrati:')
+    for (const p of subs) {
+      const min = stats[p.id]!.minute_in
+      const pos = stats[p.id]?.position_played ? ` – ${stats[p.id]!.position_played}` : ''
+      recapLines.push(`${p.last_name} ${p.first_name[0]}. (${min}')${pos}`)
+    }
+  }
+
+  // Cartellini
+  const yellows = Object.values(stats).filter(s => (s.yellow_cards ?? 0) > 0)
+  const reds = Object.values(stats).filter(s => s.red_card)
+  if (yellows.length > 0) {
+    recapLines.push('')
+    recapLines.push(`🟨 Ammoniti: ${yellows.map(s => nameOf(s.player_id) + ((s.yellow_cards ?? 0) > 1 ? ` (${s.yellow_cards})` : '')).join(', ')}`)
+  }
+  if (reds.length > 0) {
+    recapLines.push(`🟥 Espulsi: ${reds.map(s => nameOf(s.player_id) + (s.red_card_minute ? ` (${s.red_card_minute}')` : '')).join(', ')}`)
+  }
+
+  return recapLines.join('\n')
+}
+
+function RecapExport({
+  match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore,
+}: {
+  match: PostMatchData | null
+  formation: string
+  players: Player[]
+  stats: Record<string, Stats>
+  opponentOwnGoals: number
+  opponentOwnGoalMinutes: number[]
+  ourScore: number
+  theirScore: number
+}) {
+  const [copied, setCopied] = useState(false)
+  if (!match) return null
+  const message = buildRecapMessage({ match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore })
+
+  const doCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // Fallback: alcune webview mobile bloccano clipboard senza permessi
+      window.prompt('Copia manualmente il messaggio:', message)
+    }
+  }
+  const doWhatsApp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <div style={{
+      marginTop: 12, padding: 12,
+      background: '#f0f9ff', border: '1px solid #005f98', borderRadius: 10,
+      display: 'flex', flexDirection: 'column', gap: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#005f98' }}>share</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: '#181c20' }}>
+            Recap partita
+          </div>
+          <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
+            Risultato, marcatori coi minuti, formazione titolare e subentrati.
+            Copia il messaggio o condividilo su WhatsApp.
+          </div>
+        </div>
+      </div>
+      <details style={{ background: '#fff', border: '1px solid #e0e2e9', borderRadius: 8, padding: '6px 10px' }}>
+        <summary style={{ fontSize: 11, color: '#005f98', fontWeight: 700, cursor: 'pointer' }}>
+          Anteprima messaggio
+        </summary>
+        <pre style={{
+          margin: '6px 0 0', padding: 8, background: '#f8f9fc', borderRadius: 6,
+          fontSize: 11, color: '#181c20', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: 1.45,
+          maxHeight: 240, overflowY: 'auto',
+        }}>{message}</pre>
+      </details>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <button onClick={doCopy} style={{
+          padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: copied ? '#006e25' : '#404751', color: '#fff',
+          fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          transition: 'background 0.2s',
+        }}>
+          <Icon name={copied ? 'check' : 'content_copy'} size={14} color="#fff" />
+          {copied ? 'Copiato!' : 'Copia messaggio'}
+        </button>
+        <button onClick={doWhatsApp} style={{
+          padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          background: '#25d366', color: '#fff',
+          fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}>
+          <Icon name="chat" size={14} color="#fff" />
+          Condividi WhatsApp
+        </button>
+      </div>
     </div>
   )
 }

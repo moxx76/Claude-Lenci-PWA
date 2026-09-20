@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.55'
+export const APP_VERSION = '1.9.56'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.56',
+    date: '2026-09-15',
+    title: 'Recap partita: pulsanti Copia e WhatsApp in fondo al referto',
+    features: [
+      'Dopo il salvataggio del referto post-gara compare una card blu con l\u2019anteprima di un messaggio di riepilogo pronto da condividere: risultato, squadra e competizione, elenco marcatori con il minuto del gol (rigori e autoreti indicati esplicitamente), formazione titolare col modulo tattico e i ruoli, subentrati col minuto di ingresso, ammoniti ed espulsi',
+      'Due pulsanti: Copia messaggio (mette il testo negli appunti) e Condividi WhatsApp (apre WhatsApp Web/App con il messaggio gi\u00e0 precompilato per l\u2019invio al gruppo o a un contatto). Ideale da mandare al gruppo della squadra subito dopo il fischio finale',
+      'La card \u00e8 sempre visibile mentre il referto \u00e8 aperto: puoi copiare il recap anche riaprendo il referto giorni dopo. Il messaggio si aggiorna in tempo reale mentre modifichi il referto',
+    ],
+  },
   {
     version: '1.9.55',
     date: '2026-09-15',
