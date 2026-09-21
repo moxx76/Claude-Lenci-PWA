@@ -19,6 +19,7 @@ interface MatchWithConv {
   kickoff_field: string | null
   shirt_color_home: string | null
   shirt_color_gk: string | null
+  meeting_time: string | null
   status: string
   home_score: number | null
   away_score: number | null
@@ -83,12 +84,12 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
 
     const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes] = await Promise.all([
       supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, status, home_score, away_score')
+        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score')
         .eq('team_id', teamId)
         .gte('match_date', today)
         .order('match_date').limit(20),
       supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, status, home_score, away_score')
+        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score')
         .eq('team_id', teamId)
         .lt('match_date', today)
         .order('match_date', { ascending: false }).limit(10),
@@ -247,6 +248,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       kickoff_field: m.kickoff_field,
       shirt_color_home: m.shirt_color_home,
       shirt_color_gk: m.shirt_color_gk,
+      meeting_time: m.meeting_time ?? null,
       team_id: currentTeam?.id,
       team_name: currentTeam.name,
       team_category: currentTeam.category,

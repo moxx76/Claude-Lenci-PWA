@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.56'
+export const APP_VERSION = '1.9.57'
 export const APP_VERSION_DATE = '2026-09-11'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.57',
+    date: '2026-09-21',
+    title: 'Fix: l\u2019orario di ritrovo salvato dalla convocazione ora persiste',
+    features: [
+      'Corretto un bug per cui l\u2019orario di ritrovo scritto nella scheda Presenze & Convocazioni (usato per la locandina) veniva perso alla riapertura della scheda: il campo era solo temporaneo e non veniva mai scritto sul database. Ora l\u2019orario \u00e8 persistito sulla partita e ricomparir\u00e0 al successivo accesso, sia per il coach che per il dirigente',
+    ],
+  },
   {
     version: '1.9.56',
     date: '2026-09-15',

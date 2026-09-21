@@ -18,6 +18,7 @@ export interface ConvocationMatch {
   kickoff_field?: string | null
   shirt_color_home?: string | null
   shirt_color_gk?: string | null
+  meeting_time?: string | null   // "HH:MM" salvato in DB (matches.meeting_time)
   team_id: string
   team_name: string
   team_category: string | null
@@ -209,6 +210,8 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
       setShirtColorGk(match.venue === 'away' ? agk : hgk)
     }
     setKickoffField(match.kickoff_field || match.location || '')
+    // Precompilo l'orario ritrovo dal DB (persistito nella colonna matches.meeting_time)
+    setMeetingTimeOverride(match.meeting_time || '')
 
     setLoading(false)
   }
@@ -285,6 +288,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
         shirt_color_home: shirtColorHome || null,
         shirt_color_gk: shirtColorGk || null,
         kickoff_field: kickoffField || null,
+        meeting_time: meetingTimeOverride.trim() || null,
       }).eq('id', match.id)
 
       // 2. Sostituisce le convocazioni: delete + insert

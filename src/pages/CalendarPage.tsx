@@ -223,6 +223,7 @@ export function CalendarPage() {
         location: event.location,
         location_address: event.raw.location_address ?? null,
         kickoff_field: event.raw.kickoff_field ?? null,
+        meeting_time: event.raw.meeting_time ?? null,
         competition: event.competition,
       })
       setConvocationOpen(true)
