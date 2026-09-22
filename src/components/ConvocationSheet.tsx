@@ -45,6 +45,7 @@ interface ConvocationRow {
   player_id: string
   status: 'accepted' | 'declined' | 'pending'
   is_captain: boolean
+  is_vice_captain: boolean
   shirt_number_override: number | null
   note: string | null
 }
@@ -102,7 +103,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
         .order('jersey_number', { nullsFirst: false })
         .order('last_name'),
       supabase.from('convocations')
-        .select('player_id, status, note, is_captain, shirt_number_override')
+        .select('player_id, status, note, is_captain, is_vice_captain, shirt_number_override')
         .eq('match_id', match.id),
       supabase.from('teams')
         .select(`
@@ -137,6 +138,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
         player_id: c.player_id,
         status: c.status as any,
         is_captain: !!c.is_captain,
+        is_vice_captain: !!(c as any).is_vice_captain,
         shirt_number_override: c.shirt_number_override,
         note: c.note,
       }
@@ -224,6 +226,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
         player_id: pid,
         status: newStatus,
         is_captain: newStatus === 'accepted' ? (cur?.is_captain ?? false) : false,
+        is_vice_captain: newStatus === 'accepted' ? (cur?.is_vice_captain ?? false) : false,
         shirt_number_override: cur?.shirt_number_override ?? null,
         note: cur?.note ?? null,
       } }
@@ -234,13 +237,37 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
     setRows(r => {
       const next: Record<string, ConvocationRow> = {}
       for (const [k, v] of Object.entries(r)) {
-        next[k] = { ...v, is_captain: k === pid && v.status === 'accepted' }
+        // Se questo diventa il nuovo capitano E era vice → rimuovi vice
+        const willBeCaptain = k === pid && v.status === 'accepted'
+        next[k] = {
+          ...v,
+          is_captain: willBeCaptain,
+          is_vice_captain: willBeCaptain ? false : v.is_vice_captain,
+        }
       }
       // Se il capitano non è nella lista (non era convocato) → convocalo
       if (!next[pid]) {
-        next[pid] = { player_id: pid, status: 'accepted', is_captain: true, shirt_number_override: null, note: null }
+        next[pid] = { player_id: pid, status: 'accepted', is_captain: true, is_vice_captain: false, shirt_number_override: null, note: null }
       } else if (next[pid].status !== 'accepted') {
-        next[pid] = { ...next[pid], status: 'accepted', is_captain: true }
+        next[pid] = { ...next[pid], status: 'accepted', is_captain: true, is_vice_captain: false }
+      }
+      return next
+    })
+  }
+
+  // Vice capitano: uno solo, non può coincidere col capitano titolare
+  const setViceCaptain = (pid: string) => {
+    setRows(r => {
+      const next: Record<string, ConvocationRow> = {}
+      for (const [k, v] of Object.entries(r)) {
+        // Il vice non può essere anche capitano: se questo era capitano, resta capitano e non è vice
+        const willBeVice = k === pid && v.status === 'accepted' && !v.is_captain
+        next[k] = { ...v, is_vice_captain: willBeVice }
+      }
+      if (!next[pid]) {
+        next[pid] = { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: true, shirt_number_override: null, note: null }
+      } else if (next[pid].status !== 'accepted') {
+        next[pid] = { ...next[pid], status: 'accepted', is_vice_captain: true }
       }
       return next
     })
@@ -250,7 +277,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
     setRows(r => ({
       ...r,
       [pid]: {
-        ...(r[pid] || { player_id: pid, status: 'accepted', is_captain: false, shirt_number_override: null, note: null }),
+        ...(r[pid] || { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: false, shirt_number_override: null, note: null }),
         shirt_number_override: val ? parseInt(val, 10) : null,
       },
     }))
@@ -264,6 +291,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
           player_id: p.id,
           status: 'accepted',
           is_captain: next[p.id]?.is_captain ?? false,
+          is_vice_captain: next[p.id]?.is_vice_captain ?? false,
           shirt_number_override: next[p.id]?.shirt_number_override ?? null,
           note: next[p.id]?.note ?? null,
         }
@@ -300,6 +328,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
           player_id: r.player_id,
           status: r.status,
           is_captain: r.is_captain,
+          is_vice_captain: r.is_vice_captain,
           shirt_number_override: r.shirt_number_override,
           note: r.note,
         }))
@@ -614,6 +643,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                 const row = rows[p.id]
                 const isConvocated = row?.status === 'accepted'
                 const isCap = !!row?.is_captain
+                const isVice = !!row?.is_vice_captain
                 const shirtNum = row?.shirt_number_override ?? p.jersey_number
                 const medExpires = p.medical_expiry
                   ? Math.floor((new Date(p.medical_expiry).getTime() - Date.now()) / 86400000)
@@ -699,6 +729,15 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                             <Icon name="star" size={9} color="#8e6300" /> CAP
                           </span>
                         )}
+                        {isVice && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4,
+                            background: 'rgba(0,95,152,0.18)', color: '#005f98',
+                            display: 'inline-flex', alignItems: 'center', gap: 2,
+                          }}>
+                            <Icon name="star_half" size={9} color="#005f98" /> VICE
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 10.5, color: '#707882', display: 'flex', gap: 6, alignItems: 'center' }}>
                         <span>Mat. {p.card_number || '—'}</span>
@@ -710,19 +749,36 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                       </div>
                     </div>
                     {isConvocated && (
-                      <button
-                        onClick={() => setCaptain(p.id)}
-                        title={isCap ? 'Capitano' : 'Nomina capitano'}
-                        style={{
-                          width: 28, height: 28, borderRadius: 8, border: 'none',
-                          background: isCap ? 'rgba(255,209,0,0.35)' : 'transparent',
-                          cursor: 'pointer', display: 'flex',
-                          alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Icon name="star" size={16} color={isCap ? '#8e6300' : '#c0c7d2'} />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setCaptain(p.id)}
+                          title={isCap ? 'Capitano' : 'Nomina capitano'}
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: 'none',
+                            background: isCap ? 'rgba(255,209,0,0.35)' : 'transparent',
+                            cursor: 'pointer', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon name="star" size={16} color={isCap ? '#8e6300' : '#c0c7d2'} />
+                        </button>
+                        <button
+                          onClick={() => setViceCaptain(p.id)}
+                          disabled={isCap}
+                          title={isCap ? 'Il capitano non può essere anche vice' : (isVice ? 'Vice capitano' : 'Nomina vice capitano')}
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: 'none',
+                            background: isVice ? 'rgba(0,95,152,0.18)' : 'transparent',
+                            cursor: isCap ? 'not-allowed' : 'pointer',
+                            opacity: isCap ? 0.35 : 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon name="star_half" size={16} color={isVice ? '#005f98' : '#c0c7d2'} />
+                        </button>
+                      </>
                     )}
                   </div>
                 )
@@ -879,6 +935,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                   player_id: c.id,
                   status: 'accepted',
                   is_captain: false,
+                  is_vice_captain: false,
                   shirt_number_override: null,
                   note: null,
                 }

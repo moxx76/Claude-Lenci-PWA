@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.57'
-export const APP_VERSION_DATE = '2026-09-11'
+export const APP_VERSION = '1.9.58'
+export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
   version: string
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.58',
+    date: '2026-09-22',
+    title: 'Vice capitano e passaggio di fascia nel referto giornalisti',
+    features: [
+      'Nella scheda Presenze & Convocazioni ora \u00e8 possibile nominare anche il Vice Capitano, con una nuova stella a met\u00e0 (\u2606) accanto alla stella del capitano. Vincoli: un solo vice per partita, e non pu\u00f2 essere lo stesso giocatore designato come capitano titolare',
+      'Sul referto post-gara: se il capitano titolare esce durante la partita, il minuto della sua sostituzione viene automaticamente registrato come passaggio di fascia al vice capitano. Nessuna azione manuale richiesta',
+      'Sulla vista Giornalisti la fascia \u00e8 ora tracciata correttamente: il capitano sostituito compare come "(C fino al 65\')" e il vice che ha ereditato la fascia come "(C dal 65\')", sia se era titolare sia se \u00e8 subentrato dalla panchina',
+      'Anche il messaggio recap WhatsApp riflette la nuova notazione di capitano/vice capitano con il minuto del cambio fascia',
+    ],
+    notes: [
+      'Prima release del ciclo di 4 versioni dedicato alla riscrittura della gestione distinta/report squadra. Prossime tappe: nuovo flusso Distinta Tattica con slot per modulo (v1.9.59), vista campo grafico e modulo cambiato in corsa (v1.9.60), referto post-gara che parte dalla distinta e bozza persistente (v1.9.61)',
+    ],
+  },
   {
     version: '1.9.57',
     date: '2026-09-21',

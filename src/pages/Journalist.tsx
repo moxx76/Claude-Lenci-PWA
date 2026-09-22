@@ -41,6 +41,7 @@ interface MatchRow {
   scorers?: Scorer[]
   opponent_own_goals?: number | null
   opponent_own_goal_minutes?: number[] | null
+  captain_change_minute?: number | null
 }
 interface PlayerLite {
   id: string
@@ -496,6 +497,7 @@ interface TeamRow {
 interface Convoc {
   player_id: string
   is_captain: boolean | null
+  is_vice_captain: boolean | null
   shirt_number_override: number | null
 }
 interface Stats {
@@ -530,17 +532,17 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation')
           .eq('id', matchId).maybeSingle(),
         supabase.from('convocations')
-          .select('player_id, is_captain, shirt_number_override')
+          .select('player_id, is_captain, is_vice_captain, shirt_number_override')
           .eq('match_id', matchId).eq('status', 'accepted'),
         supabase.from('match_player_stats')
           .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played')
           .eq('match_id', matchId),
       ])
-      // Query separata resiliente per autogol avversari
+      // Query separata resiliente per autogol avversari + captain_change_minute
       let matchRow = (mRes.data as MatchRow) || null
       try {
         const { data: oogData } = await supabase.from('matches')
-          .select('opponent_own_goals, opponent_own_goal_minutes')
+          .select('opponent_own_goals, opponent_own_goal_minutes, captain_change_minute')
           .eq('id', matchId)
           .maybeSingle()
         if (matchRow && oogData) {
@@ -548,10 +550,11 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             ...matchRow,
             opponent_own_goals: (oogData as any).opponent_own_goals,
             opponent_own_goal_minutes: (oogData as any).opponent_own_goal_minutes,
+            captain_change_minute: (oogData as any).captain_change_minute,
           }
         }
       } catch (err) {
-        console.warn('[Journalist] opponent_own_goals non caricato (match sheet)', err)
+        console.warn('[Journalist] opponent_own_goals/captain_change_minute non caricato (match sheet)', err)
       }
       setMatch(matchRow)
       setConvocs((cRes.data ?? []) as Convoc[])
@@ -760,6 +763,19 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           <Section title={`Titolari (${starters.length})`} icon="group" empty="Nessuna distinta registrata">
             {starters.map(c => {
               const s = stats.find(x => x.player_id === c.player_id)
+              // Notazione fascia: se capitano_change_minute è valorizzato il capitano
+              // ha ceduto la fascia al vice al minuto X
+              const capChangeAt = match?.captain_change_minute ?? null
+              let captainBadge: React.ReactNode = null
+              if (c.is_captain) {
+                captainBadge = capChangeAt
+                  ? <span title={`Capitano fino al ${capChangeAt}'`} style={{ color: '#8e6300' }}>(C fino al {capChangeAt}')</span>
+                  : <span title="Capitano" style={{ color: '#8e6300' }}>(C)</span>
+              } else if (c.is_vice_captain) {
+                captainBadge = capChangeAt
+                  ? <span title={`Fascia dal ${capChangeAt}'`} style={{ color: '#005f98' }}>(C dal {capChangeAt}')</span>
+                  : <span title="Vice capitano" style={{ color: '#005f98' }}>(VC)</span>
+              }
               return (
                 <div key={c.player_id} style={rowStyle}>
                   <span style={{ fontSize: 11, fontWeight: 800, color: '#005f98', minWidth: 30 }}>
@@ -767,7 +783,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      {nome(c.player_id)} {c.is_captain && <span title="Capitano" style={{ color: '#8e6300' }}>(C)</span>}
+                      {nome(c.player_id)} {captainBadge}
                     </div>
                     {s?.position_played && (
                       <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
@@ -788,13 +804,20 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             <Section title={`Panchina / subentrati (${bench.length})`} icon="event_seat" empty="">
               {bench.map(c => {
                 const s = stats.find(x => x.player_id === c.player_id)
+                const capChangeAt = match?.captain_change_minute ?? null
+                let viceBadge: React.ReactNode = null
+                if (c.is_vice_captain) {
+                  viceBadge = capChangeAt
+                    ? <span title={`Fascia dal ${capChangeAt}'`} style={{ color: '#005f98', marginLeft: 4 }}>(C dal {capChangeAt}')</span>
+                    : <span title="Vice capitano" style={{ color: '#005f98', marginLeft: 4 }}>(VC)</span>
+                }
                 return (
                   <div key={c.player_id} style={rowStyle}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#404751', minWidth: 30 }}>
                       {numero(c.player_id, c.shirt_number_override)}
                     </span>
                     <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
-                      {nome(c.player_id)}
+                      {nome(c.player_id)}{viceBadge}
                     </span>
                     {s?.minute_in != null && (
                       <span style={{ fontSize: 11, color: '#707882' }}>entrato {s.minute_in}'</span>

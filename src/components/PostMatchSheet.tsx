@@ -124,6 +124,10 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   // Autogol degli avversari a favore di Lenci (contano nel nostro punteggio, no giocatore associato)
   const [opponentOwnGoals, setOpponentOwnGoals] = useState<number>(0)
   const [opponentOwnGoalMinutes, setOpponentOwnGoalMinutes] = useState<number[]>([])
+  // Id del capitano dei convocati (dalla convocazione): serve per calcolare captain_change_minute
+  const [captainPlayerId, setCaptainPlayerId] = useState<string | null>(null)
+  // Id del vice capitano dei convocati (per notazione recap "Capitano dal X'")
+  const [viceCaptainPlayerId, setViceCaptainPlayerId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !match) return
@@ -137,7 +141,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     // Convocati (via convocations) + tutte stats esistenti + campi report tattico
     const [convRes, statsRes, matchRes] = await Promise.all([
       supabase.from('convocations')
-        .select('player_id, is_captain, shirt_number_override, player:players(id, first_name, last_name, jersey_number, position)')
+        .select('player_id, is_captain, is_vice_captain, shirt_number_override, player:players(id, first_name, last_name, jersey_number, position)')
         .eq('match_id', match.id)
         .eq('status', 'accepted'),
       supabase.from('match_player_stats')
@@ -189,6 +193,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         return na - nb
       })
     setPlayers(convPlayers)
+    // Identifico il capitano dalla convocazione: serve per calcolare captain_change_minute al save
+    const capRow = ((convRes.data ?? []) as any[]).find(c => c.is_captain)
+    setCaptainPlayerId(capRow?.player_id ?? null)
+    const viceRow = ((convRes.data ?? []) as any[]).find(c => (c as any).is_vice_captain)
+    setViceCaptainPlayerId(viceRow?.player_id ?? null)
 
     // Se non ci sono convocati, carico tutta la rosa (fallback)
     if (convPlayers.length === 0) {
@@ -303,16 +312,27 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         report_completed_by: hasReport ? uid : null,
       }).eq('id', match.id)
 
-      // 1b. Autogol avversari a favore Lenci: UPDATE separato in try/catch
-      // (colonne aggiunte con la migration v1.9.55: se il DB non le ha ancora
+      // 1b. Autogol avversari a favore Lenci + captain_change_minute: UPDATE separato in try/catch
+      // (colonne aggiunte con le migration v1.9.55 / v1.9.58: se il DB non le ha ancora
       // il campo non viene salvato ma il resto del referto sì).
       try {
+        // captain_change_minute: se il capitano titolare esce durante la partita
+        // (minute_out valorizzato) segno il minuto della sostituzione. Il vice
+        // prenderà la fascia da quel momento nella vista giornalisti.
+        let captainChangeMinute: number | null = null
+        if (captainPlayerId) {
+          const capStats = stats[captainPlayerId]
+          if (capStats?.was_starter && capStats.minute_out != null && capStats.minute_out > 0) {
+            captainChangeMinute = capStats.minute_out
+          }
+        }
         await supabase.from('matches').update({
           opponent_own_goals: opponentOwnGoals,
           opponent_own_goal_minutes: opponentOwnGoalMinutes,
+          captain_change_minute: captainChangeMinute,
         }).eq('id', match.id)
       } catch (err) {
-        console.warn('[PostMatchSheet] opponent_own_goals non salvato (migration mancante?)', err)
+        console.warn('[PostMatchSheet] opponent_own_goals/captain_change_minute non salvati (migration mancante?)', err)
       }
 
       // 2. Sostituisce match_player_stats: delete + insert
@@ -905,6 +925,8 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               opponentOwnGoalMinutes={opponentOwnGoalMinutes}
               ourScore={parseInt(ourScore, 10) || 0}
               theirScore={parseInt(theirScore, 10) || 0}
+              captainPlayerId={captainPlayerId}
+              viceCaptainPlayerId={viceCaptainPlayerId}
             />
           </>
         )}
@@ -1097,8 +1119,12 @@ function buildRecapMessage(args: {
   opponentOwnGoalMinutes: number[]
   ourScore: number
   theirScore: number
+  captainPlayerId: string | null
+  viceCaptainPlayerId: string | null
+  captainChangeMinute: number | null
 }): string {
-  const { match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore } = args
+  const { match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore,
+    captainPlayerId, viceCaptainPlayerId, captainChangeMinute } = args
   const isHome = match.venue === 'home'
   const lenci = 'Lenci Poirino'
   const line1 = isHome
@@ -1185,7 +1211,15 @@ function buildRecapMessage(args: {
     for (const p of starters) {
       const n = p.jersey_number != null ? `${p.jersey_number}. ` : '• '
       const pos = stats[p.id]?.position_played ? ` – ${stats[p.id]!.position_played}` : ''
-      recapLines.push(`${n}${p.last_name} ${p.first_name[0]}.${pos}`)
+      // Fascia: capitano titolare + eventuale passaggio al vice
+      let capTag = ''
+      if (p.id === captainPlayerId) {
+        capTag = captainChangeMinute ? ` (C fino al ${captainChangeMinute}')` : ' (C)'
+      } else if (p.id === viceCaptainPlayerId) {
+        // Vice che gioca dal 1': se il capitano è uscito, prende la fascia dal min di uscita
+        capTag = captainChangeMinute ? ` (C dal ${captainChangeMinute}')` : ' (VC)'
+      }
+      recapLines.push(`${n}${p.last_name} ${p.first_name[0]}.${pos}${capTag}`)
     }
   }
   if (subs.length > 0) {
@@ -1194,7 +1228,12 @@ function buildRecapMessage(args: {
     for (const p of subs) {
       const min = stats[p.id]!.minute_in
       const pos = stats[p.id]?.position_played ? ` – ${stats[p.id]!.position_played}` : ''
-      recapLines.push(`${p.last_name} ${p.first_name[0]}. (${min}')${pos}`)
+      // Vice capitano subentrato: se il capitano titolare era già uscito, prende la fascia
+      let capTag = ''
+      if (p.id === viceCaptainPlayerId) {
+        capTag = captainChangeMinute ? ` (C dal ${captainChangeMinute}')` : ' (VC)'
+      }
+      recapLines.push(`${p.last_name} ${p.first_name[0]}. (${min}')${pos}${capTag}`)
     }
   }
 
@@ -1214,6 +1253,7 @@ function buildRecapMessage(args: {
 
 function RecapExport({
   match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore,
+  captainPlayerId, viceCaptainPlayerId,
 }: {
   match: PostMatchData | null
   formation: string
@@ -1223,10 +1263,24 @@ function RecapExport({
   opponentOwnGoalMinutes: number[]
   ourScore: number
   theirScore: number
+  captainPlayerId: string | null
+  viceCaptainPlayerId: string | null
 }) {
   const [copied, setCopied] = useState(false)
   if (!match) return null
-  const message = buildRecapMessage({ match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore })
+  // Calcolo live del cambio fascia: se il capitano titolare è uscito, il vice
+  // prende la fascia dal minuto di uscita
+  let captainChangeMinute: number | null = null
+  if (captainPlayerId) {
+    const capStats = stats[captainPlayerId]
+    if (capStats?.was_starter && capStats.minute_out != null && capStats.minute_out > 0) {
+      captainChangeMinute = capStats.minute_out
+    }
+  }
+  const message = buildRecapMessage({
+    match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes,
+    ourScore, theirScore, captainPlayerId, viceCaptainPlayerId, captainChangeMinute,
+  })
 
   const doCopy = async () => {
     try {
