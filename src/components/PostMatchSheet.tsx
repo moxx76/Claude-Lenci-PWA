@@ -251,6 +251,8 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   //   'starter' = titolare (was_starter=true, minute_in=0 implicito)
   //   'sub'     = subentrato dalla panchina (was_starter=false, minute_in>0)
   //   'out'     = non entrato / non convocato (was_starter=false, minute_in=null)
+  // NB: quando un giocatore lascia lo stato 'starter' i campi legati alla distinta
+  // tattica (role_slot, slot_index, role_slot_label) vengono azzerati per coerenza.
   const setPlayerRole = (pid: string, role: 'starter' | 'sub' | 'out') => {
     if (role === 'starter') {
       updateStat(pid, { was_starter: true,  minute_in: 0,    minute_out: null })
@@ -260,9 +262,15 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       // (inizio secondo tempo per una partita da 90'); l'utente poi lo modifica.
       const current = stats[pid]
       const keepIn = (current?.minute_in && current.minute_in > 0) ? current.minute_in : 46
-      updateStat(pid, { was_starter: false, minute_in: keepIn, minute_out: current?.minute_out ?? null })
+      updateStat(pid, {
+        was_starter: false, minute_in: keepIn, minute_out: current?.minute_out ?? null,
+        role_slot: null, slot_index: null, role_slot_label: null,
+      } as any)
     } else {
-      updateStat(pid, { was_starter: false, minute_in: null,  minute_out: null })
+      updateStat(pid, {
+        was_starter: false, minute_in: null,  minute_out: null,
+        role_slot: null, slot_index: null, role_slot_label: null,
+      } as any)
     }
   }
 

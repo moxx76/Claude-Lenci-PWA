@@ -20,6 +20,7 @@ import { useToast } from '../components/Toast'
 import { TrainingProgramSheet } from '../components/TrainingProgramSheet'
 import { ParentAttendanceSheet } from '../components/ParentAttendanceSheet'
 import { ConvocationSheet } from '../components/ConvocationSheet'
+import { DistintaTatticaSheet, type DistintaTatticaData } from '../components/DistintaTatticaSheet'
 import { supabase } from '../lib/supabase'
 
 function formatDate(iso: string): { day: string; date: string; month: string } {
@@ -98,6 +99,7 @@ export function CalendarPage() {
   const [matchCounts, setMatchCounts] = useState<Record<string, MatchBreakdown>>({})
   const [postMatchOpen, setPostMatchOpen] = useState(false)
   const [postMatchData, setPostMatchData] = useState<PostMatchData | null>(null)
+  const [distintaMatch, setDistintaMatch] = useState<DistintaTatticaData | null>(null)
 
   // Se coach con squadra assegnata → filtro automatico e nascondi chips
   // È un membro staff (coach o dirigente) associato a una singola squadra?
@@ -737,6 +739,24 @@ export function CalendarPage() {
         open={convocationOpen}
         onClose={() => { setConvocationOpen(false); refresh?.() }}
         match={convocationMatch}
+        onSaved={() => refresh?.()}
+        onOpenDistintaTattica={convocationMatch ? () => {
+          setDistintaMatch({
+            id: convocationMatch.id,
+            opponent: convocationMatch.opponent,
+            match_date: convocationMatch.match_date,
+            venue: convocationMatch.venue,
+            team_id: convocationMatch.team_id,
+            team_name: convocationMatch.team_name,
+            team_category: convocationMatch.team_category,
+          })
+        } : undefined}
+      />
+      {/* Distinta tattica */}
+      <DistintaTatticaSheet
+        open={distintaMatch !== null}
+        onClose={() => setDistintaMatch(null)}
+        match={distintaMatch}
         onSaved={() => refresh?.()}
       />
     </div>

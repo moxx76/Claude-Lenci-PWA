@@ -61,11 +61,13 @@ interface ConvocationSheetProps {
   onClose: () => void
   match: ConvocationMatch | null
   onSaved?: () => void
+  /** Se fornita, mostra un pulsante "Distinta tattica" in fondo (dopo il Save) che passa alla scheda distinta */
+  onOpenDistintaTattica?: () => void
 }
 
 const CLUB_NAME = 'A.S.D. Lenci Poirino'
 
-export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationSheetProps) {
+export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistintaTattica }: ConvocationSheetProps) {
   const [players, setPlayers] = useState<Player[]>([])
   const [rows, setRows] = useState<Record<string, ConvocationRow>>({})
   const [borrowPickerOpen, setBorrowPickerOpen] = useState(false)
@@ -891,6 +893,21 @@ export function ConvocationSheet({ open, onClose, match, onSaved }: ConvocationS
                 {savedOk ? 'Salvato!' : (saving ? 'Salvo…' : 'Solo salva convocazione')}
               </button>
             </div>
+            {/* Pulsante per passare alla Distinta Tattica (fornito dal parent quando disponibile) */}
+            {onOpenDistintaTattica && acceptedCount > 0 && (
+              <button
+                onClick={() => { onOpenDistintaTattica(); onClose() }}
+                style={{
+                  width: '100%', marginTop: 10, padding: '11px 14px', borderRadius: 10,
+                  border: '1.5px solid #005f98', background: '#f0f9ff', color: '#005f98',
+                  fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Icon name="dashboard" size={15} color="#005f98" />
+                Prosegui con la Distinta tattica (modulo & titolari) →
+              </button>
+            )}
           </>
         )}
       </div>

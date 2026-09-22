@@ -5,6 +5,7 @@ import { Icon } from './Icon'
 import { useMyTeam } from '../hooks/useMyTeam'
 import { ConvocationSheet, type ConvocationMatch } from './ConvocationSheet'
 import { PostMatchSheet, type PostMatchData } from './PostMatchSheet'
+import { DistintaTatticaSheet, type DistintaTatticaData } from './DistintaTatticaSheet'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
 
@@ -38,6 +39,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   const [rosterWithoutJersey, setRosterWithoutJersey] = useState(0)
   const [openMatch, setOpenMatch] = useState<ConvocationMatch | null>(null)
   const [openPostMatch, setOpenPostMatch] = useState<PostMatchData | null>(null)
+  const [openDistinta, setOpenDistinta] = useState<DistintaTatticaData | null>(null)
   const [proposeOpen, setProposeOpen] = useState(false)
   const [editingAnn, setEditingAnn] = useState<{ id: string; title: string; body: string; audience?: string } | null>(null)
   const [myAnnouncements, setMyAnnouncements] = useState<Array<{ id: string; title: string; body: string; audience: string; status: string; rejection_reason: string | null; submitted_at: string }>>([])
@@ -273,6 +275,19 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
     })
   }
 
+  const openDistintaTattica = (m: MatchWithConv) => {
+    if (!currentTeam) return
+    setOpenDistinta({
+      id: m.id,
+      opponent: m.opponent,
+      match_date: m.match_date,
+      venue: m.venue,
+      team_id: currentTeam.id,
+      team_name: currentTeam.name,
+      team_category: currentTeam.category,
+    })
+  }
+
   const teamColor = currentTeam?.color || '#005f98'
   const nextMatch = upcoming[0] ?? null
 
@@ -444,6 +459,20 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
               <Icon name="how_to_reg" size={17} color="#fff" />
               {nextMatch.convocated_count > 0 ? 'Modifica convocazione' : 'Prepara convocazione'}
             </button>
+            {/* Distinta tattica: disponibile solo se ci sono già convocati */}
+            {nextMatch.convocated_count > 0 && (
+              <button
+                onClick={() => openDistintaTattica(nextMatch)}
+                style={{
+                  width: '100%', marginTop: 8, padding: '11px 18px', borderRadius: 10, border: '1.5px solid #005f98',
+                  background: '#fff', color: '#005f98', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Icon name="dashboard" size={15} color="#005f98" />
+                Distinta tattica (modulo & titolari)
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -680,12 +709,29 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         onClose={() => setOpenMatch(null)}
         match={openMatch}
         onSaved={() => { if (currentTeam?.id) load(currentTeam.id) }}
+        onOpenDistintaTattica={openMatch ? () => openDistintaTattica({
+          id: openMatch.id,
+          opponent: openMatch.opponent,
+          match_date: openMatch.match_date,
+          venue: openMatch.venue,
+          competition: (openMatch as any).competition ?? null,
+          home_score: null,
+          away_score: null,
+          convocated_count: 0,
+        } as MatchWithConv) : undefined}
       />
       {/* Post-match sheet */}
       <PostMatchSheet
         open={openPostMatch !== null}
         onClose={() => setOpenPostMatch(null)}
         match={openPostMatch}
+        onSaved={() => { if (currentTeam?.id) load(currentTeam.id) }}
+      />
+      {/* Distinta tattica sheet */}
+      <DistintaTatticaSheet
+        open={openDistinta !== null}
+        onClose={() => setOpenDistinta(null)}
+        match={openDistinta}
         onSaved={() => { if (currentTeam?.id) load(currentTeam.id) }}
       />
       {/* Propose announcement sheet */}

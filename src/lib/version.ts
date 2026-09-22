@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.58'
+export const APP_VERSION = '1.9.59'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.59',
+    date: '2026-09-22',
+    title: 'Distinta tattica: modulo, titolari per slot, capitani',
+    features: [
+      'Nuovo passaggio dopo la Convocazione: la "Distinta tattica" — un flusso a 3 step per compilare la formazione partendo dal modulo. Step 1: scegli il modulo tra 17 preset (4-4-2, 4-3-3, 3-5-2 e molti altri, incluse le formazioni a 7 e a 9 per Pulcini/Esordienti). Step 2: il modulo genera slot posizionali (Portiere, Terzino destro, Mediano, Ala…) e per ciascuno scegli il giocatore da un menu a tendina che pesca solo tra i convocati; i giocatori del ruolo naturale giusto compaiono in cima. Le etichette degli slot sono editabili (clicca la matita) per personalizzare il singolo ruolo. Step 3: assegni la panchina tra i convocati non titolari e confermi capitano e vice capitano (ereditati dalla convocazione ma modificabili qui)',
+      'Il pulsante "Distinta tattica" compare nella scheda partita del dirigente sotto il pulsante Convocazione (visibile solo quando c\u2019\u00e8 almeno un convocato), e anche in fondo alla scheda Presenze & Convocazioni per passare direttamente al passo successivo appena salvata la convocazione',
+      'La distinta popola automaticamente la scheda referto post-partita: i titolari sono gi\u00e0 impostati con il ruolo giocato preso dallo slot della distinta, quindi il coach nel dopo-gara deve solo aggiungere gol, minuti di sostituzione, cartellini',
+    ],
+    notes: [
+      'Migration DB: match_player_stats.role_slot / role_slot_label / slot_index, matches.lineup_completed_at / lineup_completed_by. Salvataggio tramite UPSERT su (match_id, player_id) per non azzerare eventuali stats gi\u00e0 presenti. Il PostMatchSheet ora azzera automaticamente role_slot quando un giocatore viene spostato dalla titolarit\u00e0 alla panchina, per mantenere coerenza',
+      'Prossime tappe: v1.9.60 vista campo grafico SVG in preview distinta e nel report giornalisti + modulo cambiato in corsa. v1.9.61 riscrittura completa del referto post-gara che parte dalla distinta + bozza persistente',
+    ],
+  },
   {
     version: '1.9.58',
     date: '2026-09-22',
