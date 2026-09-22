@@ -33,6 +33,8 @@ export interface DistintaTatticaData {
   team_id: string
   team_name: string
   team_category: string | null
+  /** Se già presente all'apertura dello sheet, la distinta è stata salvata in precedenza */
+  lineup_completed_at?: string | null
 }
 
 interface Convocato {
@@ -820,6 +822,23 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
                     {savedOk ? '✓ Salvata!' : saving ? 'Salvo…' : '💾 Salva distinta'}
                   </button>
                 </div>
+
+                {/* Foglio partita: appare come CTA secondaria dopo il salvataggio (o se la distinta era già salvata all'apertura) */}
+                {(savedOk || match.lineup_completed_at) && (
+                  <a
+                    href={`/foglio-partita/${match.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      marginTop: 8, padding: '11px 18px', borderRadius: 10, border: '1.5px solid #404751',
+                      background: '#fff', color: '#404751', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      textDecoration: 'none', boxSizing: 'border-box',
+                    }}
+                  >
+                    🖨️ Foglio partita A4 (stampa / PDF)
+                  </a>
+                )}
               </div>
             )}
           </>

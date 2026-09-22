@@ -13,6 +13,7 @@ import { MarketingPage } from './pages/Marketing'
 import { JournalistPage } from './pages/Journalist'
 import { ComunicatiPage } from './pages/Comunicati'
 import { EserciziPage } from './pages/EserciziPage'
+import { MatchSheetPrint } from './pages/MatchSheetPrint'
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
 import { ToastProvider } from './components/Toast'
 import { useMyTeam } from './hooks/useMyTeam'
@@ -81,6 +82,10 @@ export default function App() {
       <SilentAutoUpdater />
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
+        <Route path="/foglio-partita/:matchId" element={
+          <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>
+        } />
         <Route
           path="/"
           element={

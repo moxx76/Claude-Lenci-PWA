@@ -469,6 +469,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       team_id: currentTeam.id,
       team_name: currentTeam.name,
       team_category: currentTeam.category,
+      lineup_completed_at: m.lineup_completed_at,
     })
   }
 
@@ -656,6 +657,24 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 <Icon name="dashboard" size={15} color="#005f98" />
                 {nextMatch.lineup_completed_at ? 'Modifica distinta tattica' : 'Distinta tattica (modulo & titolari)'}
               </button>
+            )}
+            {/* Foglio partita A4 stampabile — utile per panchina/mister/collaboratori */}
+            {nextMatch.convocated_count > 0 && (
+              <a
+                href={`/foglio-partita/${nextMatch.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  width: '100%', marginTop: 8, padding: '11px 18px', borderRadius: 10, border: '1.5px solid #404751',
+                  background: '#fff', color: '#404751', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  textDecoration: 'none', boxSizing: 'border-box',
+                }}
+                title="Apre in una nuova pagina la griglia da stampare o salvare in PDF"
+              >
+                <Icon name="print" size={15} color="#404751" />
+                Foglio partita (PDF stampabile)
+              </a>
             )}
             {/* Preview distinta compilata: campo grafico + riepilogo */}
             {nextMatch.lineup_completed_at && nextMatch.lineup_starters.length > 0 && (

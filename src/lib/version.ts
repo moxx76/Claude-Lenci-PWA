@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.65'
+export const APP_VERSION = '1.9.66'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,21 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.66',
+    date: '2026-09-22',
+    title: 'Foglio partita A4 stampabile in PDF per la panchina',
+    features: [
+      'Nuovo pulsante "\ud83d\uddb0\ufe0f Foglio partita (PDF stampabile)" sotto la card del prossimo match nella dashboard: apre una pagina dedicata gi\u00e0 impaginata come foglio A4 orizzontale, con distinta pre-compilata dei tuoi convocati e griglie vuote per annotare a mano tutto quello che succede in partita',
+      'Contenuto del foglio: header con squadre + risultato finale in caselle vuote + arbitro/terreno/meteo, mini-campo con schieramento e numeri di maglia, tabella titolari (11 righe con caselle Cart e Uscita), tabella panchina (Entra + Sostituisce), 15 slot GOAL LENCI su 3 colonne con min/marcatore/assist e checkbox rigore/punizione, 8 slot GOAL AVVERSARI, 10 slot SOSTITUZIONI, 8 slot AMMONIZIONI orizzontali, 2 slot ESPULSIONI con motivo esteso e zona NOTE a righe',
+      'Stampa: un tap sul pulsante "\ud83d\uddb0\ufe0f Stampa / Salva come PDF" apre il dialogo nativo del browser che permette di stampare fisicamente o salvare in PDF (su iOS/Android si salva in Files/Drive con un tap). Il layout \u00e8 impostato per essere leggibile anche in bianco/nero, cos\u00ec funziona con qualsiasi stampante',
+      'Disponibile anche nel wizard "Distinta tattica" step finale: appena salvi la distinta compare la CTA "\ud83d\uddb0\ufe0f Foglio partita A4" per stampare subito con i giocatori appena scelti',
+    ],
+    notes: [
+      'Nessuna dipendenza esterna: implementato con Print CSS + window.print() nativo. Il foglio si adatta gi\u00e0 alle proporzioni A4 landscape (297\u00d7210 mm)',
+      'La rotta \u00e8 /foglio-partita/:matchId, apre in una nuova scheda per non perdere la dashboard',
+    ],
+  },
   {
     version: '1.9.65',
     date: '2026-09-22',
