@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.62'
+export const APP_VERSION = '1.9.63'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.63',
+    date: '2026-09-22',
+    title: 'Campo grafico: sostituzioni indicate + immagine PNG per WhatsApp + preview partite passate',
+    features: [
+      'Il campo grafico ora mostra anche le sostituzioni: sotto ogni titolare che \u00e8 uscito compare una freccia gialla "\u2193 65\u2032" seguita dal cognome (con numero maglia) del subentrato. Cos\u00ec la formazione racconta l\u2019intera partita a colpo d\u2019occhio, non solo l\u2019undici iniziale. Visibile su dashboard, distinta tattica, vista giornalisti e nel recap PNG',
+      'Nuovi due pulsanti nel Recap partita del referto post-gara: "Scarica campo (PNG)" e "Condividi immagine". La formazione viene esportata come immagine 900x1260 pixel (qualit\u00e0 retina) pronta per WhatsApp/Instagram. Su mobile "Condividi" apre il selettore nativo di condivisione con file immagine allegato; su desktop scarica il PNG e copia il testo del recap negli appunti da incollare accanto',
+      'Preview distinta anche sulle partite passate della dashboard: le ultime 5 gi\u00e0 giocate mostrano una sezione espandibile "Vedi distinta" con modulo, campo grafico e sostituzioni. Utile per rivedere schieramenti e cambi vecchi senza dover riaprire il referto',
+    ],
+    notes: [
+      'Il PNG del campo \u00e8 generato via canvas dal SVG del componente PitchView (nessuna dipendenza esterna): funziona offline e senza upload di dati. Se il browser non supporta la Web Share API con file (desktop principalmente), la condivisione fa fallback su download del PNG + copia del testo negli appunti',
+    ],
+  },
   {
     version: '1.9.62',
     date: '2026-09-22',

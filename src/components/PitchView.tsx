@@ -18,6 +18,12 @@ export interface PitchPlayer {
   first_name: string
   is_captain?: boolean
   is_vice_captain?: boolean
+  /** Se il titolare è stato sostituito: minuto di uscita */
+  minute_out?: number | null
+  /** Se il titolare è stato sostituito: nome del subentrato (cognome) */
+  substituted_by?: string | null
+  /** Se il titolare è stato sostituito: numero maglia del subentrato */
+  substituted_by_number?: number | null
 }
 
 interface Props {
@@ -164,6 +170,42 @@ export function PitchView({
                   )}
                 </text>
               )}
+              {/* Sostituzione: freccetta ↓ con minuto e nome subentrato sotto */}
+              {showNames && player?.substituted_by && player?.minute_out != null && (
+                <>
+                  {/* Riga min di uscita in giallo */}
+                  <text
+                    x={cx}
+                    y={cy + 11.5}
+                    textAnchor="middle"
+                    fontSize={2.2}
+                    fontWeight={700}
+                    fill="#ffd100"
+                    stroke="rgba(0,0,0,0.5)"
+                    strokeWidth={0.15}
+                    paintOrder="stroke"
+                    style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                  >
+                    ↓ {player.minute_out}′
+                  </text>
+                  {/* Nome del subentrato */}
+                  <text
+                    x={cx}
+                    y={cy + 14.5}
+                    textAnchor="middle"
+                    fontSize={2.3}
+                    fontWeight={600}
+                    fill="#fff"
+                    stroke="rgba(0,0,0,0.5)"
+                    strokeWidth={0.15}
+                    paintOrder="stroke"
+                    style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                  >
+                    {player.substituted_by_number != null && `#${player.substituted_by_number} `}
+                    {player.substituted_by}
+                  </text>
+                </>
+              )}
               {showNames && !player && (
                 <text
                   x={cx}
@@ -209,4 +251,64 @@ function FieldLines({ lineColor }: { lineColor: string }) {
       <path d="M 40 122 A 10 10 0 0 1 60 122" />
     </g>
   )
+}
+
+/**
+ * Utility: converte l'SVG del PitchView in PNG data URL.
+ * Usato per generare l'immagine da condividere su WhatsApp accanto al recap testuale.
+ *
+ * NB: l'SVG deve essere self-contained (no external images/fonts). Nel PitchView usiamo
+ * solo colori inline + font di sistema, quindi il rendering canvas → PNG funziona su tutti i browser.
+ */
+export async function pitchToPngDataUrl(svgElement: SVGSVGElement, scale = 3): Promise<string> {
+  const vbW = 100, vbH = 140
+  const width = vbW * scale * 3   // 900px @ scale 3 (ottima qualità per WhatsApp)
+  const height = vbH * scale * 3  // 1260px
+
+  const serializer = new XMLSerializer()
+  let svgStr = serializer.serializeToString(svgElement)
+  if (!svgStr.match(/^<svg[^>]+xmlns=/)) {
+    svgStr = svgStr.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"')
+  }
+  svgStr = svgStr.replace(/^<svg[^>]*>/, (match) => {
+    // Rimuovo eventuali width/height inline e aggiungo width/height espliciti per il canvas
+    return match.replace(/\s(width|height)="[^"]*"/g, '') + ''
+  }).replace(/^<svg/, `<svg width="${width}" height="${height}"`)
+
+  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(svgBlob)
+
+  try {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Errore caricamento SVG in immagine'))
+      img.src = url
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas 2D context non disponibile')
+    ctx.fillStyle = '#2d7a3e'
+    ctx.fillRect(0, 0, width, height)
+    ctx.drawImage(img, 0, 0, width, height)
+    return canvas.toDataURL('image/png')
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Utility: converte una data URL PNG in Blob (utile per navigator.share con file).
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(',')
+  const mimeMatch = parts[0].match(/data:([^;]+)/)
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png'
+  const binary = atob(parts[1])
+  const array = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i)
+  return new Blob([array], { type: mime })
 }

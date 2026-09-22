@@ -770,11 +770,26 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           {/* Distinta - Campo grafico */}
           {starters.length > 0 && match?.formation && (() => {
             // Costruisco i player per il PitchView usando role_slot da stats + capitani da convocs
+            // Includo le sostituzioni: per ogni titolare uscito, trovo chi è entrato al suo minute_out
+            const subsByMin: Record<number, { last_name: string; jersey_number: number | null }> = {}
+            for (const c of convocs) {
+              const s = stats.find(x => x.player_id === c.player_id)
+              if (s && !s.was_starter && s.minute_in != null && s.minute_in > 0) {
+                const p = players[c.player_id]
+                if (p) {
+                  subsByMin[s.minute_in] = {
+                    last_name: p.last_name,
+                    jersey_number: c.shirt_number_override ?? p.jersey_number,
+                  }
+                }
+              }
+            }
             const pitchPlayers: PitchPlayer[] = starters
               .map(c => {
                 const s = stats.find(x => x.player_id === c.player_id)
                 const player = players[c.player_id]
                 if (!s?.role_slot || !player) return null
+                const substituted = s.minute_out != null && s.minute_out > 0 ? subsByMin[s.minute_out] : null
                 return {
                   slot_key: s.role_slot,
                   slot_label: s.role_slot_label || '',
@@ -783,6 +798,9 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   first_name: player.first_name,
                   is_captain: !!c.is_captain,
                   is_vice_captain: !!c.is_vice_captain,
+                  minute_out: s.minute_out,
+                  substituted_by: substituted?.last_name ?? null,
+                  substituted_by_number: substituted?.jersey_number ?? null,
                 } as PitchPlayer
               })
               .filter((p): p is PitchPlayer => p !== null)

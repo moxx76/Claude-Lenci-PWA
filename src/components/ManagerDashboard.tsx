@@ -39,6 +39,9 @@ interface MatchWithConv {
     jersey_number: number | null
     is_captain: boolean
     is_vice_captain: boolean
+    minute_out: number | null
+    substituted_by: string | null
+    substituted_by_number: number | null
   }>
   lineup_captain_name: string | null
   lineup_vice_name: string | null
@@ -152,13 +155,14 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       }
     }
 
-    // Preload distinta del prossimo match (solo se lineup_completed_at) per la preview compatta
-    // Faccio una singola fetch di tutti gli slot titolari + capitani per i match imminenti che hanno la distinta
+    // Preload distinta per prossimi e ultime 5 partite passate (per la preview compatta)
     const upcomingWithLineup = (upcomingRes.data ?? []).filter((m: any) => m.lineup_completed_at)
-    const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string; last_name: string; first_name: string; jersey_number: number | null; is_captain: boolean; is_vice_captain: boolean }>> = {}
+    const pastWithLineup = (pastRes.data ?? []).slice(0, 5).filter((m: any) => m.lineup_completed_at)
+    const allWithLineup = [...upcomingWithLineup, ...pastWithLineup]
+    const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string; last_name: string; first_name: string; jersey_number: number | null; is_captain: boolean; is_vice_captain: boolean; minute_out: number | null; substituted_by: string | null; substituted_by_number: number | null }>> = {}
     const lineupCapByMatch: Record<string, { cap: string | null; vice: string | null; bench: number; capId: string | null; viceId: string | null }> = {}
-    if (upcomingWithLineup.length > 0) {
-      const lineupIds = upcomingWithLineup.map((m: any) => m.id)
+    if (allWithLineup.length > 0) {
+      const lineupIds = allWithLineup.map((m: any) => m.id)
       // Prima raccolgo capitano/vice per match_id (mi serve prima di costruire lineup_starters)
       const { data: convDetail } = await supabase.from('convocations')
         .select('match_id, player_id, is_captain, is_vice_captain, player:players(first_name, last_name, jersey_number)')
@@ -170,14 +174,38 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         if (c.is_captain) capViceIds[c.match_id].capId = c.player_id
         if (c.is_vice_captain) capViceIds[c.match_id].viceId = c.player_id
       }
-      // Titolari con dati giocatore
+      // Titolari con dati giocatore + minute_in/out per calcolo sostituzioni
       const { data: lineupStatsRes } = await supabase.from('match_player_stats')
-        .select('match_id, player_id, slot_index, role_slot, role_slot_label, was_starter, player:players(first_name, last_name, jersey_number)')
+        .select('match_id, player_id, slot_index, role_slot, role_slot_label, was_starter, minute_in, minute_out, player:players(first_name, last_name, jersey_number)')
         .in('match_id', lineupIds)
+      // Prima costruisco una mappa dei subentrati per match: chi ha minute_in = X = titolare uscito al minuto X
+      const subsByMatch: Record<string, Array<{ player_id: string; minute_in: number; last_name: string; jersey_number: number | null }>> = {}
+      for (const s of (lineupStatsRes ?? []) as any[]) {
+        if (!s.was_starter && s.minute_in != null && s.minute_in > 0 && s.player) {
+          if (!subsByMatch[s.match_id]) subsByMatch[s.match_id] = []
+          subsByMatch[s.match_id].push({
+            player_id: s.player_id,
+            minute_in: s.minute_in,
+            last_name: s.player.last_name,
+            jersey_number: s.player.jersey_number,
+          })
+        }
+      }
       for (const s of (lineupStatsRes ?? []) as any[]) {
         if (s.was_starter && s.slot_index != null && s.player) {
           if (!lineupStartersByMatch[s.match_id]) lineupStartersByMatch[s.match_id] = []
           const cv = capViceIds[s.match_id]
+          // Cerco chi è entrato al minuto in cui questo titolare è uscito
+          let substituted_by: string | null = null
+          let substituted_by_number: number | null = null
+          if (s.minute_out != null && s.minute_out > 0) {
+            const matchSubs = subsByMatch[s.match_id] || []
+            const sub = matchSubs.find(x => x.minute_in === s.minute_out)
+            if (sub) {
+              substituted_by = sub.last_name
+              substituted_by_number = sub.jersey_number
+            }
+          }
           lineupStartersByMatch[s.match_id].push({
             slot_index: s.slot_index,
             role_slot: s.role_slot,
@@ -188,6 +216,9 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
             jersey_number: s.player.jersey_number,
             is_captain: cv?.capId === s.player_id,
             is_vice_captain: cv?.viceId === s.player_id,
+            minute_out: s.minute_out ?? null,
+            substituted_by,
+            substituted_by_number,
           })
         }
       }
@@ -592,6 +623,9 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                     first_name: s.first_name,
                     is_captain: s.is_captain,
                     is_vice_captain: s.is_vice_captain,
+                    minute_out: s.minute_out,
+                    substituted_by: s.substituted_by,
+                    substituted_by_number: s.substituted_by_number,
                   }))}
                   height={340}
                   shirtColor={teamColor}
@@ -653,6 +687,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 match={m}
                 onOpenDistinta={() => openConvocation(m)}
                 onOpenReport={() => openReport(m)}
+                teamColor={teamColor}
               />
             ))}
           </div>
@@ -910,15 +945,17 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   )
 }
 
-function PastMatchRow({ match, onOpenDistinta, onOpenReport }: {
+function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor }: {
   match: MatchWithConv;
   onOpenDistinta: () => void;
   onOpenReport: () => void;
+  teamColor: string;
 }) {
   const d = new Date(match.match_date)
   const isHome = match.venue === 'home'
   const hasReport = match.stats_count > 0
   const hasScore = match.home_score != null && match.away_score != null
+  const hasLineup = match.lineup_completed_at && match.lineup_starters.length > 0
   const ourScore = isHome ? match.home_score : match.away_score
   const theirScore = isHome ? match.away_score : match.home_score
   const resultColor = hasScore && ourScore! > theirScore! ? '#006e25'
@@ -991,6 +1028,40 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport }: {
           <span>{hasReport ? `Referto ✓ (${match.stats_count})` : 'Compila referto'}</span>
         </button>
       </div>
+      {/* Distinta espandibile con campo grafico e sostituzioni */}
+      {hasLineup && (
+        <details style={{ borderTop: '1px solid #f1f3fa' }}>
+          <summary style={{
+            padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#005f98',
+            cursor: 'pointer', background: '#f8fbff', listStyle: 'none',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <Icon name="dashboard" size={13} color="#005f98" />
+            Vedi distinta ({match.formation || '—'}) · {match.lineup_starters.length} tit
+            {match.lineup_starters.filter(s => s.substituted_by).length > 0 &&
+              ` · ${match.lineup_starters.filter(s => s.substituted_by).length} sub`}
+          </summary>
+          <div style={{ padding: 8 }}>
+            <PitchView
+              formation={match.formation || '4-4-2'}
+              players={match.lineup_starters.map<PitchPlayer>(s => ({
+                slot_key: s.role_slot || '',
+                slot_label: s.role_slot_label || '',
+                jersey_number: s.jersey_number,
+                last_name: s.last_name,
+                first_name: s.first_name,
+                is_captain: s.is_captain,
+                is_vice_captain: s.is_vice_captain,
+                minute_out: s.minute_out,
+                substituted_by: s.substituted_by,
+                substituted_by_number: s.substituted_by_number,
+              }))}
+              height={320}
+              shirtColor={teamColor}
+            />
+          </div>
+        </details>
+      )}
     </div>
   )
 }

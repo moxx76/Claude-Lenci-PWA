@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
 import { avatarBg } from '../lib/utils'
 import { StaffAttendanceSection } from './StaffAttendanceSection'
+import { PitchView, pitchToPngDataUrl, dataUrlToBlob, type PitchPlayer } from './PitchView'
 
 export interface PostMatchData {
   id: string
@@ -47,6 +48,9 @@ interface Stats {
   rating: number | null
   is_mvp: boolean
   notes: string | null
+  role_slot?: string | null
+  slot_index?: number | null
+  role_slot_label?: string | null
 }
 
 interface PostMatchSheetProps {
@@ -1596,6 +1600,9 @@ function RecapExport({
   viceCaptainPlayerId: string | null
 }) {
   const [copied, setCopied] = useState(false)
+  const [pngBusy, setPngBusy] = useState(false)
+  const [pngError, setPngError] = useState<string | null>(null)
+  const pitchWrapRef = useRef<HTMLDivElement>(null)
   if (!match) return null
   // Calcolo live del cambio fascia: se il capitano titolare è uscito, il vice
   // prende la fascia dal minuto di uscita
@@ -1610,6 +1617,44 @@ function RecapExport({
     match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes,
     ourScore, theirScore, captainPlayerId, viceCaptainPlayerId, captainChangeMinute,
   })
+
+  // Costruisco i PitchPlayer per il campo grafico dell'export PNG (solo se distinta valida)
+  const pitchPlayers: PitchPlayer[] = useMemo(() => {
+    const starters = players
+      .map(p => {
+        const s = stats[p.id]
+        if (!s?.was_starter || (s as any).slot_index == null || !s.role_slot) return null
+        // Cerca subentrato
+        let substituted_by: string | null = null
+        let substituted_by_number: number | null = null
+        if (s.minute_out != null && s.minute_out > 0) {
+          const subP = players.find(x => {
+            const xs = stats[x.id]
+            return xs && !xs.was_starter && xs.minute_in === s.minute_out
+          })
+          if (subP) {
+            substituted_by = subP.last_name
+            substituted_by_number = subP.jersey_number
+          }
+        }
+        return {
+          slot_key: s.role_slot,
+          slot_label: (s as any).role_slot_label || '',
+          jersey_number: p.jersey_number,
+          last_name: p.last_name,
+          first_name: p.first_name,
+          is_captain: p.id === captainPlayerId,
+          is_vice_captain: p.id === viceCaptainPlayerId,
+          minute_out: s.minute_out,
+          substituted_by,
+          substituted_by_number,
+        } as PitchPlayer
+      })
+      .filter((x): x is PitchPlayer => x !== null)
+    return starters
+  }, [players, stats, captainPlayerId, viceCaptainPlayerId])
+
+  const hasPitch = pitchPlayers.length > 0 && !!formation
 
   const doCopy = async () => {
     try {
@@ -1626,6 +1671,71 @@ function RecapExport({
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  // Scarica il campo grafico come PNG (locandina condivisibile)
+  const doDownloadPitchPng = async () => {
+    setPngError(null)
+    setPngBusy(true)
+    try {
+      const svg = pitchWrapRef.current?.querySelector('svg') as SVGSVGElement | null
+      if (!svg) throw new Error('Campo non trovato')
+      const dataUrl = await pitchToPngDataUrl(svg, 3)
+      // Trigger download
+      const a = document.createElement('a')
+      a.href = dataUrl
+      const isHome = match.venue === 'home'
+      const dateStr = new Date(match.match_date).toISOString().slice(0, 10)
+      a.download = `formazione-${dateStr}-${isHome ? 'vs' : 'a'}-${match.opponent.replace(/[^a-zA-Z0-9]/g, '_')}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (e: any) {
+      setPngError(e?.message || 'Errore generazione immagine')
+    } finally {
+      setPngBusy(false)
+    }
+  }
+
+  // Condividi via Web Share API (native share sheet mobile) — se non supportato, fallback download
+  const doSharePitchPng = async () => {
+    setPngError(null)
+    setPngBusy(true)
+    try {
+      const svg = pitchWrapRef.current?.querySelector('svg') as SVGSVGElement | null
+      if (!svg) throw new Error('Campo non trovato')
+      const dataUrl = await pitchToPngDataUrl(svg, 3)
+      const blob = dataUrlToBlob(dataUrl)
+      const isHome = match.venue === 'home'
+      const dateStr = new Date(match.match_date).toISOString().slice(0, 10)
+      const fileName = `formazione-${dateStr}-${isHome ? 'vs' : 'a'}-${match.opponent.replace(/[^a-zA-Z0-9]/g, '_')}.png`
+      const file = new File([blob], fileName, { type: 'image/png' })
+      // Prova Web Share API con file
+      const nav = navigator as any
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        await nav.share({
+          files: [file],
+          title: `Formazione ${match.team_name} vs ${match.opponent}`,
+          text: message,
+        })
+      } else {
+        // Fallback: download del file + copia del testo negli appunti
+        const a = document.createElement('a')
+        a.href = dataUrl
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        try { await navigator.clipboard.writeText(message) } catch {}
+        alert('Immagine scaricata e testo copiato negli appunti. Ora aprilo in WhatsApp e allega l\u2019immagine.')
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') {
+        setPngError(e?.message || 'Errore condivisione immagine')
+      }
+    } finally {
+      setPngBusy(false)
+    }
+  }
+
   return (
     <div style={{
       marginTop: 12, padding: 12,
@@ -1640,7 +1750,7 @@ function RecapExport({
           </div>
           <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
             Risultato, marcatori coi minuti, formazione titolare e subentrati.
-            Copia il messaggio o condividilo su WhatsApp.
+            Copia il messaggio o condividilo su WhatsApp{hasPitch ? ', o scarica il campo grafico come immagine' : ''}.
           </div>
         </div>
       </div>
@@ -1655,6 +1765,21 @@ function RecapExport({
           maxHeight: 240, overflowY: 'auto',
         }}>{message}</pre>
       </details>
+      {hasPitch && (
+        <details style={{ background: '#fff', border: '1px solid #e0e2e9', borderRadius: 8, padding: '6px 10px' }}>
+          <summary style={{ fontSize: 11, color: '#005f98', fontWeight: 700, cursor: 'pointer' }}>
+            Anteprima campo (usato per l\u2019immagine PNG)
+          </summary>
+          <div ref={pitchWrapRef} style={{ marginTop: 6 }}>
+            <PitchView
+              formation={formation}
+              players={pitchPlayers}
+              height={340}
+              shirtColor={match.team_color || '#b3005c'}
+            />
+          </div>
+        </details>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <button onClick={doCopy} style={{
           padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -1676,6 +1801,38 @@ function RecapExport({
           Condividi WhatsApp
         </button>
       </div>
+      {hasPitch && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button onClick={doDownloadPitchPng} disabled={pngBusy} style={{
+            padding: '10px 12px', borderRadius: 8, border: '1px solid #005f98', cursor: pngBusy ? 'wait' : 'pointer',
+            background: '#fff', color: '#005f98',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: pngBusy ? 0.6 : 1,
+          }}>
+            <Icon name="download" size={14} color="#005f98" />
+            {pngBusy ? 'Genero…' : 'Scarica campo (PNG)'}
+          </button>
+          <button onClick={doSharePitchPng} disabled={pngBusy} style={{
+            padding: '10px 12px', borderRadius: 8, border: 'none', cursor: pngBusy ? 'wait' : 'pointer',
+            background: '#25d366', color: '#fff',
+            fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            opacity: pngBusy ? 0.6 : 1,
+          }}>
+            <Icon name="ios_share" size={14} color="#fff" />
+            {pngBusy ? 'Genero…' : 'Condividi immagine'}
+          </button>
+        </div>
+      )}
+      {pngError && (
+        <div style={{
+          padding: 8, borderRadius: 6, background: '#ffdad6', color: '#93000a',
+          fontSize: 11, fontWeight: 600,
+        }}>
+          ⚠️ {pngError}
+        </div>
+      )}
     </div>
   )
 }
