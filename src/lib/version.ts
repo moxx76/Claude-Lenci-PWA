@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.67'
+export const APP_VERSION = '1.9.68'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.68',
+    date: '2026-09-22',
+    title: 'Dashboard mister: pulsanti prossima partita smettono di lampeggiare',
+    fixes: [
+      'I pulsanti "Distinta tattica" e "Foglio partita" nella card del prossimo match a volte scomparivano e riapparivano a intermittenza. Ora la dashboard tiene in memoria l\u2019ultima partita mostrata (sticky) e non azzera pi\u00f9 i pulsanti anche se un reload interno fallisce a met\u00e0. Aggiunto anche un try/catch globale intorno al caricamento della dashboard: se una singola query fallisce, gli altri dati continuano a mostrarsi invece di far sparire tutto',
+      'Aggiunti log diagnostici in console del browser (F12 \u2192 Console) che stampano "[ManagerDashboard] load() #N" ogni volta che la dashboard si ricarica: utile per capire se un\u2019azione fa scattare troppi reload consecutivi',
+    ],
+  },
   {
     version: '1.9.67',
     date: '2026-09-22',

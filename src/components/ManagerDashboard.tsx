@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Icon } from './Icon'
@@ -102,17 +102,24 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
 
   useEffect(() => { if (currentTeam?.id) load(currentTeam.id) }, [currentTeam?.id])
 
+  // Counter di quante volte è partito load, utile per diagnosticare re-render loop
+  const loadCounterRef = useRef(0)
+
   const load = async (teamId: string) => {
+    loadCounterRef.current += 1
+    const loadNum = loadCounterRef.current
+    console.log(`[ManagerDashboard] load() #${loadNum} — team ${teamId}`)
     setLoading(true)
-    const today = new Date().toISOString().slice(0, 10)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
 
-    // Fetch parallelo
-    const in14d = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
-    const from14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
+      // Fetch parallelo
+      const in14d = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+      const from14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
 
-    const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes] = await Promise.all([
-      supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
+      const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes] = await Promise.all([
+        supabase.from('matches')
+          .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
         .eq('team_id', teamId)
         .gte('match_date', today)
         .order('match_date').limit(20),
@@ -417,8 +424,14 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         })
       }
     }
-
-    setLoading(false)
+      console.log(`[ManagerDashboard] load() #${loadNum} — completato, upcoming=${(upcomingRes.data ?? []).length} past=${(pastRes.data ?? []).length}`)
+    } catch (err) {
+      // Se qualcosa fallisce nel middle di load(), NON azzero lo stato precedente:
+      // meglio tenere i pulsanti come stavano piuttosto che farli sparire.
+      console.error(`[ManagerDashboard] load() #${loadNum} — errore:`, err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const openConvocation = (m: MatchWithConv) => {
@@ -474,7 +487,19 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   }
 
   const teamColor = currentTeam?.color || '#005f98'
-  const nextMatch = upcoming[0] ?? null
+  // Sticky nextMatch: se `upcoming[0]` per un frame diventa null a causa di un reload
+  // fallito, tengo l'ultimo valore known-good. Il ref viene aggiornato solo quando
+  // c'è un match valido (in useEffect sotto), altrimenti riuso quello precedente.
+  const rawNextMatch = upcoming[0] ?? null
+  const lastGoodNextMatchRef = useRef<MatchWithConv | null>(null)
+  useEffect(() => {
+    if (rawNextMatch) lastGoodNextMatchRef.current = rawNextMatch
+    // Se rawNextMatch è null MA prima avevamo qualcosa, teniamo il ref intatto.
+    // Se rawNextMatch è null perché davvero non c'è più partita futura, l'operatore
+    // avrebbe azioni come "assegna nuova partita" da fare altrove: il ref stale non è pericoloso
+    // finché non facciamo azioni distruttive basate su di esso.
+  }, [rawNextMatch])
+  const nextMatch = rawNextMatch ?? lastGoodNextMatchRef.current
 
   // Manager senza squadra
   if (!currentTeam) {
