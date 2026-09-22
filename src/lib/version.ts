@@ -23,10 +23,11 @@ export const CHANGELOG: Release[] = [
   {
     version: '1.9.70',
     date: '2026-09-22',
-    title: 'Foglio partita: header pi\u00f9 alto + capitano/vice senza "?" quando manca numero maglia',
+    title: 'Foglio partita: pulsante sempre visibile + header pi\u00f9 alto + capitano/vice senza "?" quando manca numero maglia',
     fixes: [
+      'Pulsante "Foglio partita (PDF stampabile)" nella card della prossima partita continuava a sparire in modo intermittente anche dopo il fix sticky di v1.9.68. Vera causa individuata: la condizione richiedeva convocated_count > 0, ma la query convocations in Promise.all pu\u00f2 fallire silenziosamente (Supabase restituisce {data:null, error:...} invece di rejectare) facendo scendere il conteggio a 0 anche in presenza di convocazioni. Doppio fix: (a) il pulsante Foglio ora appare sempre se c\u2019\u00e8 una prossima partita, perch\u00e9 comunque \u00e8 un PDF da stampare e riempire a mano - anche in bianco \u00e8 utile alla panchina; (b) sticky ref anche sui conteggi convocazioni e stats: se la query fallisce, riuso i valori precedenti invece di azzerare la UI, cos\u00ec anche gli altri contatori/badge non lampeggiano',
       'Header schiacciato: la riga "Arbitro / Terreno / Meteo" sforava fuori dall\u2019area header e si mescolava con le sezioni sottostanti (SCHIERAMENTO, TITOLARI, GOAL LENCI). Ora l\u2019header ha 18mm (era 15mm) e il corpo 137mm (era 140mm), totale invariato 200mm A4 landscape',
-      'Riquadro CAP/VC mostrava un brutto cerchietto nero con "?" bianco quando il numero maglia del capitano non era in anagrafica. Ora: cerchietto bianco vuoto con bordo se numero mancante, cerchietto nero pieno col numero se presente. Icona ⭐ dorata per CAP (colore capitano) e blu per VC',
+      'Riquadro CAP/VC mostrava un brutto cerchietto nero con "?" bianco quando il numero maglia del capitano non era in anagrafica. Ora: cerchietto bianco vuoto con bordo se numero mancante, cerchietto nero pieno col numero se presente. Icona \u2b50 dorata per CAP (colore capitano) e blu per VC',
     ],
   },
   {

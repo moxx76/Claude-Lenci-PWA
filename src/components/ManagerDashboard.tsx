@@ -105,6 +105,11 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   // Counter di quante volte è partito load, utile per diagnosticare re-render loop
   const loadCounterRef = useRef(0)
 
+  // Sticky counters: se una query di conteggio fallisce (rete traballante, tab in background),
+  // uso l'ultimo valore known-good invece di azzerare la UI e far sparire pulsanti condizionati.
+  const lastGoodConvCountsRef = useRef<Record<string, number>>({})
+  const lastGoodStatsCountsRef = useRef<Record<string, number>>({})
+
   const load = async (teamId: string) => {
     loadCounterRef.current += 1
     const loadNum = loadCounterRef.current
@@ -146,7 +151,11 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         .order('last_name'),
     ])
 
-    // Conteggi convocazioni + stats per ogni partita
+    // Conteggi convocazioni + stats per ogni partita.
+    // NB: Supabase in caso di errore ritorna {data:null, error:...} SENZA rejectare Promise.all,
+    // quindi una query fallita silenziosa faceva scendere il conteggio a 0 e faceva sparire pulsanti
+    // condizionati (es. il vecchio "Foglio partita" richiedeva convocated_count > 0 → sparizione lampeggiante).
+    // Fix: se la query convocations fallisce (error != null), riuso i contatori vecchi memorizzati nel ref.
     const allMatchIds = [...(upcomingRes.data ?? []), ...(pastRes.data ?? [])].map(m => m.id)
     const convCounts: Record<string, number> = {}
     const statsCounts: Record<string, number> = {}
@@ -160,11 +169,29 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
           .select('match_id, player_id')
           .in('match_id', allMatchIds),
       ])
-      for (const c of convData.data ?? []) {
-        convCounts[c.match_id] = (convCounts[c.match_id] ?? 0) + 1
+      if (convData.error) {
+        // Query fallita: uso i valori sticky per non azzerare la UI
+        console.warn('[ManagerDashboard] convocations query error, using sticky counts:', convData.error)
+        for (const [mid, cnt] of Object.entries(lastGoodConvCountsRef.current)) {
+          convCounts[mid] = cnt
+        }
+      } else {
+        for (const c of convData.data ?? []) {
+          convCounts[c.match_id] = (convCounts[c.match_id] ?? 0) + 1
+        }
+        // Salvo per i prossimi reload
+        lastGoodConvCountsRef.current = { ...convCounts }
       }
-      for (const s of statsData.data ?? []) {
-        statsCounts[s.match_id] = (statsCounts[s.match_id] ?? 0) + 1
+      if (statsData.error) {
+        console.warn('[ManagerDashboard] stats query error, using sticky counts:', statsData.error)
+        for (const [mid, cnt] of Object.entries(lastGoodStatsCountsRef.current)) {
+          statsCounts[mid] = cnt
+        }
+      } else {
+        for (const s of statsData.data ?? []) {
+          statsCounts[s.match_id] = (statsCounts[s.match_id] ?? 0) + 1
+        }
+        lastGoodStatsCountsRef.current = { ...statsCounts }
       }
     }
 
@@ -683,24 +710,27 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 {nextMatch.lineup_completed_at ? 'Modifica distinta tattica' : 'Distinta tattica (modulo & titolari)'}
               </button>
             )}
-            {/* Foglio partita A4 stampabile — utile per panchina/mister/collaboratori */}
-            {nextMatch.convocated_count > 0 && (
-              <a
-                href={`/foglio-partita/${nextMatch.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  width: '100%', marginTop: 8, padding: '11px 18px', borderRadius: 10, border: '1.5px solid #404751',
-                  background: '#fff', color: '#404751', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  textDecoration: 'none', boxSizing: 'border-box',
-                }}
-                title="Apre in una nuova pagina la griglia da stampare o salvare in PDF"
-              >
-                <Icon name="print" size={15} color="#404751" />
-                Foglio partita (PDF stampabile)
-              </a>
-            )}
+            {/* Foglio partita A4 stampabile — utile per panchina/mister/collaboratori.
+                Il pulsante appare SEMPRE se c'è una prossima partita, anche senza convocazioni:
+                il foglio è comunque un PDF da stampare e riempire a mano in panchina, e prima
+                era condizionato a convocated_count > 0 che poteva andare a 0 se la query convocations
+                falliva silenziosamente in Promise.all (Supabase ritorna {data:null, error:...} non throw),
+                facendo scomparire il pulsante nonostante il match fosse presente. */}
+            <a
+              href={`/foglio-partita/${nextMatch.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                width: '100%', marginTop: 8, padding: '11px 18px', borderRadius: 10, border: '1.5px solid #404751',
+                background: '#fff', color: '#404751', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                textDecoration: 'none', boxSizing: 'border-box',
+              }}
+              title="Apre in una nuova pagina la griglia da stampare o salvare in PDF"
+            >
+              <Icon name="print" size={15} color="#404751" />
+              Foglio partita (PDF stampabile)
+            </a>
             {/* Preview distinta compilata: campo grafico + riepilogo */}
             {nextMatch.lineup_completed_at && nextMatch.lineup_starters.length > 0 && (
               <div
