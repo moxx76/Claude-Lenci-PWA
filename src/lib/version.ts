@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.71'
+export const APP_VERSION = '1.9.72'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.72',
+    date: '2026-09-22',
+    title: 'Foglio partita A4: aggiunta casella assist sotto ogni marcatore',
+    fixes: [
+      'GOAL LENCI: ogni slot ha ora 2 righe compilabili — "marcatore" (sopra) e "assist" (sotto in italico grigio), utili al match analyst per tracciare il contributo del compagno che ha servito il gol. La griglia resta 3\u00d75 = 15 slot per non allungare la sezione oltre l\u2019area disponibile del foglio A4',
+    ],
+  },
   {
     version: '1.9.71',
     date: '2026-09-22',

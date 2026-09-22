@@ -615,18 +615,25 @@ function RightPanel() {
               padding: '1mm 0',
               borderBottom: '0.4pt solid #d9dde4',
             }}>
-              {/* Colonna 1: minuto in casella evidenziata */}
+              {/* Colonna 1: minuto in casella evidenziata (occupa entrambe le righe della colonna 2) */}
               <div style={{
                 border: '0.5pt solid #000', height: '4.5mm',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 800,
               }}>&nbsp;</div>
-              {/* Colonna 2: marcatore (nome) */}
-              <div style={{
-                borderBottom: '0.5pt solid #000', height: '4.5mm',
-                display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.3mm',
-                fontSize: '6.5pt', color: '#707882',
-              }}>marcatore</div>
+              {/* Colonna 2: marcatore + assist stackati (2 righe compatte per non allungare la sezione) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5mm' }}>
+                <div style={{
+                  borderBottom: '0.5pt solid #000', height: '3.8mm',
+                  display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.2mm',
+                  fontSize: '6pt', color: '#707882',
+                }}>marcatore</div>
+                <div style={{
+                  borderBottom: '0.4pt solid #999', height: '3.5mm',
+                  display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.2mm',
+                  fontSize: '5.5pt', color: '#8993a3', fontStyle: 'italic',
+                }}>assist</div>
+              </div>
               {/* Colonna 3: checkbox rig/pun */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5mm', fontSize: '6pt', color: '#404751' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
