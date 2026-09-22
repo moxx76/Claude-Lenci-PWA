@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.63'
+export const APP_VERSION = '1.9.64'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.64',
+    date: '2026-09-22',
+    title: 'Timeline eventi grafica 0\u2019-90\u2019 con gol, cartellini rossi e sostituzioni',
+    features: [
+      'Nuova timeline orizzontale che racconta la partita minuto per minuto: puntini gialli per i gol Lenci, rossi per i gol subiti, cartellini rossi con icona, sostituzioni con freccia (uscente \u2190 subentrato). Il tratto centrale segna l\u2019intervallo (HT al 45\u2019) e la scala si estende automaticamente ai supplementari se ci sono eventi oltre il 90\u2019',
+      'Nel referto post-gara nuovo campo "Gol avversari (minuti)" facoltativo: se compilato, i gol subiti compaiono come puntini rossi sulla timeline. Il conteggio totale rimane invariato e si legge sempre dal risultato',
+      'Timeline visibile in tre punti: vista giornalisti sotto il campo grafico, anteprima live nel Recap del referto (mentre compili vedi come apparir\u00e0), e nelle partite passate della dashboard come nuovo pulsante espandibile "Timeline eventi" accanto a "Vedi distinta"',
+      'I cartellini gialli vengono contati e mostrati come badge riassuntivo (es. "\ud83d\udfe8 3 ammonizioni") accanto alla timeline: nel DB attuale non abbiamo i minuti dei gialli, quindi non finiscono sulla barra',
+    ],
+    notes: [
+      'Nuova colonna DB matches.opponent_goal_minutes (array int, default vuoto). Il campo \u00e8 opzionale e retro-compatibile: le partite gi\u00e0 registrate senza minuti gol subiti continuano a mostrare tutto tranne quei puntini rossi',
+    ],
+  },
   {
     version: '1.9.63',
     date: '2026-09-22',

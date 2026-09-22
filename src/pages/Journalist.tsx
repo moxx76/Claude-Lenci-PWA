@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { PitchView, type PitchPlayer } from '../components/PitchView'
+import { MatchTimeline } from '../components/MatchTimeline'
+import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { BottomSheet } from '../components/BottomSheet'
 import { Icon } from '../components/Icon'
 
@@ -42,6 +44,7 @@ interface MatchRow {
   scorers?: Scorer[]
   opponent_own_goals?: number | null
   opponent_own_goal_minutes?: number[] | null
+  opponent_goal_minutes?: number[] | null
   captain_change_minute?: number | null
   effective_formation?: string | null
   formation_change_minute?: number | null
@@ -513,6 +516,7 @@ interface Stats {
   own_goal_minutes: number[] | null
   yellow_cards: number | null
   red_card: boolean | null
+  red_card_minute: number | null
   minute_in: number | null
   minute_out: number | null
   was_starter: boolean | null
@@ -541,14 +545,14 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           .select('player_id, is_captain, is_vice_captain, shirt_number_override')
           .eq('match_id', matchId).eq('status', 'accepted'),
         supabase.from('match_player_stats')
-          .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played, role_slot, slot_index, role_slot_label')
+          .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, red_card_minute, minute_in, minute_out, was_starter, position_played, role_slot, slot_index, role_slot_label')
           .eq('match_id', matchId),
       ])
-      // Query separata resiliente per autogol avversari + captain_change_minute + effective_formation
+      // Query separata resiliente per autogol avversari + gol subiti + captain_change_minute + effective_formation
       let matchRow = (mRes.data as MatchRow) || null
       try {
         const { data: oogData } = await supabase.from('matches')
-          .select('opponent_own_goals, opponent_own_goal_minutes, captain_change_minute, effective_formation, formation_change_minute')
+          .select('opponent_own_goals, opponent_own_goal_minutes, opponent_goal_minutes, captain_change_minute, effective_formation, formation_change_minute')
           .eq('id', matchId)
           .maybeSingle()
         if (matchRow && oogData) {
@@ -556,13 +560,14 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             ...matchRow,
             opponent_own_goals: (oogData as any).opponent_own_goals,
             opponent_own_goal_minutes: (oogData as any).opponent_own_goal_minutes,
+            opponent_goal_minutes: (oogData as any).opponent_goal_minutes,
             captain_change_minute: (oogData as any).captain_change_minute,
             effective_formation: (oogData as any).effective_formation,
             formation_change_minute: (oogData as any).formation_change_minute,
           }
         }
       } catch (err) {
-        console.warn('[Journalist] opponent_own_goals/captain_change_minute/effective_formation non caricato (match sheet)', err)
+        console.warn('[Journalist] opponent_own_goals/opponent_goal_minutes/captain_change_minute/effective_formation non caricato (match sheet)', err)
       }
       setMatch(matchRow)
       setConvocs((cRes.data ?? []) as Convoc[])
@@ -828,6 +833,36 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   players={pitchPlayers}
                   height={340}
                 />
+              </div>
+            )
+          })()}
+
+          {/* Timeline eventi grafica: gol Lenci/subiti + rossi + sostituzioni sull'asse 0'-90' */}
+          {match && (() => {
+            const { events, yellowCardsCount } = buildTimelineEvents({
+              stats: stats.map(s => ({
+                player_id: s.player_id,
+                was_starter: s.was_starter,
+                minute_in: s.minute_in,
+                minute_out: s.minute_out,
+                goals: s.goals ?? 0,
+                goal_minutes: s.goal_minutes,
+                penalties_scored: s.penalties_scored ?? 0,
+                penalty_minutes: s.penalty_minutes,
+                own_goals: s.own_goals ?? 0,
+                own_goal_minutes: s.own_goal_minutes,
+                yellow_cards: s.yellow_cards ?? 0,
+                red_card: s.red_card ?? false,
+                red_card_minute: s.red_card_minute,
+              })),
+              players,
+              opponentGoalMinutes: match.opponent_goal_minutes ?? [],
+              opponentOwnGoalMinutes: match.opponent_own_goal_minutes ?? [],
+            })
+            if (events.length === 0 && yellowCardsCount === 0) return null
+            return (
+              <div style={{ margin: '10px 0' }}>
+                <MatchTimeline events={events} yellowCardsCount={yellowCardsCount} />
               </div>
             )
           })()}

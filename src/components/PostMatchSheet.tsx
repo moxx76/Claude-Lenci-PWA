@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { avatarBg } from '../lib/utils'
 import { StaffAttendanceSection } from './StaffAttendanceSection'
 import { PitchView, pitchToPngDataUrl, dataUrlToBlob, type PitchPlayer } from './PitchView'
+import { MatchTimeline } from './MatchTimeline'
+import { buildTimelineEvents } from '../lib/timelineBuilder'
 
 export interface PostMatchData {
   id: string
@@ -131,6 +133,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   // Autogol degli avversari a favore di Lenci (contano nel nostro punteggio, no giocatore associato)
   const [opponentOwnGoals, setOpponentOwnGoals] = useState<number>(0)
   const [opponentOwnGoalMinutes, setOpponentOwnGoalMinutes] = useState<number[]>([])
+  const [opponentGoalMinutes, setOpponentGoalMinutes] = useState<number[]>([])
   // Id del capitano dei convocati (dalla convocazione): serve per calcolare captain_change_minute
   const [captainPlayerId, setCaptainPlayerId] = useState<string | null>(null)
   // Id del vice capitano dei convocati (per notazione recap "Capitano dal X'")
@@ -182,22 +185,24 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setRefereeNotes(mRow?.referee_notes ?? '')
     setPublishedForJournalists(mRow?.published_for_journalists === true)
 
-    // Carico autogol avversari + modulo effettivo + lineup_completed_at in query separata resiliente
-    // (le colonne potrebbero non esistere se le migration v1.9.55/v1.9.59/v1.9.61 non sono state applicate).
+    // Carico autogol avversari + gol subiti + modulo effettivo + lineup_completed_at in query separata resiliente
+    // (le colonne potrebbero non esistere se le migration v1.9.55/v1.9.59/v1.9.61/v1.9.64 non sono state applicate).
     try {
       const { data: oogData } = await supabase.from('matches')
-        .select('opponent_own_goals, opponent_own_goal_minutes, effective_formation, formation_change_minute, lineup_completed_at')
+        .select('opponent_own_goals, opponent_own_goal_minutes, opponent_goal_minutes, effective_formation, formation_change_minute, lineup_completed_at')
         .eq('id', match.id)
         .maybeSingle()
-      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null; lineup_completed_at?: string | null } | null
+      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; opponent_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null; lineup_completed_at?: string | null } | null
       setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
       setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
+      setOpponentGoalMinutes(oogRow?.opponent_goal_minutes ?? [])
       setEffectiveFormation(oogRow?.effective_formation ?? '')
       setFormationChangeMinute(oogRow?.formation_change_minute != null ? String(oogRow.formation_change_minute) : '')
       setLineupCompletedAt(oogRow?.lineup_completed_at ?? null)
     } catch {
       setOpponentOwnGoals(0)
       setOpponentOwnGoalMinutes([])
+      setOpponentGoalMinutes([])
       setEffectiveFormation('')
       setFormationChangeMinute('')
       setLineupCompletedAt(null)
@@ -316,6 +321,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           autoScore,
           opponentOwnGoals,
           opponentOwnGoalMinutes,
+          opponentGoalMinutes,
           stats,
         }
         localStorage.setItem(draftKey, JSON.stringify(payload))
@@ -324,7 +330,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       }
     }, 500)
     return () => clearTimeout(timer)
-  }, [isLoaded, draftKey, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, stats])
+  }, [isLoaded, draftKey, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes, stats])
 
   // Recupera bozza da localStorage e applica tutto lo state
   const recoverDraft = () => {
@@ -347,6 +353,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       if (p.autoScore != null) setAutoScore(p.autoScore)
       if (p.opponentOwnGoals != null) setOpponentOwnGoals(p.opponentOwnGoals)
       if (p.opponentOwnGoalMinutes != null) setOpponentOwnGoalMinutes(p.opponentOwnGoalMinutes)
+      if (p.opponentGoalMinutes != null) setOpponentGoalMinutes(p.opponentGoalMinutes)
       if (p.stats) setStats(p.stats)
       setDraftMeta(null)
     } catch (err) {
@@ -478,12 +485,13 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         await supabase.from('matches').update({
           opponent_own_goals: opponentOwnGoals,
           opponent_own_goal_minutes: opponentOwnGoalMinutes,
+          opponent_goal_minutes: opponentGoalMinutes,
           captain_change_minute: captainChangeMinute,
           effective_formation: effectiveFormation.trim() || null,
           formation_change_minute: formationChangeMinute.trim() ? (parseInt(formationChangeMinute, 10) || null) : null,
         }).eq('id', match.id)
       } catch (err) {
-        console.warn('[PostMatchSheet] opponent_own_goals/captain_change_minute/effective_formation non salvati (migration mancante?)', err)
+        console.warn('[PostMatchSheet] opponent_own_goals/opponent_goal_minutes/captain_change_minute/effective_formation non salvati (migration mancante?)', err)
       }
 
       // 2. Sostituisce match_player_stats: delete + insert
@@ -865,6 +873,32 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               }}>
                 Tocca un giocatore per aprire il form
               </span>
+            </div>
+
+            {/* Gol avversari (subiti): serve per la timeline eventi (puntini rossi al minuto).
+                Il conteggio totale è già in matches.away_score/home_score, ma qui tracciamo i minuti. */}
+            <div style={{
+              marginBottom: 12, padding: 12,
+              background: opponentGoalMinutes.length > 0 ? '#fff5f5' : '#f8f9fc',
+              border: `1px solid ${opponentGoalMinutes.length > 0 ? '#93000a' : '#e0e2e9'}`,
+              borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#93000a' }}>sports_soccer</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#181c20' }}>
+                    Gol avversari (minuti)
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
+                    Minuti dei gol segnati dagli avversari. Facoltativi, ma se compilati compaiono nella timeline eventi come puntini rossi.
+                  </div>
+                </div>
+              </div>
+              <MinutesInput
+                label={`Minuti gol subiti (facoltativi) — segnati ${theirScore}`}
+                value={opponentGoalMinutes}
+                onChange={setOpponentGoalMinutes}
+              />
             </div>
 
             {/* Autogol degli avversari a favore Lenci: contano nel nostro risultato ma non hanno
@@ -1256,6 +1290,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               stats={stats}
               opponentOwnGoals={opponentOwnGoals}
               opponentOwnGoalMinutes={opponentOwnGoalMinutes}
+              opponentGoalMinutes={opponentGoalMinutes}
               ourScore={parseInt(ourScore, 10) || 0}
               theirScore={parseInt(theirScore, 10) || 0}
               captainPlayerId={captainPlayerId}
@@ -1585,8 +1620,8 @@ function buildRecapMessage(args: {
 }
 
 function RecapExport({
-  match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore,
-  captainPlayerId, viceCaptainPlayerId,
+  match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes,
+  ourScore, theirScore, captainPlayerId, viceCaptainPlayerId,
 }: {
   match: PostMatchData | null
   formation: string
@@ -1594,6 +1629,7 @@ function RecapExport({
   stats: Record<string, Stats>
   opponentOwnGoals: number
   opponentOwnGoalMinutes: number[]
+  opponentGoalMinutes: number[]
   ourScore: number
   theirScore: number
   captainPlayerId: string | null
@@ -1655,6 +1691,34 @@ function RecapExport({
   }, [players, stats, captainPlayerId, viceCaptainPlayerId])
 
   const hasPitch = pitchPlayers.length > 0 && !!formation
+
+  // Timeline eventi: gol/rossi/sostituzioni con minuti — mostrata come preview live nel recap
+  const { events: timelineEvents, yellowCardsCount } = useMemo(() => buildTimelineEvents({
+    stats: players.map(p => {
+      const s = stats[p.id]
+      return {
+        player_id: p.id,
+        was_starter: s?.was_starter ?? false,
+        minute_in: s?.minute_in ?? null,
+        minute_out: s?.minute_out ?? null,
+        goals: s?.goals ?? 0,
+        goal_minutes: s?.goal_minutes ?? [],
+        penalties_scored: s?.penalties_scored ?? 0,
+        penalty_minutes: s?.penalty_minutes ?? [],
+        own_goals: s?.own_goals ?? 0,
+        own_goal_minutes: s?.own_goal_minutes ?? [],
+        yellow_cards: s?.yellow_cards ?? 0,
+        red_card: s?.red_card ?? false,
+        red_card_minute: s?.red_card_minute ?? null,
+      }
+    }),
+    players: Object.fromEntries(players.map(p => [p.id, {
+      first_name: p.first_name, last_name: p.last_name, jersey_number: p.jersey_number,
+    }])),
+    opponentGoalMinutes,
+    opponentOwnGoalMinutes,
+  }), [players, stats, opponentGoalMinutes, opponentOwnGoalMinutes])
+  const hasTimeline = timelineEvents.length > 0 || yellowCardsCount > 0
 
   const doCopy = async () => {
     try {
@@ -1777,6 +1841,16 @@ function RecapExport({
               height={340}
               shirtColor={match.team_color || '#b3005c'}
             />
+          </div>
+        </details>
+      )}
+      {hasTimeline && (
+        <details open style={{ background: '#fff', border: '1px solid #e0e2e9', borderRadius: 8, padding: '6px 10px' }}>
+          <summary style={{ fontSize: 11, color: '#005f98', fontWeight: 700, cursor: 'pointer' }}>
+            Timeline eventi ({timelineEvents.length} {timelineEvents.length === 1 ? 'evento' : 'eventi'}{yellowCardsCount > 0 ? ` + ${yellowCardsCount} 🟨` : ''})
+          </summary>
+          <div style={{ marginTop: 6 }}>
+            <MatchTimeline events={timelineEvents} yellowCardsCount={yellowCardsCount} />
           </div>
         </details>
       )}

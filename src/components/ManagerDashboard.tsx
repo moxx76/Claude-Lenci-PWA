@@ -7,6 +7,8 @@ import { ConvocationSheet, type ConvocationMatch } from './ConvocationSheet'
 import { PostMatchSheet, type PostMatchData } from './PostMatchSheet'
 import { DistintaTatticaSheet, type DistintaTatticaData } from './DistintaTatticaSheet'
 import { PitchView, type PitchPlayer } from './PitchView'
+import { MatchTimeline, type TimelineEvent } from './MatchTimeline'
+import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
 
@@ -46,6 +48,10 @@ interface MatchWithConv {
   lineup_captain_name: string | null
   lineup_vice_name: string | null
   lineup_bench_count: number
+  /** Eventi timeline (gol/rossi/sostituzioni) pre-calcolati per la preview past match */
+  timeline_events: TimelineEvent[]
+  /** Conteggio cartellini gialli (non hanno minuti nel DB, mostrati come badge legenda) */
+  timeline_yellow_count: number
 }
 
 export function ManagerDashboard({ firstName }: { firstName: string }) {
@@ -161,6 +167,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
     const allWithLineup = [...upcomingWithLineup, ...pastWithLineup]
     const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string; last_name: string; first_name: string; jersey_number: number | null; is_captain: boolean; is_vice_captain: boolean; minute_out: number | null; substituted_by: string | null; substituted_by_number: number | null }>> = {}
     const lineupCapByMatch: Record<string, { cap: string | null; vice: string | null; bench: number; capId: string | null; viceId: string | null }> = {}
+    const timelineByMatch: Record<string, { events: TimelineEvent[]; yellowCardsCount: number }> = {}
     if (allWithLineup.length > 0) {
       const lineupIds = allWithLineup.map((m: any) => m.id)
       // Prima raccolgo capitano/vice per match_id (mi serve prima di costruire lineup_starters)
@@ -175,8 +182,9 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         if (c.is_vice_captain) capViceIds[c.match_id].viceId = c.player_id
       }
       // Titolari con dati giocatore + minute_in/out per calcolo sostituzioni
+      // + eventi timeline (gol/rigori/autogol/rossi/gialli)
       const { data: lineupStatsRes } = await supabase.from('match_player_stats')
-        .select('match_id, player_id, slot_index, role_slot, role_slot_label, was_starter, minute_in, minute_out, player:players(first_name, last_name, jersey_number)')
+        .select('match_id, player_id, slot_index, role_slot, role_slot_label, was_starter, minute_in, minute_out, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, red_card_minute, player:players(first_name, last_name, jersey_number)')
         .in('match_id', lineupIds)
       // Prima costruisco una mappa dei subentrati per match: chi ha minute_in = X = titolare uscito al minuto X
       const subsByMatch: Record<string, Array<{ player_id: string; minute_in: number; last_name: string; jersey_number: number | null }>> = {}
@@ -243,6 +251,64 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
           lineupCapByMatch[c.match_id].bench += 1
         }
       }
+
+      // Query resiliente per opponent_goal_minutes + opponent_own_goal_minutes (v1.9.64+)
+      // Se la colonna opponent_goal_minutes non esiste, il catch la ignora e la timeline mostrerà solo i gol Lenci
+      const oppGoalsByMatch: Record<string, { subiti: number[]; autogol_fav: number[] }> = {}
+      try {
+        const { data: oogRes } = await supabase.from('matches')
+          .select('id, opponent_goal_minutes, opponent_own_goal_minutes')
+          .in('id', lineupIds)
+        for (const r of (oogRes ?? []) as any[]) {
+          oppGoalsByMatch[r.id] = {
+            subiti: Array.isArray(r.opponent_goal_minutes) ? r.opponent_goal_minutes : [],
+            autogol_fav: Array.isArray(r.opponent_own_goal_minutes) ? r.opponent_own_goal_minutes : [],
+          }
+        }
+      } catch (err) {
+        console.warn('[ManagerDashboard] opponent_goal_minutes non caricato (migration v1.9.64 mancante?)', err)
+      }
+
+      // Costruisco la timeline per ogni match che ha lineup
+      // Raggruppo prima le stats per match_id, e mi serve la mappa players (per nome nel timeline)
+      const statsByMatch: Record<string, any[]> = {}
+      const playersInMatch: Record<string, Record<string, { first_name: string; last_name: string; jersey_number: number | null }>> = {}
+      for (const s of (lineupStatsRes ?? []) as any[]) {
+        if (!statsByMatch[s.match_id]) statsByMatch[s.match_id] = []
+        statsByMatch[s.match_id].push(s)
+        if (!playersInMatch[s.match_id]) playersInMatch[s.match_id] = {}
+        if (s.player) {
+          playersInMatch[s.match_id][s.player_id] = {
+            first_name: s.player.first_name,
+            last_name: s.player.last_name,
+            jersey_number: s.player.jersey_number,
+          }
+        }
+      }
+      for (const mid of lineupIds) {
+        const opp = oppGoalsByMatch[mid] ?? { subiti: [], autogol_fav: [] }
+        const built = buildTimelineEvents({
+          stats: (statsByMatch[mid] ?? []).map(s => ({
+            player_id: s.player_id,
+            was_starter: s.was_starter,
+            minute_in: s.minute_in,
+            minute_out: s.minute_out,
+            goals: s.goals ?? 0,
+            goal_minutes: s.goal_minutes ?? [],
+            penalties_scored: s.penalties_scored ?? 0,
+            penalty_minutes: s.penalty_minutes ?? [],
+            own_goals: s.own_goals ?? 0,
+            own_goal_minutes: s.own_goal_minutes ?? [],
+            yellow_cards: s.yellow_cards ?? 0,
+            red_card: s.red_card ?? false,
+            red_card_minute: s.red_card_minute ?? null,
+          })),
+          players: playersInMatch[mid] ?? {},
+          opponentGoalMinutes: opp.subiti,
+          opponentOwnGoalMinutes: opp.autogol_fav,
+        })
+        timelineByMatch[mid] = built
+      }
     }
 
     const enrich = (m: any): MatchWithConv => ({
@@ -255,6 +321,8 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       lineup_captain_name: lineupCapByMatch[m.id]?.cap ?? null,
       lineup_vice_name: lineupCapByMatch[m.id]?.vice ?? null,
       lineup_bench_count: lineupCapByMatch[m.id]?.bench ?? 0,
+      timeline_events: timelineByMatch[m.id]?.events ?? [],
+      timeline_yellow_count: timelineByMatch[m.id]?.yellowCardsCount ?? 0,
     })
     setUpcoming((upcomingRes.data ?? []).map(enrich))
     setPast((pastRes.data ?? []).map(enrich))
@@ -956,6 +1024,7 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor }: {
   const hasReport = match.stats_count > 0
   const hasScore = match.home_score != null && match.away_score != null
   const hasLineup = match.lineup_completed_at && match.lineup_starters.length > 0
+  const hasTimeline = match.timeline_events.length > 0 || match.timeline_yellow_count > 0
   const ourScore = isHome ? match.home_score : match.away_score
   const theirScore = isHome ? match.away_score : match.home_score
   const resultColor = hasScore && ourScore! > theirScore! ? '#006e25'
@@ -1059,6 +1128,23 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor }: {
               height={320}
               shirtColor={teamColor}
             />
+          </div>
+        </details>
+      )}
+      {/* Timeline eventi espandibile (gol, rossi, sostituzioni con minuti) */}
+      {hasTimeline && (
+        <details style={{ borderTop: '1px solid #f1f3fa' }}>
+          <summary style={{
+            padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#93000a',
+            cursor: 'pointer', background: '#fff8f8', listStyle: 'none',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <Icon name="timeline" size={13} color="#93000a" />
+            Timeline eventi · {match.timeline_events.length} {match.timeline_events.length === 1 ? 'evento' : 'eventi'}
+            {match.timeline_yellow_count > 0 && ` + ${match.timeline_yellow_count} 🟨`}
+          </summary>
+          <div style={{ padding: 8 }}>
+            <MatchTimeline events={match.timeline_events} yellowCardsCount={match.timeline_yellow_count} />
           </div>
         </details>
       )}
