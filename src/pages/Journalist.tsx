@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { PitchView, type PitchPlayer } from '../components/PitchView'
 import { BottomSheet } from '../components/BottomSheet'
 import { Icon } from '../components/Icon'
 
@@ -42,6 +43,8 @@ interface MatchRow {
   opponent_own_goals?: number | null
   opponent_own_goal_minutes?: number[] | null
   captain_change_minute?: number | null
+  effective_formation?: string | null
+  formation_change_minute?: number | null
 }
 interface PlayerLite {
   id: string
@@ -514,6 +517,9 @@ interface Stats {
   minute_out: number | null
   was_starter: boolean | null
   position_played: string | null
+  role_slot: string | null
+  slot_index: number | null
+  role_slot_label: string | null
 }
 
 function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; open: boolean; onClose: () => void }) {
@@ -535,14 +541,14 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
           .select('player_id, is_captain, is_vice_captain, shirt_number_override')
           .eq('match_id', matchId).eq('status', 'accepted'),
         supabase.from('match_player_stats')
-          .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played')
+          .select('player_id, goals, goal_minutes, penalties_scored, penalty_minutes, own_goals, own_goal_minutes, yellow_cards, red_card, minute_in, minute_out, was_starter, position_played, role_slot, slot_index, role_slot_label')
           .eq('match_id', matchId),
       ])
-      // Query separata resiliente per autogol avversari + captain_change_minute
+      // Query separata resiliente per autogol avversari + captain_change_minute + effective_formation
       let matchRow = (mRes.data as MatchRow) || null
       try {
         const { data: oogData } = await supabase.from('matches')
-          .select('opponent_own_goals, opponent_own_goal_minutes, captain_change_minute')
+          .select('opponent_own_goals, opponent_own_goal_minutes, captain_change_minute, effective_formation, formation_change_minute')
           .eq('id', matchId)
           .maybeSingle()
         if (matchRow && oogData) {
@@ -551,10 +557,12 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             opponent_own_goals: (oogData as any).opponent_own_goals,
             opponent_own_goal_minutes: (oogData as any).opponent_own_goal_minutes,
             captain_change_minute: (oogData as any).captain_change_minute,
+            effective_formation: (oogData as any).effective_formation,
+            formation_change_minute: (oogData as any).formation_change_minute,
           }
         }
       } catch (err) {
-        console.warn('[Journalist] opponent_own_goals/captain_change_minute non caricato (match sheet)', err)
+        console.warn('[Journalist] opponent_own_goals/captain_change_minute/effective_formation non caricato (match sheet)', err)
       }
       setMatch(matchRow)
       setConvocs((cRes.data ?? []) as Convoc[])
@@ -758,6 +766,53 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
               ))}
             </Section>
           )}
+
+          {/* Distinta - Campo grafico */}
+          {starters.length > 0 && match?.formation && (() => {
+            // Costruisco i player per il PitchView usando role_slot da stats + capitani da convocs
+            const pitchPlayers: PitchPlayer[] = starters
+              .map(c => {
+                const s = stats.find(x => x.player_id === c.player_id)
+                const player = players[c.player_id]
+                if (!s?.role_slot || !player) return null
+                return {
+                  slot_key: s.role_slot,
+                  slot_label: s.role_slot_label || '',
+                  jersey_number: c.shirt_number_override ?? player.jersey_number,
+                  last_name: player.last_name,
+                  first_name: player.first_name,
+                  is_captain: !!c.is_captain,
+                  is_vice_captain: !!c.is_vice_captain,
+                } as PitchPlayer
+              })
+              .filter((p): p is PitchPlayer => p !== null)
+            if (pitchPlayers.length === 0) return null
+            return (
+              <div style={{
+                margin: '10px 0', borderRadius: 12, overflow: 'hidden',
+                border: '1px solid #e6e8ee',
+              }}>
+                <div style={{
+                  padding: '8px 12px', background: '#f8f9fc', borderBottom: '1px solid #e6e8ee',
+                  fontSize: 11, fontWeight: 700, color: '#404751',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span>📋 Modulo: <strong>{match.formation}</strong></span>
+                  {match.effective_formation && match.effective_formation !== match.formation && (
+                    <span style={{ color: '#8e6300', fontSize: 10.5 }}>
+                      → {match.effective_formation}
+                      {match.formation_change_minute && ` (dal ${match.formation_change_minute}\u2032)`}
+                    </span>
+                  )}
+                </div>
+                <PitchView
+                  formation={match.formation}
+                  players={pitchPlayers}
+                  height={340}
+                />
+              </div>
+            )
+          })()}
 
           {/* Distinta - Titolari */}
           <Section title={`Titolari (${starters.length})`} icon="group" empty="Nessuna distinta registrata">

@@ -22,6 +22,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
+import { PitchView, type PitchPlayer } from './PitchView'
 import { FORMATIONS, FORMATION_KEYS, startersCount, benchMax, type FormationSlot } from '../lib/formations'
 
 export interface DistintaTatticaData {
@@ -708,6 +709,31 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
             {/* STEP 3 — Panchina + Capitani */}
             {step === 3 && (
               <div>
+                {/* Anteprima campo grafico con la distinta corrente */}
+                <div style={{
+                  marginBottom: 14, borderRadius: 12, overflow: 'hidden',
+                  border: '1px solid #e6e8ee',
+                }}>
+                  <PitchView
+                    formation={formation}
+                    players={slots
+                      .filter(s => s.player_id)
+                      .map(s => {
+                        const c = convocati.find(cc => cc.player_id === s.player_id)!
+                        return {
+                          slot_key: s.key,
+                          slot_label: s.label,
+                          jersey_number: c.jersey_number,
+                          last_name: c.last_name,
+                          first_name: c.first_name,
+                          is_captain: c.player_id === captainId,
+                          is_vice_captain: c.player_id === viceCaptainId,
+                        } as PitchPlayer
+                      })
+                    }
+                    height={300}
+                  />
+                </div>
                 <div style={{ fontSize: 12.5, color: '#404751', marginBottom: 8 }}>
                   Panchina: {benchCount}/{bMax} massimo · {convocati.length - starterIds.size - benchCount} convocati non in distinta
                 </div>

@@ -6,6 +6,7 @@ import { useMyTeam } from '../hooks/useMyTeam'
 import { ConvocationSheet, type ConvocationMatch } from './ConvocationSheet'
 import { PostMatchSheet, type PostMatchData } from './PostMatchSheet'
 import { DistintaTatticaSheet, type DistintaTatticaData } from './DistintaTatticaSheet'
+import { PitchView, type PitchPlayer } from './PitchView'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
 
@@ -33,6 +34,11 @@ interface MatchWithConv {
     role_slot: string | null
     role_slot_label: string | null
     player_name: string
+    last_name: string
+    first_name: string
+    jersey_number: number | null
+    is_captain: boolean
+    is_vice_captain: boolean
   }>
   lineup_captain_name: string | null
   lineup_vice_name: string | null
@@ -149,22 +155,39 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
     // Preload distinta del prossimo match (solo se lineup_completed_at) per la preview compatta
     // Faccio una singola fetch di tutti gli slot titolari + capitani per i match imminenti che hanno la distinta
     const upcomingWithLineup = (upcomingRes.data ?? []).filter((m: any) => m.lineup_completed_at)
-    const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string }>> = {}
-    const lineupCapByMatch: Record<string, { cap: string | null; vice: string | null; bench: number }> = {}
+    const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string; last_name: string; first_name: string; jersey_number: number | null; is_captain: boolean; is_vice_captain: boolean }>> = {}
+    const lineupCapByMatch: Record<string, { cap: string | null; vice: string | null; bench: number; capId: string | null; viceId: string | null }> = {}
     if (upcomingWithLineup.length > 0) {
       const lineupIds = upcomingWithLineup.map((m: any) => m.id)
+      // Prima raccolgo capitano/vice per match_id (mi serve prima di costruire lineup_starters)
+      const { data: convDetail } = await supabase.from('convocations')
+        .select('match_id, player_id, is_captain, is_vice_captain, player:players(first_name, last_name, jersey_number)')
+        .in('match_id', lineupIds)
+        .eq('status', 'accepted')
+      const capViceIds: Record<string, { capId: string | null; viceId: string | null }> = {}
+      for (const c of (convDetail ?? []) as any[]) {
+        if (!capViceIds[c.match_id]) capViceIds[c.match_id] = { capId: null, viceId: null }
+        if (c.is_captain) capViceIds[c.match_id].capId = c.player_id
+        if (c.is_vice_captain) capViceIds[c.match_id].viceId = c.player_id
+      }
       // Titolari con dati giocatore
       const { data: lineupStatsRes } = await supabase.from('match_player_stats')
-        .select('match_id, slot_index, role_slot, role_slot_label, was_starter, player:players(first_name, last_name)')
+        .select('match_id, player_id, slot_index, role_slot, role_slot_label, was_starter, player:players(first_name, last_name, jersey_number)')
         .in('match_id', lineupIds)
       for (const s of (lineupStatsRes ?? []) as any[]) {
         if (s.was_starter && s.slot_index != null && s.player) {
           if (!lineupStartersByMatch[s.match_id]) lineupStartersByMatch[s.match_id] = []
+          const cv = capViceIds[s.match_id]
           lineupStartersByMatch[s.match_id].push({
             slot_index: s.slot_index,
             role_slot: s.role_slot,
             role_slot_label: s.role_slot_label,
             player_name: `${s.player.last_name} ${s.player.first_name[0]}.`,
+            last_name: s.player.last_name,
+            first_name: s.player.first_name,
+            jersey_number: s.player.jersey_number,
+            is_captain: cv?.capId === s.player_id,
+            is_vice_captain: cv?.viceId === s.player_id,
           })
         }
       }
@@ -172,26 +195,20 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       for (const mid of Object.keys(lineupStartersByMatch)) {
         lineupStartersByMatch[mid].sort((a, b) => a.slot_index - b.slot_index)
       }
-      // Capitano/Vice + count panchina (da convocations)
-      const { data: convDetail } = await supabase.from('convocations')
-        .select('match_id, player_id, is_captain, is_vice_captain, player:players(first_name, last_name)')
-        .in('match_id', lineupIds)
-        .eq('status', 'accepted')
+      // Bench count + nomi cap/vice per rendering testuale
       const startersIdSet: Record<string, Set<string>> = {}
       for (const s of (lineupStatsRes ?? []) as any[]) {
         if (s.was_starter) {
           if (!startersIdSet[s.match_id]) startersIdSet[s.match_id] = new Set()
-          startersIdSet[s.match_id].add((s as any).player_id ?? '')
+          startersIdSet[s.match_id].add(s.player_id ?? '')
         }
       }
       for (const c of (convDetail ?? []) as any[]) {
-        if (!lineupCapByMatch[c.match_id]) lineupCapByMatch[c.match_id] = { cap: null, vice: null, bench: 0 }
+        if (!lineupCapByMatch[c.match_id]) lineupCapByMatch[c.match_id] = { cap: null, vice: null, bench: 0, capId: null, viceId: null }
         const name = c.player ? `${c.player.last_name} ${c.player.first_name[0]}.` : null
-        if (c.is_captain) lineupCapByMatch[c.match_id].cap = name
-        if (c.is_vice_captain) lineupCapByMatch[c.match_id].vice = name
-        // panchina = convocato non titolare (uso la lista slot come reference)
-        const startersForMatch = new Set((lineupStartersByMatch[c.match_id] ?? []).map(x => x.player_name))
-        if (name && !startersForMatch.has(name)) {
+        if (c.is_captain) { lineupCapByMatch[c.match_id].cap = name; lineupCapByMatch[c.match_id].capId = c.player_id }
+        if (c.is_vice_captain) { lineupCapByMatch[c.match_id].vice = name; lineupCapByMatch[c.match_id].viceId = c.player_id }
+        if (!startersIdSet[c.match_id]?.has(c.player_id)) {
           lineupCapByMatch[c.match_id].bench += 1
         }
       }
@@ -541,12 +558,12 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 {nextMatch.lineup_completed_at ? 'Modifica distinta tattica' : 'Distinta tattica (modulo & titolari)'}
               </button>
             )}
-            {/* Preview distinta compilata */}
+            {/* Preview distinta compilata: campo grafico + riepilogo */}
             {nextMatch.lineup_completed_at && nextMatch.lineup_starters.length > 0 && (
               <div
                 onClick={() => openDistintaTattica(nextMatch)}
                 style={{
-                  marginTop: 10, padding: 12, borderRadius: 10,
+                  marginTop: 10, padding: 10, borderRadius: 10,
                   background: '#f0f9ff', border: '1px solid #005f98', cursor: 'pointer',
                 }}
               >
@@ -564,26 +581,37 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                     {nextMatch.lineup_starters.length} tit · {nextMatch.lineup_bench_count} panc
                   </span>
                 </div>
-                {/* Elenco compatto: raggruppo per reparto tramite prefisso role_slot */}
-                <div style={{ fontSize: 10.5, color: '#404751', lineHeight: 1.5 }}>
-                  {nextMatch.lineup_starters.map((s, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 6 }}>
-                      <span style={{ color: '#707882', minWidth: 88, fontWeight: 600 }}>
-                        {s.role_slot_label}
+                {/* Campo grafico */}
+                <PitchView
+                  formation={nextMatch.formation || '4-4-2'}
+                  players={nextMatch.lineup_starters.map<PitchPlayer>(s => ({
+                    slot_key: s.role_slot || '',
+                    slot_label: s.role_slot_label || '',
+                    jersey_number: s.jersey_number,
+                    last_name: s.last_name,
+                    first_name: s.first_name,
+                    is_captain: s.is_captain,
+                    is_vice_captain: s.is_vice_captain,
+                  }))}
+                  height={340}
+                  shirtColor={teamColor}
+                />
+                {(nextMatch.lineup_captain_name || nextMatch.lineup_vice_name) && (
+                  <div style={{ fontSize: 10.5, color: '#404751', marginTop: 8, textAlign: 'center' }}>
+                    {nextMatch.lineup_captain_name && (
+                      <span style={{ color: '#8e6300', fontWeight: 700 }}>
+                        (C) {nextMatch.lineup_captain_name}
                       </span>
-                      <span style={{ color: '#181c20', fontWeight: 700 }}>
-                        {s.player_name}
-                        {s.player_name === nextMatch.lineup_captain_name && (
-                          <span style={{ color: '#8e6300', marginLeft: 4 }}>(C)</span>
-                        )}
-                        {s.player_name === nextMatch.lineup_vice_name && (
-                          <span style={{ color: '#005f98', marginLeft: 4 }}>(VC)</span>
-                        )}
+                    )}
+                    {nextMatch.lineup_captain_name && nextMatch.lineup_vice_name && ' · '}
+                    {nextMatch.lineup_vice_name && (
+                      <span style={{ color: '#005f98', fontWeight: 700 }}>
+                        (VC) {nextMatch.lineup_vice_name}
                       </span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ fontSize: 10, color: '#005f98', marginTop: 6, fontStyle: 'italic' }}>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: '#005f98', marginTop: 6, fontStyle: 'italic', textAlign: 'center' }}>
                   Tocca per modificare →
                 </div>
               </div>

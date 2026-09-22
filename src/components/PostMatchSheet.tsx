@@ -114,6 +114,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [savedOk, setSavedOk] = useState(false)
   // Report tattico
   const [formation, setFormation] = useState('')
+  // Modulo effettivamente giocato (se cambiato in corsa) + minuto del cambio
+  const [effectiveFormation, setEffectiveFormation] = useState('')
+  const [formationChangeMinute, setFormationChangeMinute] = useState('')
   const [reportPositive, setReportPositive] = useState('')
   const [reportNegative, setReportNegative] = useState('')
   const [reportGeneral, setReportGeneral] = useState('')
@@ -163,19 +166,23 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setRefereeNotes(mRow?.referee_notes ?? '')
     setPublishedForJournalists(mRow?.published_for_journalists === true)
 
-    // Carico autogol avversari in query separata resiliente (le colonne potrebbero non esistere
-    // se la migration v1.9.55 non è ancora stata applicata al DB).
+    // Carico autogol avversari + modulo effettivo in query separata resiliente (le colonne potrebbero non esistere
+    // se le migration v1.9.55/v1.9.61 non sono state applicate al DB).
     try {
       const { data: oogData } = await supabase.from('matches')
-        .select('opponent_own_goals, opponent_own_goal_minutes')
+        .select('opponent_own_goals, opponent_own_goal_minutes, effective_formation, formation_change_minute')
         .eq('id', match.id)
         .maybeSingle()
-      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null } | null
+      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null } | null
       setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
       setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
+      setEffectiveFormation(oogRow?.effective_formation ?? '')
+      setFormationChangeMinute(oogRow?.formation_change_minute != null ? String(oogRow.formation_change_minute) : '')
     } catch {
       setOpponentOwnGoals(0)
       setOpponentOwnGoalMinutes([])
+      setEffectiveFormation('')
+      setFormationChangeMinute('')
     }
 
     const convPlayers: Player[] = ((convRes.data ?? []) as any[])
@@ -338,9 +345,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           opponent_own_goals: opponentOwnGoals,
           opponent_own_goal_minutes: opponentOwnGoalMinutes,
           captain_change_minute: captainChangeMinute,
+          effective_formation: effectiveFormation.trim() || null,
+          formation_change_minute: formationChangeMinute.trim() ? (parseInt(formationChangeMinute, 10) || null) : null,
         }).eq('id', match.id)
       } catch (err) {
-        console.warn('[PostMatchSheet] opponent_own_goals/captain_change_minute non salvati (migration mancante?)', err)
+        console.warn('[PostMatchSheet] opponent_own_goals/captain_change_minute/effective_formation non salvati (migration mancante?)', err)
       }
 
       // 2. Sostituisce match_player_stats: delete + insert
@@ -541,6 +550,60 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                     />
                   </div>
                 </div>
+
+                {/* Modulo cambiato in corsa: toggle compatto */}
+                {formation && (
+                  <div style={{
+                    marginTop: 8, padding: 10, borderRadius: 8,
+                    background: effectiveFormation ? 'rgba(224,168,0,0.08)' : '#f8f9fc',
+                    border: `1px solid ${effectiveFormation ? '#e0a800' : '#e6e8ee'}`,
+                  }}>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 11.5, fontWeight: 700, color: '#404751', cursor: 'pointer',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={!!effectiveFormation}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setEffectiveFormation(formation)  // parte da modulo iniziale
+                          } else {
+                            setEffectiveFormation('')
+                            setFormationChangeMinute('')
+                          }
+                        }}
+                      />
+                      Modulo cambiato in corsa (es. dopo un\u2019espulsione)
+                    </label>
+                    {effectiveFormation && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginTop: 8 }}>
+                        <div>
+                          <SmallLabel>Nuovo modulo</SmallLabel>
+                          <input
+                            list="lenci-modules"
+                            value={effectiveFormation}
+                            onChange={e => setEffectiveFormation(e.target.value)}
+                            placeholder="es. 4-4-1"
+                            style={compactInput}
+                          />
+                        </div>
+                        <div>
+                          <SmallLabel>Al minuto</SmallLabel>
+                          <input
+                            type="number"
+                            min={1}
+                            max={120}
+                            value={formationChangeMinute}
+                            onChange={e => setFormationChangeMinute(e.target.value)}
+                            placeholder="es. 65"
+                            style={compactInput}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <SmallLabel>✅ Cosa è andato bene</SmallLabel>

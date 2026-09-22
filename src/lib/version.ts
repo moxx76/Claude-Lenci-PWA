@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.60'
+export const APP_VERSION = '1.9.61'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.61',
+    date: '2026-09-22',
+    title: 'Distinta tattica: vista campo grafico + modulo cambiato in corsa',
+    features: [
+      'Nuova vista "campo grafico" della distinta: un mini campo verde SVG con i giocatori posizionati sugli slot del modulo, cerchi con numero maglia e nome sotto, bordo dorato per il capitano e bordo blu tratteggiato per il vice, portiere evidenziato in giallo. Ogni modulo dei 17 preset ha coordinate x/y specifiche (portiere in basso, attacco in alto)',
+      'Il campo compare in 3 posti: nella dashboard del prossimo match (sostituisce la lista testuale della preview), nel terzo step della Distinta tattica come anteprima live mentre imposti panchina e fascia, e nella vista Giornalisti sopra la sezione Titolari — cos\u00ec la formazione si legge a colpo d\u2019occhio invece di scorrere un elenco',
+      'Nel referto post-partita ora si pu\u00f2 dichiarare se il modulo \u00e8 cambiato in corsa dopo un\u2019espulsione o un cambio tattico: nuovo toggle "Modulo cambiato in corsa" che espande i campi "Nuovo modulo" e "Al minuto". Nella vista Giornalisti l\u2019header del campo mostra la transizione (es. "4-3-1-2 \u2192 4-4-1 dal 65\u2032")',
+    ],
+    notes: [
+      'Migration DB: matches.effective_formation, matches.formation_change_minute. Nuovo componente riutilizzabile PitchView (SVG scalabile con coordinate percentuali per garantire coerenza tra i vari punti di visualizzazione)',
+      'Prossima tappa (v1.9.62): riscrittura completa del referto post-gara che parte dalla distinta invece di ricompilare da zero + bozza persistente per non perdere il lavoro se chiudi senza salvare',
+    ],
+  },
   {
     version: '1.9.60',
     date: '2026-09-22',
