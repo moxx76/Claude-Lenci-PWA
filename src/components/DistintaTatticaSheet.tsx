@@ -52,6 +52,15 @@ interface SlotAssignment {
   player_id: string | null   // giocatore assegnato
 }
 
+// Metadati di una distinta compilata in una partita passata (per l'import)
+interface PreviousLineup {
+  match_id: string
+  match_date: string
+  opponent: string
+  formation: string
+  starters_count: number
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -70,6 +79,11 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
   const [captainId, setCaptainId] = useState<string | null>(null)
   const [viceCaptainId, setViceCaptainId] = useState<string | null>(null)
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  // Import da distinta precedente
+  const [previousLineups, setPreviousLineups] = useState<PreviousLineup[]>([])
+  const [importedFromMatchId, setImportedFromMatchId] = useState<string | null>(null)
+  // Nomi dei giocatori esclusi (in una distinta precedente ma non convocati per questa)
+  const [importSkipped, setImportSkipped] = useState<{ name: string; role: string }[]>([])
   const [originalCaptainId, setOriginalCaptainId] = useState<string | null>(null)
   const [originalViceId, setOriginalViceId] = useState<string | null>(null)
 
@@ -150,7 +164,137 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
     const bench = conv.filter(c => !starterIds.has(c.player_id)).map(c => c.player_id)
     setBenchIds(bench)
 
+    // 4. Carico ultime 10 partite passate della stessa squadra con distinta compilata (per import)
+    const { data: prevRes } = await supabase.from('matches')
+      .select('id, match_date, opponent, formation, lineup_completed_at')
+      .eq('team_id', match.team_id)
+      .neq('id', match.id)
+      .not('lineup_completed_at', 'is', null)
+      .order('match_date', { ascending: false })
+      .limit(10)
+    // Conto i titolari effettivi per ognuna: serve per mostrare 11/9/7
+    const prevIds = (prevRes ?? []).map((p: any) => p.id)
+    let counts: Record<string, number> = {}
+    if (prevIds.length > 0) {
+      const { data: cntRes } = await supabase.from('match_player_stats')
+        .select('match_id, was_starter')
+        .in('match_id', prevIds)
+        .eq('was_starter', true)
+      for (const r of (cntRes ?? []) as any[]) {
+        counts[r.match_id] = (counts[r.match_id] ?? 0) + 1
+      }
+    }
+    setPreviousLineups(((prevRes ?? []) as any[]).map(p => ({
+      match_id: p.id,
+      match_date: p.match_date,
+      opponent: p.opponent,
+      formation: p.formation || '',
+      starters_count: counts[p.id] ?? 0,
+    })))
+
     setLoading(false)
+  }
+
+  /**
+   * Import da una distinta precedente (opzione C: modulo + slot con giocatori + capitani + panchina).
+   * Regole:
+   * - Se il modulo importato differisce dall'attuale, sostituisce il modulo
+   * - Ogni giocatore titolare della vecchia distinta va nel nuovo slot (stessa key) SOLO se convocato per questa partita
+   * - Se non convocato: slot lasciato vuoto (badge giallo)
+   * - Panchina: importati solo i panchinari che sono convocati anche qui
+   * - Capitano/Vice: importati solo se il giocatore è convocato
+   * - Avviso in cima con i giocatori esclusi
+   */
+  async function importFromPrevious(prevMatchId: string) {
+    if (!match) return
+    setLoading(true)
+    try {
+      // 1. Prendo il modulo della partita precedente
+      const { data: prevMatch } = await supabase.from('matches')
+        .select('formation')
+        .eq('id', prevMatchId)
+        .maybeSingle()
+      const prevFormation = prevMatch?.formation && FORMATION_KEYS.includes(prevMatch.formation)
+        ? prevMatch.formation
+        : formation
+
+      // 2. Titolari della precedente con role_slot / slot_index
+      const { data: prevStats } = await supabase.from('match_player_stats')
+        .select('player_id, was_starter, role_slot, role_slot_label, slot_index, player:players(id, first_name, last_name, position)')
+        .eq('match_id', prevMatchId)
+
+      // 3. Convocati precedenti con capitano/vice
+      const { data: prevConv } = await supabase.from('convocations')
+        .select('player_id, is_captain, is_vice_captain')
+        .eq('match_id', prevMatchId)
+        .eq('status', 'accepted')
+
+      // Set convocati per QUESTA partita
+      const nowConvocatedIds = new Set(convocati.map(c => c.player_id))
+      const skipped: { name: string; role: string }[] = []
+
+      // Costruisco slot template per il modulo importato
+      const template = FORMATIONS[prevFormation] || FORMATIONS['4-4-2']
+      const newSlots: SlotAssignment[] = template.map((t, idx) => {
+        // Cerco chi c'era in quello slot nella distinta precedente
+        const prevAssign = (prevStats ?? []).find((s: any) =>
+          s.was_starter && s.slot_index === idx && s.role_slot === t.key
+        ) as any
+        let assignedId: string | null = null
+        if (prevAssign?.player_id) {
+          if (nowConvocatedIds.has(prevAssign.player_id)) {
+            assignedId = prevAssign.player_id
+          } else if (prevAssign.player) {
+            // Non convocato: lo aggiungo alla lista degli esclusi
+            skipped.push({
+              name: `${prevAssign.player.last_name} ${prevAssign.player.first_name[0]}.`,
+              role: prevAssign.role_slot_label || t.label,
+            })
+          }
+        }
+        return {
+          key: t.key,
+          label: prevAssign?.role_slot_label || t.label,
+          position_hint: t.position_hint,
+          player_id: assignedId,
+        }
+      })
+
+      // Panchinari: precedenti was_starter=false + minute_in dichiarato (o solo convocati non titolari)
+      // Prendo tutti i convocati precedenti non titolari, e importo solo quelli convocati anche adesso
+      const prevStarterIds = new Set(
+        (prevStats ?? []).filter((s: any) => s.was_starter).map((s: any) => s.player_id)
+      )
+      const prevBenchIds = (prevConv ?? [])
+        .map((c: any) => c.player_id)
+        .filter((pid: string) => !prevStarterIds.has(pid))
+      // Filtro: presenti anche nei convocati di questa partita e non ora titolari
+      const importedStarterIds = new Set(newSlots.map(s => s.player_id).filter(Boolean) as string[])
+      const importedBench = prevBenchIds.filter((pid: string) =>
+        nowConvocatedIds.has(pid) && !importedStarterIds.has(pid)
+      )
+
+      // Capitano/Vice: importa se convocati adesso, altrimenti mantiene quelli attuali
+      const prevCap = (prevConv ?? []).find((c: any) => c.is_captain) as any
+      const prevVice = (prevConv ?? []).find((c: any) => c.is_vice_captain) as any
+      const newCaptainId = prevCap && nowConvocatedIds.has(prevCap.player_id) ? prevCap.player_id : captainId
+      let newViceId = prevVice && nowConvocatedIds.has(prevVice.player_id) ? prevVice.player_id : viceCaptainId
+      // Se cap e vice coincidono, resetto vice
+      if (newCaptainId && newViceId === newCaptainId) newViceId = null
+
+      // Applico
+      setFormation(prevFormation)
+      setSlots(newSlots)
+      setBenchIds(importedBench)
+      setCaptainId(newCaptainId)
+      setViceCaptainId(newViceId)
+      setImportSkipped(skipped)
+      setImportedFromMatchId(prevMatchId)
+      // Vado direttamente allo step 2 (Titolari) per rifinire
+      setStep(2)
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Cambio modulo: se ci sono già slot assegnati, chiedo conferma reset
@@ -396,8 +540,48 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
             {/* STEP 1 — Modulo */}
             {step === 1 && (
               <div>
+                {/* Import da distinta precedente */}
+                {previousLineups.length > 0 && (
+                  <div style={{
+                    marginBottom: 14, padding: 12, borderRadius: 10,
+                    background: '#f0f9ff', border: '1px solid #005f98',
+                  }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 12, fontWeight: 800, color: '#005f98', marginBottom: 6,
+                    }}>
+                      <Icon name="content_copy" size={14} color="#005f98" />
+                      Importa da distinta precedente
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#404751', marginBottom: 8 }}>
+                      Riparti da una distinta già compilata: modulo, titolari sugli slot, panchina, capitani.
+                      I giocatori non convocati per questa partita saranno esclusi (con avviso).
+                    </div>
+                    <select
+                      value=""
+                      onChange={e => {
+                        const v = e.target.value
+                        if (v) importFromPrevious(v)
+                      }}
+                      style={{
+                        width: '100%', padding: '7px 8px', borderRadius: 6,
+                        border: '1px solid #005f98', fontSize: 12, background: '#fff',
+                      }}
+                    >
+                      <option value="">— Scegli una partita da cui importare —</option>
+                      {previousLineups.map(p => {
+                        const d = new Date(p.match_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+                        return (
+                          <option key={p.match_id} value={p.match_id}>
+                            {d} · vs {p.opponent} · {p.formation || 'senza modulo'} · {p.starters_count} tit.
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                )}
                 <div style={{ fontSize: 12.5, color: '#404751', marginBottom: 10 }}>
-                  Scegli il modulo tattico. Ci sono {convocati.length} convocati, ne servono {sCount} titolari.
+                  {previousLineups.length > 0 ? 'Oppure ricomincia scegliendo il modulo:' : 'Scegli il modulo tattico.'} Ci sono {convocati.length} convocati, ne servono {sCount} titolari.
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
                   {FORMATION_KEYS.map(f => (
@@ -434,9 +618,46 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
             {/* STEP 2 — Titolari */}
             {step === 2 && (
               <div>
+                {/* Avviso: giocatori della distinta importata NON convocati per questa partita */}
+                {importSkipped.length > 0 && (
+                  <div style={{
+                    padding: 10, borderRadius: 8, marginBottom: 10,
+                    background: '#fff4e5', border: '1px solid #e0a800',
+                  }}>
+                    <div style={{
+                      fontSize: 11.5, fontWeight: 800, color: '#8e6300',
+                      display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4,
+                    }}>
+                      <Icon name="warning" size={14} color="#8e6300" />
+                      {importSkipped.length} giocator{importSkipped.length === 1 ? 'e' : 'i'} della distinta importata non convocat{importSkipped.length === 1 ? 'o' : 'i'} per questa partita
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#8e6300', lineHeight: 1.4 }}>
+                      {importSkipped.map((s, i) => (
+                        <span key={i}>
+                          {s.name} <span style={{ opacity: 0.75 }}>({s.role})</span>{i < importSkipped.length - 1 ? ' · ' : ''}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#8e6300', marginTop: 4, fontStyle: 'italic' }}>
+                      I loro slot sono rimasti vuoti — assegna un giocatore convocato per riempirli.
+                    </div>
+                    <button
+                      onClick={() => setImportSkipped([])}
+                      style={{
+                        marginTop: 6, padding: '4px 10px', borderRadius: 6, border: '1px solid #e0a800',
+                        background: 'transparent', color: '#8e6300', fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      Ho capito, nascondi avviso
+                    </button>
+                  </div>
+                )}
                 <div style={{ fontSize: 12.5, color: '#404751', marginBottom: 8 }}>
                   Modulo <strong>{formation}</strong> · {sCount - emptySlots}/{sCount} slot compilati
                   {emptySlots > 0 && <span style={{ color: '#8e6300' }}> · {emptySlots} vuoti</span>}
+                  {importedFromMatchId && (
+                    <span style={{ color: '#005f98', fontSize: 10.5, marginLeft: 6 }}>· ⚡ importata</span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {slots.map((s, idx) => {

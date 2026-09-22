@@ -26,6 +26,17 @@ interface MatchWithConv {
   away_score: number | null
   convocated_count: number
   stats_count: number
+  formation: string | null
+  lineup_completed_at: string | null
+  lineup_starters: Array<{
+    slot_index: number
+    role_slot: string | null
+    role_slot_label: string | null
+    player_name: string
+  }>
+  lineup_captain_name: string | null
+  lineup_vice_name: string | null
+  lineup_bench_count: number
 }
 
 export function ManagerDashboard({ firstName }: { firstName: string }) {
@@ -86,12 +97,12 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
 
     const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes] = await Promise.all([
       supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score')
+        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
         .eq('team_id', teamId)
         .gte('match_date', today)
         .order('match_date').limit(20),
       supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score')
+        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
         .eq('team_id', teamId)
         .lt('match_date', today)
         .order('match_date', { ascending: false }).limit(10),
@@ -135,10 +146,67 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       }
     }
 
+    // Preload distinta del prossimo match (solo se lineup_completed_at) per la preview compatta
+    // Faccio una singola fetch di tutti gli slot titolari + capitani per i match imminenti che hanno la distinta
+    const upcomingWithLineup = (upcomingRes.data ?? []).filter((m: any) => m.lineup_completed_at)
+    const lineupStartersByMatch: Record<string, Array<{ slot_index: number; role_slot: string | null; role_slot_label: string | null; player_name: string }>> = {}
+    const lineupCapByMatch: Record<string, { cap: string | null; vice: string | null; bench: number }> = {}
+    if (upcomingWithLineup.length > 0) {
+      const lineupIds = upcomingWithLineup.map((m: any) => m.id)
+      // Titolari con dati giocatore
+      const { data: lineupStatsRes } = await supabase.from('match_player_stats')
+        .select('match_id, slot_index, role_slot, role_slot_label, was_starter, player:players(first_name, last_name)')
+        .in('match_id', lineupIds)
+      for (const s of (lineupStatsRes ?? []) as any[]) {
+        if (s.was_starter && s.slot_index != null && s.player) {
+          if (!lineupStartersByMatch[s.match_id]) lineupStartersByMatch[s.match_id] = []
+          lineupStartersByMatch[s.match_id].push({
+            slot_index: s.slot_index,
+            role_slot: s.role_slot,
+            role_slot_label: s.role_slot_label,
+            player_name: `${s.player.last_name} ${s.player.first_name[0]}.`,
+          })
+        }
+      }
+      // Ordino per slot_index
+      for (const mid of Object.keys(lineupStartersByMatch)) {
+        lineupStartersByMatch[mid].sort((a, b) => a.slot_index - b.slot_index)
+      }
+      // Capitano/Vice + count panchina (da convocations)
+      const { data: convDetail } = await supabase.from('convocations')
+        .select('match_id, player_id, is_captain, is_vice_captain, player:players(first_name, last_name)')
+        .in('match_id', lineupIds)
+        .eq('status', 'accepted')
+      const startersIdSet: Record<string, Set<string>> = {}
+      for (const s of (lineupStatsRes ?? []) as any[]) {
+        if (s.was_starter) {
+          if (!startersIdSet[s.match_id]) startersIdSet[s.match_id] = new Set()
+          startersIdSet[s.match_id].add((s as any).player_id ?? '')
+        }
+      }
+      for (const c of (convDetail ?? []) as any[]) {
+        if (!lineupCapByMatch[c.match_id]) lineupCapByMatch[c.match_id] = { cap: null, vice: null, bench: 0 }
+        const name = c.player ? `${c.player.last_name} ${c.player.first_name[0]}.` : null
+        if (c.is_captain) lineupCapByMatch[c.match_id].cap = name
+        if (c.is_vice_captain) lineupCapByMatch[c.match_id].vice = name
+        // panchina = convocato non titolare (uso la lista slot come reference)
+        const startersForMatch = new Set((lineupStartersByMatch[c.match_id] ?? []).map(x => x.player_name))
+        if (name && !startersForMatch.has(name)) {
+          lineupCapByMatch[c.match_id].bench += 1
+        }
+      }
+    }
+
     const enrich = (m: any): MatchWithConv => ({
       ...m,
       convocated_count: convCounts[m.id] ?? 0,
       stats_count: statsCounts[m.id] ?? 0,
+      formation: m.formation ?? null,
+      lineup_completed_at: m.lineup_completed_at ?? null,
+      lineup_starters: lineupStartersByMatch[m.id] ?? [],
+      lineup_captain_name: lineupCapByMatch[m.id]?.cap ?? null,
+      lineup_vice_name: lineupCapByMatch[m.id]?.vice ?? null,
+      lineup_bench_count: lineupCapByMatch[m.id]?.bench ?? 0,
     })
     setUpcoming((upcomingRes.data ?? []).map(enrich))
     setPast((pastRes.data ?? []).map(enrich))
@@ -470,8 +538,55 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 }}
               >
                 <Icon name="dashboard" size={15} color="#005f98" />
-                Distinta tattica (modulo & titolari)
+                {nextMatch.lineup_completed_at ? 'Modifica distinta tattica' : 'Distinta tattica (modulo & titolari)'}
               </button>
+            )}
+            {/* Preview distinta compilata */}
+            {nextMatch.lineup_completed_at && nextMatch.lineup_starters.length > 0 && (
+              <div
+                onClick={() => openDistintaTattica(nextMatch)}
+                style={{
+                  marginTop: 10, padding: 12, borderRadius: 10,
+                  background: '#f0f9ff', border: '1px solid #005f98', cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: 8, gap: 6,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon name="dashboard" size={14} color="#005f98" />
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: '#005f98' }}>
+                      Distinta {nextMatch.formation || ''}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 10, color: '#707882' }}>
+                    {nextMatch.lineup_starters.length} tit · {nextMatch.lineup_bench_count} panc
+                  </span>
+                </div>
+                {/* Elenco compatto: raggruppo per reparto tramite prefisso role_slot */}
+                <div style={{ fontSize: 10.5, color: '#404751', lineHeight: 1.5 }}>
+                  {nextMatch.lineup_starters.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 6 }}>
+                      <span style={{ color: '#707882', minWidth: 88, fontWeight: 600 }}>
+                        {s.role_slot_label}
+                      </span>
+                      <span style={{ color: '#181c20', fontWeight: 700 }}>
+                        {s.player_name}
+                        {s.player_name === nextMatch.lineup_captain_name && (
+                          <span style={{ color: '#8e6300', marginLeft: 4 }}>(C)</span>
+                        )}
+                        {s.player_name === nextMatch.lineup_vice_name && (
+                          <span style={{ color: '#005f98', marginLeft: 4 }}>(VC)</span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: '#005f98', marginTop: 6, fontStyle: 'italic' }}>
+                  Tocca per modificare →
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -718,7 +833,13 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
           home_score: null,
           away_score: null,
           convocated_count: 0,
-        } as MatchWithConv) : undefined}
+          formation: null,
+          lineup_completed_at: null,
+          lineup_starters: [],
+          lineup_captain_name: null,
+          lineup_vice_name: null,
+          lineup_bench_count: 0,
+        } as unknown as MatchWithConv) : undefined}
       />
       {/* Post-match sheet */}
       <PostMatchSheet

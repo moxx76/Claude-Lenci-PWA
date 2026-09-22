@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.59'
+export const APP_VERSION = '1.9.60'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.60',
+    date: '2026-09-22',
+    title: 'Distinta tattica: import da partite precedenti + preview in dashboard',
+    features: [
+      'Nel primo passaggio della Distinta tattica ora compare in alto un menu "Importa da distinta precedente" con le ultime 10 partite gi\u00e0 compilate della squadra: data, avversario, modulo e numero di titolari. Scegliendone una viene importato tutto — modulo, giocatori sugli slot, capitano, vice, panchina — e si viene portati direttamente allo step Titolari per rifinire',
+      'I giocatori della distinta importata che non sono convocati per la nuova partita vengono automaticamente esclusi: i loro slot restano vuoti e in cima appare un avviso giallo con l\u2019elenco degli esclusi ("3 giocatori non convocati per questa partita: Rossi M. (Terzino), Bianchi L. (Punta), \u2026") che pu\u00f2 essere chiuso con un click',
+      'Preview della distinta gi\u00e0 compilata direttamente sulla dashboard del prossimo match: card azzurra sotto il pulsante che mostra modulo, elenco titolari per slot con (C) e (VC), e riassunto numerico (11 tit \u00b7 9 panc). Toccando la card si apre la scheda in modifica. Il pulsante cambia etichetta in "Modifica distinta tattica" quando la distinta \u00e8 gi\u00e0 salvata',
+    ],
+    notes: [
+      'Prossima tappa (v1.9.61): vista campo grafico SVG in preview distinta e nel report giornalisti, gestione modulo cambiato in corsa nel post-gara. Poi v1.9.62: riscrittura completa del referto post-gara che parte dalla distinta + bozza persistente',
+    ],
+  },
   {
     version: '1.9.59',
     date: '2026-09-22',
