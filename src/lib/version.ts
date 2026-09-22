@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.69'
+export const APP_VERSION = '1.9.70'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.70',
+    date: '2026-09-22',
+    title: 'Foglio partita: header pi\u00f9 alto + capitano/vice senza "?" quando manca numero maglia',
+    fixes: [
+      'Header schiacciato: la riga "Arbitro / Terreno / Meteo" sforava fuori dall\u2019area header e si mescolava con le sezioni sottostanti (SCHIERAMENTO, TITOLARI, GOAL LENCI). Ora l\u2019header ha 18mm (era 15mm) e il corpo 137mm (era 140mm), totale invariato 200mm A4 landscape',
+      'Riquadro CAP/VC mostrava un brutto cerchietto nero con "?" bianco quando il numero maglia del capitano non era in anagrafica. Ora: cerchietto bianco vuoto con bordo se numero mancante, cerchietto nero pieno col numero se presente. Icona ⭐ dorata per CAP (colore capitano) e blu per VC',
+    ],
+  },
   {
     version: '1.9.69',
     date: '2026-09-22',

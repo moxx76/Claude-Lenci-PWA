@@ -227,8 +227,9 @@ export function MatchSheetPrint() {
           color: #000;
           overflow: hidden;
           display: grid;
-          /* 15mm header + 140mm corpo + 45mm footer = 200mm (A4 landscape usable) */
-          grid-template-rows: 15mm 140mm 45mm;
+          /* 18mm header + 137mm corpo + 45mm footer = 200mm (A4 landscape usable).
+             Header più alto per far entrare senza schiacciare le 3 righe testo (titoli + data/venue + arbitro/terreno/meteo) */
+          grid-template-rows: 18mm 137mm 45mm;
           gap: 1.5mm;
         }
         .box { border: 0.5pt solid #000; box-sizing: border-box; }
@@ -373,23 +374,26 @@ function LeftPanel({ starters, teamColor, captainNumber, captainName, viceNumber
         borderTop: '0.5pt solid #000', paddingTop: '1.5mm',
         fontSize: '8.5pt', lineHeight: 1.5,
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm' }}>
-          <span style={{ fontWeight: 800 }}>⭐ CAP</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2mm' }}>
+          <span style={{ fontWeight: 800, color: '#8e6300' }}>⭐ CAP</span>
+          {/* Se ho il numero maglia lo mostro nel cerchietto nero, altrimenti cerchietto vuoto da riempire a mano */}
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '5mm', height: '5mm', borderRadius: '50%',
-            background: '#000', color: '#fff', fontSize: '7pt', fontWeight: 800,
-          }}>{captainNumber ?? '?'}</span>
+            width: '5.5mm', height: '5.5mm', borderRadius: '50%',
+            background: captainNumber != null ? '#000' : '#fff',
+            color: '#fff', fontSize: '7pt', fontWeight: 800,
+            border: captainNumber != null ? 'none' : '0.5pt solid #000',
+          }}>{captainNumber ?? ''}</span>
           <span style={{ fontWeight: 700 }}>{captainName || '—'}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '2mm', marginTop: '1mm' }}>
-          <span style={{ fontWeight: 800 }}>⭐ VC</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2mm', marginTop: '1.5mm' }}>
+          <span style={{ fontWeight: 800, color: '#005f98' }}>⭐ VC</span>
           <span style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '5mm', height: '5mm', borderRadius: '50%',
+            width: '5.5mm', height: '5.5mm', borderRadius: '50%',
             background: '#fff', color: '#000', border: '0.5pt solid #000',
             fontSize: '7pt', fontWeight: 800,
-          }}>{viceNumber ?? '?'}</span>
+          }}>{viceNumber ?? ''}</span>
           <span style={{ fontWeight: 700 }}>{viceName || '—'}</span>
         </div>
       </div>
