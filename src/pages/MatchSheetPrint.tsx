@@ -558,7 +558,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
               const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
               if (!b) {
                 return (
-                  <tr key={i} style={{ background: rowBg, height: '5mm' }}>
+                  <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
@@ -568,8 +568,8 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
                 )
               }
               return (
-                <tr key={i} style={{ background: rowBg, height: '5mm' }}>
-                  <td style={{ textAlign: 'center', padding: '0.5mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '9.5pt' }}>
+                <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
+                  <td style={{ textAlign: 'center', padding: '0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '8.5pt', lineHeight: 1 }}>
                     {b.jersey ?? ''}
                   </td>
                   <td style={{ padding: '0.5mm 1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7.5pt' }}>{b.role_group}</td>

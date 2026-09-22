@@ -6,6 +6,7 @@ import { avatarBg } from '../lib/utils'
 import { StaffAttendanceSection } from './StaffAttendanceSection'
 import { PitchView, pitchToPngDataUrl, dataUrlToBlob, type PitchPlayer } from './PitchView'
 import { MatchTimeline } from './MatchTimeline'
+import { makeMatchDuration } from '../lib/matchDuration'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { buildLocandinaPngDataUrl, type LocandinaData } from '../lib/locandinaBuilder'
 
@@ -112,6 +113,9 @@ function emptyStats(player_id: string): Stats {
 export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheetProps) {
   const [players, setPlayers] = useState<Player[]>([])
   const [stats, setStats] = useState<Record<string, Stats>>({})
+  // Nome breve del club (es. "Lenci Poirino") — fetchato al load, usato nella locandina
+  // come titolo grande al posto del nome squadra (che diventa dettaglio sotto)
+  const [clubShortName, setClubShortName] = useState<string | null>(null)
   const [ourScore, setOurScore] = useState<string>('0')
   const [theirScore, setTheirScore] = useState<string>('0')
   // Auto-sincronizzazione punteggio "nostro" dalla somma dei marcatori.
@@ -211,6 +215,21 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       setLineupCompletedAt(null)
     }
 
+    // Nome breve del club per la locandina (query resiliente: se fallisce, la locandina cade in fallback
+    // sul team_name — comportamento pre-v1.9.71). Serve per far comparire "LENCI POIRINO" come titolo
+    // grande invece di "UNDER 14".
+    try {
+      const { data: teamRow } = await supabase.from('teams')
+        .select('club:clubs(short_name, name)')
+        .eq('id', match.team_id)
+        .maybeSingle()
+      const club = (teamRow as any)?.club
+      // Preferisco short_name se c'è, fallback su name completo, fallback su null (nessun override)
+      setClubShortName(club?.short_name ?? club?.name ?? null)
+    } catch {
+      setClubShortName(null)
+    }
+
     const convPlayers: Player[] = ((convRes.data ?? []) as any[])
       .filter(c => c.player)
       .map(c => ({
@@ -304,9 +323,18 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   // Bozza persistente: salva lo state completo del referto in localStorage con debounce 500ms.
   // Serve a proteggere il coach da chiusure accidentali (tap fuori sheet, chiude browser, ecc.).
   // Non sostituisce il salvataggio esplicito su DB — è solo un cuscinetto di sicurezza.
+  //
+  // BUG FIX v1.9.71: il timer di debounce era locale al useEffect e non era cancellabile da fuori,
+  // quindi (a) dopo "Scarta bozza" il timer già armato scadeva 300ms dopo e riscriveva la bozza,
+  // (b) dopo "Salva" idem: removeItem rimuoveva, e 500ms dopo il timer scriveva di nuovo.
+  // Soluzione: tengo il timer in un ref e lo cancello esplicitamente in discardDraft/save,
+  // e skippo la scrittura quando `saving` o `savedOk` sono true (per catturare anche stati intermedi).
+  const draftSaveTimerRef = useRef<number | null>(null)
   useEffect(() => {
     if (!isLoaded || !draftKey) return
-    const timer = setTimeout(() => {
+    if (saving || savedOk) return
+    if (draftSaveTimerRef.current !== null) window.clearTimeout(draftSaveTimerRef.current)
+    draftSaveTimerRef.current = window.setTimeout(() => {
       try {
         const payload = {
           savedAt: new Date().toISOString(),
@@ -332,8 +360,13 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         console.warn('[PostMatchSheet] Errore salvataggio bozza', err)
       }
     }, 500)
-    return () => clearTimeout(timer)
-  }, [isLoaded, draftKey, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes, stats])
+    return () => {
+      if (draftSaveTimerRef.current !== null) {
+        window.clearTimeout(draftSaveTimerRef.current)
+        draftSaveTimerRef.current = null
+      }
+    }
+  }, [isLoaded, draftKey, saving, savedOk, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes, stats])
 
   // Recupera bozza da localStorage e applica tutto lo state
   const recoverDraft = () => {
@@ -367,6 +400,12 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   // Scarta la bozza salvata (l'utente vuole partire dai dati del DB)
   const discardDraft = () => {
     if (!draftKey) return
+    // Kill del timer di debounce pending: senza questo, il timer già armato
+    // scadeva 300ms dopo il click e riscriveva la bozza appena rimossa
+    if (draftSaveTimerRef.current !== null) {
+      window.clearTimeout(draftSaveTimerRef.current)
+      draftSaveTimerRef.current = null
+    }
     try { localStorage.removeItem(draftKey) } catch {}
     setDraftMeta(null)
   }
@@ -522,7 +561,12 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         const { error } = await supabase.from('match_player_stats').insert(rows)
         if (error) throw error
       }
-      // Bozza persistente non serve più: il DB ora ha i dati definitivi
+      // Bozza persistente non serve più: il DB ora ha i dati definitivi.
+      // Kill esplicito del timer di debounce (senza, poteva riscrivere la bozza 500ms dopo il remove)
+      if (draftSaveTimerRef.current !== null) {
+        window.clearTimeout(draftSaveTimerRef.current)
+        draftSaveTimerRef.current = null
+      }
       if (draftKey) {
         try { localStorage.removeItem(draftKey) } catch {}
         setDraftMeta(null)
@@ -855,7 +899,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11.5, fontWeight: 800, color: '#005520' }}>
-                    Distinta tattica gi\u00e0 compilata
+                    Distinta tattica già compilata
                   </div>
                   <div style={{ fontSize: 10.5, color: '#404751', marginTop: 2, lineHeight: 1.4 }}>
                     I titolari sono impostati con i ruoli dalla distinta ({new Date(lineupCompletedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} alle {new Date(lineupCompletedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}).
@@ -1298,6 +1342,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               theirScore={parseInt(theirScore, 10) || 0}
               captainPlayerId={captainPlayerId}
               viceCaptainPlayerId={viceCaptainPlayerId}
+              clubShortName={clubShortName}
             />
           </>
         )}
@@ -1624,7 +1669,7 @@ function buildRecapMessage(args: {
 
 function RecapExport({
   match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes,
-  ourScore, theirScore, captainPlayerId, viceCaptainPlayerId,
+  ourScore, theirScore, captainPlayerId, viceCaptainPlayerId, clubShortName,
 }: {
   match: PostMatchData | null
   formation: string
@@ -1637,6 +1682,7 @@ function RecapExport({
   theirScore: number
   captainPlayerId: string | null
   viceCaptainPlayerId: string | null
+  clubShortName: string | null
 }) {
   const [copied, setCopied] = useState(false)
   const [pngBusy, setPngBusy] = useState(false)
@@ -1780,6 +1826,7 @@ function RecapExport({
     sostituzioni.sort((a, b) => a.minute - b.minute)
 
     return {
+      teamClubName: clubShortName,
       teamName: match!.team_name,
       teamCategory: match!.team_category,
       opponentName: match!.opponent,
@@ -1910,7 +1957,14 @@ function RecapExport({
             Timeline eventi ({timelineEvents.length} {timelineEvents.length === 1 ? 'evento' : 'eventi'}{yellowCardsCount > 0 ? ` + ${yellowCardsCount} 🟨` : ''})
           </summary>
           <div style={{ marginTop: 6 }}>
-            <MatchTimeline events={timelineEvents} yellowCardsCount={yellowCardsCount} />
+            <MatchTimeline
+              events={timelineEvents}
+              yellowCardsCount={yellowCardsCount}
+              matchDuration={makeMatchDuration(
+                match.team_match_periods_count ?? null,
+                match.team_match_period_duration_min ?? null,
+              )}
+            />
           </div>
         </details>
       )}

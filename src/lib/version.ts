@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.70'
+export const APP_VERSION = '1.9.71'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.71',
+    date: '2026-09-22',
+    title: 'Locandina col nome del club + Timeline con durata categoria + bozza fantasma fixed + panchina compatta',
+    fixes: [
+      'Locandina post-partita ora mostra "LENCI POIRINO" come titolo grande al posto del nome squadra ("UNDER 14"): la locandina promuove il CLUB, non la categoria interna. La squadra e la categoria ("Under 14 · U-14") scendono a sottotitolo sotto il nome club. Fetchato in modo resiliente dal DB (tabella clubs.short_name). Vale per entrambi i lati dell\u2019header',
+      'Timeline eventi (barra 0\u2019-N\u2019) finalmente collegata alla durata partita configurata sulla squadra: la U14 mostra la barra su 70\u2019 con divisore a 35\u2019, la U16 su 80\u2019 con divisore a 40\u2019, ecc. Il collegamento era mancante in 2 punti: dashboard Manager (Timeline nelle partite passate espandibili) e Post-Match report (Timeline live nel recap). Ora entrambi caricano la durata dalla tabella teams e la passano al componente. La pagina Giornalista era gi\u00e0 collegata da v1.9.67',
+      'U14 aggiornata in DB da 2\u00d730 (60\u2019) a 2\u00d735 (70\u2019). Le altre categorie restano sui preset FIGC: Piccoli Amici 3\u00d710, Primi Calci/Pulcini 3\u00d715, Esordienti 3\u00d720, U16 2\u00d740, Juniores/Prima 2\u00d745. Per modificare la durata di una categoria: Squadre \u2192 \u2699\ufe0f modifica squadra \u2192 pannello "Durata partita"',
+      'Bozza fantasma nel Post-Match report: il banner "Hai una bozza non salvata" ricompariva anche dopo aver cliccato Scarta o Salva. Causa: il useEffect di autosalvataggio bozza aveva un debounce 500ms non cancellabile da fuori, quindi Scarta rimuoveva la bozza e 300ms dopo il timer scaduto la riscriveva. Idem al Salva. Fix: timer in ref cancellabile esplicitamente da discardDraft e save, e skip dell\u2019autosalvataggio quando saving/savedOk sono true',
+      'Foglio partita A4: l\u2019ultimo giocatore della panchina (il 9\u00b0) veniva tagliato dal bordo del container. Ridotte le altezze delle righe (titolari 5.5\u21925mm, panchina 5\u21924.5mm) e compattato il font del numero maglia panchina (9.5\u21928.5pt con line-height 1). Ora tutti i 9 posti panchina entrano senza sforare',
+      'Escape Unicode rotto nel banner del Post-Match: "Distinta tattica gi\\u00e0 compilata" mostrava letteralmente il codice invece del carattere "\u00e0". Ora scritto correttamente come "gi\u00e0 compilata"',
+    ],
+  },
   {
     version: '1.9.70',
     date: '2026-09-22',

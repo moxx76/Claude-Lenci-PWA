@@ -8,6 +8,7 @@ import { PostMatchSheet, type PostMatchData } from './PostMatchSheet'
 import { DistintaTatticaSheet, type DistintaTatticaData } from './DistintaTatticaSheet'
 import { PitchView, type PitchPlayer } from './PitchView'
 import { MatchTimeline, type TimelineEvent } from './MatchTimeline'
+import { makeMatchDuration, type MatchDuration } from '../lib/matchDuration'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
@@ -59,6 +60,9 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
   const [upcoming, setUpcoming] = useState<MatchWithConv[]>([])
   const [past, setPast] = useState<MatchWithConv[]>([])
+  // Durata partita configurata sulla squadra (es. U14 = 2×35). Usata per scalare la MatchTimeline
+  // e per popolare i campi durata di PostMatchData quando si apre il post-partita.
+  const [teamMatchDuration, setTeamMatchDuration] = useState<MatchDuration | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [rosterCount, setRosterCount] = useState(0)
   const [rosterWithoutCard, setRosterWithoutCard] = useState(0)
@@ -122,7 +126,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       const in14d = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
       const from14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
 
-      const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes] = await Promise.all([
+      const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes, teamDurRes] = await Promise.all([
         supabase.from('matches')
           .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
         .eq('team_id', teamId)
@@ -149,7 +153,20 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         .select('id, first_name, last_name, position')
         .eq('team_id', teamId)
         .order('last_name'),
+      // Durata partita configurata per la squadra (per la Timeline eventi 0'-N')
+      supabase.from('teams')
+        .select('match_periods_count, match_period_duration_min')
+        .eq('id', teamId)
+        .maybeSingle(),
     ])
+
+    // Popolo la durata partita (fallback 2×45 se colonna mancante o query fallita)
+    const teamDurRow = (teamDurRes.data as { match_periods_count?: number | null; match_period_duration_min?: number | null } | null) ?? null
+    const currentTeamDuration = makeMatchDuration(
+      teamDurRow?.match_periods_count ?? 2,
+      teamDurRow?.match_period_duration_min ?? 45,
+    )
+    setTeamMatchDuration(currentTeamDuration)
 
     // Conteggi convocazioni + stats per ogni partita.
     // NB: Supabase in caso di errore ritorna {data:null, error:...} SENZA rejectare Promise.all,
@@ -496,6 +513,10 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       team_color: currentTeam?.color,
       home_score: m.home_score,
       away_score: m.away_score,
+      // Durata partita: la Timeline nel RecapExport si scala su questi valori
+      // (fallback 2×45 dentro makeMatchDuration se qui sono null)
+      team_match_periods_count: teamMatchDuration?.periodsCount ?? null,
+      team_match_period_duration_min: teamMatchDuration?.periodDurationMin ?? null,
     })
   }
 
@@ -830,6 +851,7 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
                 onOpenDistinta={() => openConvocation(m)}
                 onOpenReport={() => openReport(m)}
                 teamColor={teamColor}
+                matchDuration={teamMatchDuration}
               />
             ))}
           </div>
@@ -1087,11 +1109,12 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   )
 }
 
-function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor }: {
+function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor, matchDuration }: {
   match: MatchWithConv;
   onOpenDistinta: () => void;
   onOpenReport: () => void;
   teamColor: string;
+  matchDuration?: MatchDuration;
 }) {
   const d = new Date(match.match_date)
   const isHome = match.venue === 'home'
@@ -1218,7 +1241,7 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor }: {
             {match.timeline_yellow_count > 0 && ` + ${match.timeline_yellow_count} 🟨`}
           </summary>
           <div style={{ padding: 8 }}>
-            <MatchTimeline events={match.timeline_events} yellowCardsCount={match.timeline_yellow_count} />
+            <MatchTimeline events={match.timeline_events} yellowCardsCount={match.timeline_yellow_count} matchDuration={matchDuration} />
           </div>
         </details>
       )}

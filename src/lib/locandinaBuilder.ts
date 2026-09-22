@@ -23,9 +23,13 @@ interface Sostituzione {
 }
 
 export interface LocandinaData {
-  /** Nome squadra Lenci (es. "ASD Lenci Poirino") */
+  /** Nome club Lenci (es. "Lenci Poirino") — se presente diventa il nome GRANDE nell'header,
+   * mentre teamName+teamCategory scendono a sottotitolo. Se assente, teamName resta il titolo grande
+   * (comportamento retro-compatibile). Serve perché la locandina promuove il CLUB, non la categoria. */
+  teamClubName?: string | null
+  /** Nome squadra Lenci (es. "Under 14"). Se teamClubName è presente, questa scende sotto come dettaglio. */
   teamName: string
-  /** Categoria squadra opzionale (es. "Under 14") */
+  /** Categoria squadra opzionale (es. "U-14") */
   teamCategory?: string | null
   /** Nome squadra avversaria */
   opponentName: string
@@ -168,13 +172,21 @@ function drawHeader(ctx: CanvasRenderingContext2D, w: number, h: number, data: L
   ctx.textBaseline = 'middle'
   ctx.fillText(topLine, w / 2, 21)
 
-  // Team names (sx = Lenci se casa, dx altrimenti) + score al centro
-  const homeName = isHome ? data.teamName : data.opponentName
-  const awayName = isHome ? data.opponentName : data.teamName
+  // Nome del lato Lenci: se abbiamo teamClubName (es. "Lenci Poirino") lo uso come titolo GRANDE
+  // e faccio scendere la squadra ("Under 14") + categoria ("U-14") come sottotitolo compatto.
+  // Così la locandina promuove il CLUB, che è il brand riconoscibile, non la categoria interna.
+  // Retro-compatibile: se teamClubName non è passato, resta il vecchio comportamento (teamName grande).
+  const lenciBigName = data.teamClubName || data.teamName
+  const lenciSubtitle = data.teamClubName
+    ? [data.teamName, data.teamCategory].filter(Boolean).join(' · ')
+    : (data.teamCategory ?? '')
+
+  const homeName = isHome ? lenciBigName : data.opponentName
+  const awayName = isHome ? data.opponentName : lenciBigName
   const homeScore = isHome ? data.ourScore : data.theirScore
   const awayScore = isHome ? data.theirScore : data.ourScore
 
-  // Categoria squadra sotto il nome, se presente (mostra solo la nostra)
+  // Sottotitolo (solo per il lato Lenci)
   const centerY = 42 + (h - 42) / 2
 
   // Nome Home (sinistra)
@@ -185,11 +197,11 @@ function drawHeader(ctx: CanvasRenderingContext2D, w: number, h: number, data: L
   const homeNameLines = wrapText(ctx, homeName.toUpperCase(), 320)
   drawMultilineText(ctx, homeNameLines, w / 2 - 100, centerY - 14, 34)
 
-  // Sottolineatura categoria home se è Lenci
-  if (isHome && data.teamCategory) {
+  // Sottotitolo home se è Lenci
+  if (isHome && lenciSubtitle) {
     ctx.font = '600 15px system-ui, -apple-system, sans-serif'
     ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    ctx.fillText(data.teamCategory, w / 2 - 100, centerY + 30)
+    ctx.fillText(lenciSubtitle, w / 2 - 100, centerY + 30)
   }
 
   // Nome Away (destra)
@@ -199,10 +211,10 @@ function drawHeader(ctx: CanvasRenderingContext2D, w: number, h: number, data: L
   const awayNameLines = wrapText(ctx, awayName.toUpperCase(), 320)
   drawMultilineText(ctx, awayNameLines, w / 2 + 100, centerY - 14, 34)
 
-  if (!isHome && data.teamCategory) {
+  if (!isHome && lenciSubtitle) {
     ctx.font = '600 15px system-ui, -apple-system, sans-serif'
     ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    ctx.fillText(data.teamCategory, w / 2 + 100, centerY + 30)
+    ctx.fillText(lenciSubtitle, w / 2 + 100, centerY + 30)
   }
 
   // Score al centro dentro un badge scuro
