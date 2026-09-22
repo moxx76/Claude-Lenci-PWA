@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.68'
+export const APP_VERSION = '1.9.69'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.69',
+    date: '2026-09-22',
+    title: 'Foglio partita: mini-campo funzionante, ruoli compatti, panchina che non sfora',
+    fixes: [
+      'Mini-campo grafico: i cerchietti dei titolari erano tutti sovrapposti al centro (11 pallini nello stesso punto). Bug di accesso: il codice cercava FORMATIONS[modulo].slots ma FORMATIONS[modulo] è direttamente l\u2019array degli slot. Ora i puntini si distribuiscono correttamente sulle posizioni del modulo (portiere in basso, difensori, centrocampisti, attaccanti in alto)',
+      'Panchina che sconfinava sopra alle sezioni AMMONIZIONI/ESPULSIONI/NOTE: ridotta altezza riga tabelle (titolari 5.5mm, panchina 5mm) e aggiunto overflow:hidden sul contenitore corpo. Il footer ora ha 45mm invece di 40mm, il corpo 140mm invece di 145mm, tutto rimane nei 200mm A4 landscape',
+      'Ruoli titolari mostravano il testo lungo "Difensore centrale" / "Terzino destro" che occupava troppa larghezza nella colonna. Ora uso le sigle GK / TD / TS / DC / MED / INT / TRQ / ED / ES / AD / AS / PC (colorate in blu) come nel resto della app',
+      'Numero maglia: se non impostato in anagrafica, ora appare come casella vuota da compilare a mano invece del brutto "\u2014". Consiglio: aggiungete i numeri di maglia dei giocatori in Roster \u2192 modifica giocatore per averli pre-stampati',
+    ],
+  },
   {
     version: '1.9.68',
     date: '2026-09-22',
