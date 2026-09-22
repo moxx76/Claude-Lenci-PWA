@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.74'
+export const APP_VERSION = '1.9.75'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.75',
+    date: '2026-09-22',
+    title: 'Pulizia etichetta diagnostica sotto Timeline recap',
+    fixes: [
+      'Rimossa l\u2019etichetta diagnostica grigia sotto la Timeline nel Post-Match recap (aggiunta in v1.9.74 per capire perch\u00e9 la barra mostrava 90\u2019 anche per la U14). La causa era cache PWA del Service Worker sul dispositivo: il codice era corretto gi\u00e0 dal v1.9.71/v1.9.73, ma i chunk vecchi restavano serviti dalla cache locale finch\u00e9 un nuovo deploy non forzava il refresh degli asset',
+    ],
+  },
   {
     version: '1.9.74',
     date: '2026-09-22',
