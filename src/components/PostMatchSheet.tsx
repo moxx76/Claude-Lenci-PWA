@@ -131,9 +131,21 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [captainPlayerId, setCaptainPlayerId] = useState<string | null>(null)
   // Id del vice capitano dei convocati (per notazione recap "Capitano dal X'")
   const [viceCaptainPlayerId, setViceCaptainPlayerId] = useState<string | null>(null)
+  // Timestamp di quando la distinta tattica è stata compilata (banner + prompt "sei allineato?")
+  const [lineupCompletedAt, setLineupCompletedAt] = useState<string | null>(null)
+  // Bozza persistente in localStorage: metadati per il banner "recupera bozza"
+  const [draftMeta, setDraftMeta] = useState<{ savedAt: string; playersCount: number } | null>(null)
+  // Flag interno: true quando load() ha finito, così il useEffect di salvataggio bozza non parte al primo render
+  const [isLoaded, setIsLoaded] = useState(false)
+
+  // Chiave localStorage per la bozza di questa partita
+  const draftKey = match?.id ? `lenci-postmatch-draft-${match.id}` : null
 
   useEffect(() => {
-    if (!open || !match) return
+    if (!open || !match) {
+      setIsLoaded(false)
+      return
+    }
     load()
   }, [open, match?.id])
 
@@ -166,23 +178,25 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setRefereeNotes(mRow?.referee_notes ?? '')
     setPublishedForJournalists(mRow?.published_for_journalists === true)
 
-    // Carico autogol avversari + modulo effettivo in query separata resiliente (le colonne potrebbero non esistere
-    // se le migration v1.9.55/v1.9.61 non sono state applicate al DB).
+    // Carico autogol avversari + modulo effettivo + lineup_completed_at in query separata resiliente
+    // (le colonne potrebbero non esistere se le migration v1.9.55/v1.9.59/v1.9.61 non sono state applicate).
     try {
       const { data: oogData } = await supabase.from('matches')
-        .select('opponent_own_goals, opponent_own_goal_minutes, effective_formation, formation_change_minute')
+        .select('opponent_own_goals, opponent_own_goal_minutes, effective_formation, formation_change_minute, lineup_completed_at')
         .eq('id', match.id)
         .maybeSingle()
-      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null } | null
+      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null; lineup_completed_at?: string | null } | null
       setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
       setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
       setEffectiveFormation(oogRow?.effective_formation ?? '')
       setFormationChangeMinute(oogRow?.formation_change_minute != null ? String(oogRow.formation_change_minute) : '')
+      setLineupCompletedAt(oogRow?.lineup_completed_at ?? null)
     } catch {
       setOpponentOwnGoals(0)
       setOpponentOwnGoalMinutes([])
       setEffectiveFormation('')
       setFormationChangeMinute('')
+      setLineupCompletedAt(null)
     }
 
     const convPlayers: Player[] = ((convRes.data ?? []) as any[])
@@ -231,7 +245,28 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     // Auto-sync attivo di default all'apertura (verrà disattivato al primo edit manuale)
     setAutoScore(true)
 
+    // Check bozza in localStorage per questo match
+    if (draftKey) {
+      try {
+        const rawDraft = localStorage.getItem(draftKey)
+        if (rawDraft) {
+          const parsed = JSON.parse(rawDraft) as { savedAt: string; stats?: Record<string, any> }
+          if (parsed?.savedAt) {
+            setDraftMeta({
+              savedAt: parsed.savedAt,
+              playersCount: parsed.stats ? Object.keys(parsed.stats).length : 0,
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('[PostMatchSheet] Errore lettura bozza', err)
+      }
+    }
+
     setLoading(false)
+    // Piccolo delay: monto isLoaded al prossimo tick per evitare che il useEffect di salvataggio
+    // bozza scriva subito dopo il load (che ha appena settato gli state a valore DB)
+    setTimeout(() => setIsLoaded(true), 100)
   }
 
   const updateStat = (pid: string, patch: Partial<Stats>) => {
@@ -252,6 +287,74 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       }
       return cleared
     })
+  }
+
+  // Bozza persistente: salva lo state completo del referto in localStorage con debounce 500ms.
+  // Serve a proteggere il coach da chiusure accidentali (tap fuori sheet, chiude browser, ecc.).
+  // Non sostituisce il salvataggio esplicito su DB — è solo un cuscinetto di sicurezza.
+  useEffect(() => {
+    if (!isLoaded || !draftKey) return
+    const timer = setTimeout(() => {
+      try {
+        const payload = {
+          savedAt: new Date().toISOString(),
+          formation,
+          effectiveFormation,
+          formationChangeMinute,
+          reportPositive,
+          reportNegative,
+          reportGeneral,
+          weather,
+          refereeNotes,
+          publishedForJournalists,
+          ourScore,
+          theirScore,
+          autoScore,
+          opponentOwnGoals,
+          opponentOwnGoalMinutes,
+          stats,
+        }
+        localStorage.setItem(draftKey, JSON.stringify(payload))
+      } catch (err) {
+        console.warn('[PostMatchSheet] Errore salvataggio bozza', err)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [isLoaded, draftKey, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, stats])
+
+  // Recupera bozza da localStorage e applica tutto lo state
+  const recoverDraft = () => {
+    if (!draftKey) return
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (!raw) { setDraftMeta(null); return }
+      const p = JSON.parse(raw)
+      if (p.formation != null) setFormation(p.formation)
+      if (p.effectiveFormation != null) setEffectiveFormation(p.effectiveFormation)
+      if (p.formationChangeMinute != null) setFormationChangeMinute(p.formationChangeMinute)
+      if (p.reportPositive != null) setReportPositive(p.reportPositive)
+      if (p.reportNegative != null) setReportNegative(p.reportNegative)
+      if (p.reportGeneral != null) setReportGeneral(p.reportGeneral)
+      if (p.weather != null) setWeather(p.weather)
+      if (p.refereeNotes != null) setRefereeNotes(p.refereeNotes)
+      if (p.publishedForJournalists != null) setPublishedForJournalists(p.publishedForJournalists)
+      if (p.ourScore != null) setOurScore(p.ourScore)
+      if (p.theirScore != null) setTheirScore(p.theirScore)
+      if (p.autoScore != null) setAutoScore(p.autoScore)
+      if (p.opponentOwnGoals != null) setOpponentOwnGoals(p.opponentOwnGoals)
+      if (p.opponentOwnGoalMinutes != null) setOpponentOwnGoalMinutes(p.opponentOwnGoalMinutes)
+      if (p.stats) setStats(p.stats)
+      setDraftMeta(null)
+    } catch (err) {
+      alert('Errore nel recupero della bozza: ' + (err as any)?.message)
+    }
+  }
+
+  // Scarta la bozza salvata (l'utente vuole partire dai dati del DB)
+  const discardDraft = () => {
+    if (!draftKey) return
+    try { localStorage.removeItem(draftKey) } catch {}
+    setDraftMeta(null)
   }
 
   // Ruolo giocatore nella gara: 3 stati mutuamente esclusivi
@@ -295,6 +398,33 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     Object.values(stats).reduce((sum, s) => sum + (s.goals || 0) + (s.penalties_scored || 0), 0)
     + opponentOwnGoals,
     [stats, opponentOwnGoals])
+
+  // Ordinamento smart: se c'è una distinta compilata, titolari prima (ordinati per slot_index),
+  // poi panchinari (ordinati per jersey_number). Se non c'è distinta, ordinamento classico per jersey.
+  const hasLineup = useMemo(() =>
+    Object.values(stats).some(s => s.was_starter && (s as any).slot_index != null),
+    [stats])
+  const sortedPlayers = useMemo(() => {
+    if (!hasLineup) return players
+    return [...players].sort((a, b) => {
+      const sa = stats[a.id]
+      const sb = stats[b.id]
+      const saIdx = (sa as any)?.slot_index
+      const sbIdx = (sb as any)?.slot_index
+      const aIsStarter = sa?.was_starter && saIdx != null
+      const bIsStarter = sb?.was_starter && sbIdx != null
+      if (aIsStarter && bIsStarter) return saIdx - sbIdx
+      if (aIsStarter) return -1
+      if (bIsStarter) return 1
+      // Entrambi panchinari: chi ha giocato (minute_in != null) prima di chi non è entrato
+      const aPlayed = sa?.minute_in != null
+      const bPlayed = sb?.minute_in != null
+      if (aPlayed && !bPlayed) return -1
+      if (!aPlayed && bPlayed) return 1
+      // Poi per numero maglia
+      return (a.jersey_number ?? 999) - (b.jersey_number ?? 999)
+    })
+  }, [players, stats, hasLineup])
 
   // Auto-sync: se autoScore attivo, ourScore segue sempre la somma marcatori
   useEffect(() => {
@@ -376,6 +506,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       if (rows.length > 0) {
         const { error } = await supabase.from('match_player_stats').insert(rows)
         if (error) throw error
+      }
+      // Bozza persistente non serve più: il DB ora ha i dati definitivi
+      if (draftKey) {
+        try { localStorage.removeItem(draftKey) } catch {}
+        setDraftMeta(null)
       }
       setSavedOk(true)
       onSaved?.()
@@ -651,6 +786,70 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               </div>
             </details>
 
+            {/* Banner: bozza recuperabile da localStorage — chiusura accidentale, refresh, ecc. */}
+            {draftMeta && (
+              <div style={{
+                marginBottom: 12, padding: 10, borderRadius: 10,
+                background: '#fff4e5', border: '1px solid #e0a800',
+                display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8e6300', flexShrink: 0 }}>
+                  restore
+                </span>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 800, color: '#8e6300' }}>
+                    Hai una bozza non salvata
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#404751', marginTop: 2, lineHeight: 1.4 }}>
+                    Modifiche del {new Date(draftMeta.savedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} alle {new Date(draftMeta.savedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                    {draftMeta.playersCount > 0 && ` \u00b7 ${draftMeta.playersCount} giocator${draftMeta.playersCount === 1 ? 'e' : 'i'} interessat${draftMeta.playersCount === 1 ? 'o' : 'i'}`}.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={recoverDraft}
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, border: '1px solid #8e6300',
+                      background: '#8e6300', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    Recupera
+                  </button>
+                  <button
+                    onClick={discardDraft}
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, border: '1px solid #c0c7d2',
+                      background: 'transparent', color: '#707882', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    Scarta
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Banner: distinta tattica compilata → i titolari sono già impostati */}
+            {lineupCompletedAt && hasLineup && (
+              <div style={{
+                marginBottom: 12, padding: 10, borderRadius: 10,
+                background: '#e8f5e9', border: '1px solid #006e25',
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#006e25', flexShrink: 0 }}>
+                  check_circle
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 800, color: '#005520' }}>
+                    Distinta tattica gi\u00e0 compilata
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#404751', marginTop: 2, lineHeight: 1.4 }}>
+                    I titolari sono impostati con i ruoli dalla distinta ({new Date(lineupCompletedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} alle {new Date(lineupCompletedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}).
+                    Aggiungi solo gol, sostituzioni e cartellini.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Riepilogo mini */}
             <div style={{
               display: 'flex', gap: 8, marginBottom: 12, fontSize: 11, flexWrap: 'wrap',
@@ -707,9 +906,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               </div>
             </div>
 
-            {/* Lista giocatori */}
+            {/* Lista giocatori — ordinata per slot se distinta compilata */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-              {players.map(p => {
+              {sortedPlayers.map(p => {
                 const s = stats[p.id] || emptyStats(p.id)
                 const isExpanded = expandedPlayer === p.id
                 const initials = ((p.first_name?.[0] || '') + (p.last_name?.[0] || '')).toUpperCase()
@@ -806,6 +1005,65 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                                 {POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                               </select>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Sostituisce: solo per subentrati con minute_in valorizzato.
+                            Selezionando un titolare, imposta automaticamente il suo minute_out
+                            uguale al minute_in del subentrato (una singola sostituzione = due state update coordinati). */}
+                        {roleOf(s) === 'sub' && s.minute_in != null && s.minute_in > 0 && (
+                          <div style={{
+                            marginBottom: 12, padding: 8, borderRadius: 8,
+                            background: 'rgba(0,95,152,0.06)', border: '1px solid rgba(0,95,152,0.25)',
+                          }}>
+                            <SmallLabel>Sostituisce (titolare che esce al {s.minute_in}\u2032)</SmallLabel>
+                            <select
+                              value={(() => {
+                                // Chi ha minute_out = questo minute_in E era titolare
+                                const replaced = Object.values(stats).find(x =>
+                                  x.was_starter && x.minute_out === s.minute_in && x.player_id !== p.id
+                                )
+                                return replaced?.player_id || ''
+                              })()}
+                              onChange={e => {
+                                const outId = e.target.value
+                                // Reset: chi era stato marcato come sostituito da questo sub torna senza minute_out
+                                setStats(prev => {
+                                  const next = { ...prev }
+                                  for (const [pid, st] of Object.entries(next)) {
+                                    if (st.was_starter && st.minute_out === s.minute_in && pid !== outId) {
+                                      // Solo se non c'è un altro sub che gli è associato
+                                      const otherSub = Object.values(next).find(x =>
+                                        x.player_id !== p.id && !x.was_starter && x.minute_in === s.minute_in
+                                      )
+                                      if (!otherSub) next[pid] = { ...st, minute_out: null }
+                                    }
+                                  }
+                                  if (outId) {
+                                    const cur = next[outId] || emptyStats(outId)
+                                    next[outId] = { ...cur, minute_out: s.minute_in }
+                                  }
+                                  return next
+                                })
+                              }}
+                              style={{ ...compactInput, padding: '6px 8px' }}
+                            >
+                              <option value="">— Nessuno / imposta manualmente —</option>
+                              {/* Titolari ancora "in campo" al minute_in del sub: was_starter=true
+                                  E (minute_out == null OR minute_out >= s.minute_in) */}
+                              {players.filter(other => {
+                                if (other.id === p.id) return false
+                                const os = stats[other.id]
+                                if (!os?.was_starter) return false
+                                if (os.minute_out != null && os.minute_out < (s.minute_in ?? 0)) return false
+                                return true
+                              }).map(other => (
+                                <option key={other.id} value={other.id}>
+                                  {other.jersey_number != null ? `#${other.jersey_number} ` : ''}
+                                  {other.last_name} {other.first_name[0]}.
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         )}
 

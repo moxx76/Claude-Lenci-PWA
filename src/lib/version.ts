@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.61'
+export const APP_VERSION = '1.9.62'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.62',
+    date: '2026-09-22',
+    title: 'Referto post-gara riscritto: parte dalla distinta + bozza persistente',
+    features: [
+      'Il referto post-gara ora parte dalla distinta tattica: i giocatori vengono mostrati nell\u2019ordine dello schieramento (portiere, difesa, centrocampo, attacco secondo gli slot del modulo) invece che per numero di maglia, con i panchinari sotto. Se \u00e8 stata compilata la distinta compare un banner verde in cima "Distinta tattica gi\u00e0 compilata" e i titolari sono automaticamente impostati con i ruoli — il coach nel dopo-gara aggiunge solo gol, sostituzioni e cartellini',
+      'Bozza persistente: ogni modifica al referto viene salvata automaticamente nel browser (localStorage con debounce di 500ms). Se chiudi la scheda senza salvare, per errore o per il timeout della sessione, alla riapertura compare un banner arancione "Hai una bozza non salvata" con la data e ora della modifica e i pulsanti Recupera / Scarta. Al salvataggio esplicito su server la bozza viene ripulita',
+      'Sostituzioni strutturate: quando marchi un panchinaro come "Subentrato" e inserisci il minuto di ingresso, compare un dropdown "Sostituisce" che elenca solo i titolari ancora in campo a quel minuto. Selezionando un titolare, il suo minuto di uscita viene impostato automaticamente uguale al minuto di ingresso del subentrato — una sostituzione = un singolo click coordinato invece di dover modificare a mano i minutaggi di due giocatori',
+    ],
+    notes: [
+      'La bozza \u00e8 locale al singolo dispositivo/browser: non si sincronizza tra telefono e desktop. Serve come rete di sicurezza, non come vero salvataggio — il salvataggio esplicito con il pulsante "Salva" resta l\u2019unico modo per rendere le modifiche visibili a tutti',
+      'Chiude il ciclo di 5 release dedicato al flusso squadra (v1.9.58 vice capitano, v1.9.59 distinta tattica, v1.9.60 import + preview, v1.9.61 campo grafico + modulo cambiato in corsa, v1.9.62 referto riscritto). Il ciclo di miglioramenti report squadra \u00e8 completato',
+    ],
+  },
   {
     version: '1.9.61',
     date: '2026-09-22',
