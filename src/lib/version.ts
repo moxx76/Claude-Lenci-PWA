@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.64'
+export const APP_VERSION = '1.9.65'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.65',
+    date: '2026-09-22',
+    title: 'Locandina PNG post-partita: header col risultato + campo + marcatori',
+    features: [
+      'I pulsanti "Scarica" e "Condividi" nel Recap del referto ora generano una vera **locandina post-partita** in formato portrait 900\u00d71760\u20132100px, pronta per WhatsApp/Instagram/Facebook. Non pi\u00f9 solo il campo grafico',
+      'Header: fascia colorata nel colore squadra con nome team + avversario, categoria (Under 14/16 ecc.), competizione, data, orario, casa/trasferta, e al centro un badge scuro col risultato in font Anybody grande',
+      'Corpo centrale: il campo grafico gi\u00e0 esistente (con sostituzioni indicate dalle freccette gialle)',
+      'Footer: elenco completo dei marcatori Lenci con minuti (indicando i rigori con "rig"), autogol avversari a favore, sostituzioni cronologiche (in \u2190 out), modulo e hashtag della squadra. Il footer si dimensiona automaticamente al contenuto',
+    ],
+    notes: [
+      'Il rendering \u00e8 fatto interamente in canvas dal browser senza librerie esterne: il nome squadra viene scritto ad alta risoluzione dal Canvas API, il campo viene rasterizzato dall\u2019SVG del PitchView e composto sopra. Peso PNG finale tipicamente 300\u2013800 KB',
+    ],
+  },
   {
     version: '1.9.64',
     date: '2026-09-22',

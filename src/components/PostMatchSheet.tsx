@@ -7,6 +7,7 @@ import { StaffAttendanceSection } from './StaffAttendanceSection'
 import { PitchView, pitchToPngDataUrl, dataUrlToBlob, type PitchPlayer } from './PitchView'
 import { MatchTimeline } from './MatchTimeline'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
+import { buildLocandinaPngDataUrl, type LocandinaData } from '../lib/locandinaBuilder'
 
 export interface PostMatchData {
   id: string
@@ -1736,24 +1737,85 @@ function RecapExport({
   }
 
   // Scarica il campo grafico come PNG (locandina condivisibile)
+  // Costruisce il payload LocandinaData dai dati partita.
+  // Include marcatori (con distinzione rigori), sostituzioni, gol subiti/autogol avversari.
+  const buildLocandinaPayload = (): LocandinaData => {
+    const nameOf = (pid: string) => {
+      const p = players.find(x => x.id === pid)
+      return p ? `${p.last_name} ${p.first_name[0]}.` : '?'
+    }
+    // Aggrega marcatori per giocatore: per ogni giocatore un array minutes[] + isPenalty[]
+    const marcatoriMap = new Map<string, { name: string; minutes: number[]; isPenalty: boolean[] }>()
+    for (const s of Object.values(stats)) {
+      const goalMin = s.goal_minutes ?? []
+      const penMin = s.penalty_minutes ?? []
+      if (goalMin.length === 0 && penMin.length === 0) continue
+      const key = s.player_id
+      if (!marcatoriMap.has(key)) marcatoriMap.set(key, { name: nameOf(key), minutes: [], isPenalty: [] })
+      const entry = marcatoriMap.get(key)!
+      for (const m of goalMin) { entry.minutes.push(m); entry.isPenalty.push(false) }
+      for (const m of penMin) { entry.minutes.push(m); entry.isPenalty.push(true) }
+    }
+    // Ordina i minuti dentro ciascun marcatore mantenendo l'allineamento isPenalty
+    const marcatori = Array.from(marcatoriMap.values()).map(m => {
+      const idx = m.minutes.map((min, i) => ({ min, pen: m.isPenalty[i] }))
+      idx.sort((a, b) => a.min - b.min)
+      return { name: m.name, minutes: idx.map(x => x.min), isPenalty: idx.map(x => x.pen) }
+    }).sort((a, b) => a.minutes[0] - b.minutes[0])
+
+    // Sostituzioni: per ogni subentrato con minute_in > 0, trovo il titolare uscito allo stesso minuto
+    const sostituzioni: LocandinaData['sostituzioni'] = []
+    for (const s of Object.values(stats)) {
+      if (!s.was_starter && s.minute_in != null && s.minute_in > 0) {
+        const outStat = Object.values(stats).find(x => x.was_starter && x.minute_out === s.minute_in)
+        sostituzioni.push({
+          minute: s.minute_in,
+          in: nameOf(s.player_id),
+          out: outStat ? nameOf(outStat.player_id) : '—',
+        })
+      }
+    }
+    sostituzioni.sort((a, b) => a.minute - b.minute)
+
+    return {
+      teamName: match!.team_name,
+      teamCategory: match!.team_category,
+      opponentName: match!.opponent,
+      ourScore, theirScore,
+      matchDate: match!.match_date,
+      venue: match!.venue,
+      competition: match!.competition,
+      formation,
+      teamColor: match!.team_color || '#b3005c',
+      marcatori,
+      opponentOwnGoalMinutes,
+      opponentGoalMinutes,
+      sostituzioni,
+    }
+  }
+
+  const buildFileName = () => {
+    const isHome = match!.venue === 'home'
+    const dateStr = new Date(match!.match_date).toISOString().slice(0, 10)
+    const oppSlug = match!.opponent.replace(/[^a-zA-Z0-9]/g, '_')
+    return `locandina-${dateStr}-${isHome ? 'vs' : 'a'}-${oppSlug}.png`
+  }
+
   const doDownloadPitchPng = async () => {
     setPngError(null)
     setPngBusy(true)
     try {
       const svg = pitchWrapRef.current?.querySelector('svg') as SVGSVGElement | null
       if (!svg) throw new Error('Campo non trovato')
-      const dataUrl = await pitchToPngDataUrl(svg, 3)
-      // Trigger download
+      const dataUrl = await buildLocandinaPngDataUrl(svg, buildLocandinaPayload())
       const a = document.createElement('a')
       a.href = dataUrl
-      const isHome = match.venue === 'home'
-      const dateStr = new Date(match.match_date).toISOString().slice(0, 10)
-      a.download = `formazione-${dateStr}-${isHome ? 'vs' : 'a'}-${match.opponent.replace(/[^a-zA-Z0-9]/g, '_')}.png`
+      a.download = buildFileName()
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
     } catch (e: any) {
-      setPngError(e?.message || 'Errore generazione immagine')
+      setPngError(e?.message || 'Errore generazione locandina')
     } finally {
       setPngBusy(false)
     }
@@ -1766,22 +1828,18 @@ function RecapExport({
     try {
       const svg = pitchWrapRef.current?.querySelector('svg') as SVGSVGElement | null
       if (!svg) throw new Error('Campo non trovato')
-      const dataUrl = await pitchToPngDataUrl(svg, 3)
+      const dataUrl = await buildLocandinaPngDataUrl(svg, buildLocandinaPayload())
       const blob = dataUrlToBlob(dataUrl)
-      const isHome = match.venue === 'home'
-      const dateStr = new Date(match.match_date).toISOString().slice(0, 10)
-      const fileName = `formazione-${dateStr}-${isHome ? 'vs' : 'a'}-${match.opponent.replace(/[^a-zA-Z0-9]/g, '_')}.png`
+      const fileName = buildFileName()
       const file = new File([blob], fileName, { type: 'image/png' })
-      // Prova Web Share API con file
       const nav = navigator as any
       if (nav.canShare && nav.canShare({ files: [file] })) {
         await nav.share({
           files: [file],
-          title: `Formazione ${match.team_name} vs ${match.opponent}`,
+          title: `${match!.team_name} vs ${match!.opponent} ${ourScore}-${theirScore}`,
           text: message,
         })
       } else {
-        // Fallback: download del file + copia del testo negli appunti
         const a = document.createElement('a')
         a.href = dataUrl
         a.download = fileName
@@ -1789,11 +1847,11 @@ function RecapExport({
         a.click()
         document.body.removeChild(a)
         try { await navigator.clipboard.writeText(message) } catch {}
-        alert('Immagine scaricata e testo copiato negli appunti. Ora aprilo in WhatsApp e allega l\u2019immagine.')
+        alert('Locandina scaricata e testo copiato negli appunti. Ora aprila in WhatsApp e allega l\u2019immagine.')
       }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
-        setPngError(e?.message || 'Errore condivisione immagine')
+        setPngError(e?.message || 'Errore condivisione locandina')
       }
     } finally {
       setPngBusy(false)
@@ -1814,7 +1872,7 @@ function RecapExport({
           </div>
           <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
             Risultato, marcatori coi minuti, formazione titolare e subentrati.
-            Copia il messaggio o condividilo su WhatsApp{hasPitch ? ', o scarica il campo grafico come immagine' : ''}.
+            Copia il messaggio o condividilo su WhatsApp{hasPitch ? ', oppure scarica la locandina PNG post-partita (header col risultato + campo + marcatori)' : ''}.
           </div>
         </div>
       </div>
@@ -1832,7 +1890,7 @@ function RecapExport({
       {hasPitch && (
         <details style={{ background: '#fff', border: '1px solid #e0e2e9', borderRadius: 8, padding: '6px 10px' }}>
           <summary style={{ fontSize: 11, color: '#005f98', fontWeight: 700, cursor: 'pointer' }}>
-            Anteprima campo (usato per l\u2019immagine PNG)
+            Anteprima campo (usato dentro la locandina)
           </summary>
           <div ref={pitchWrapRef} style={{ marginTop: 6 }}>
             <PitchView
@@ -1885,7 +1943,7 @@ function RecapExport({
             opacity: pngBusy ? 0.6 : 1,
           }}>
             <Icon name="download" size={14} color="#005f98" />
-            {pngBusy ? 'Genero…' : 'Scarica campo (PNG)'}
+            {pngBusy ? 'Genero…' : 'Scarica locandina (PNG)'}
           </button>
           <button onClick={doSharePitchPng} disabled={pngBusy} style={{
             padding: '10px 12px', borderRadius: 8, border: 'none', cursor: pngBusy ? 'wait' : 'pointer',
@@ -1895,7 +1953,7 @@ function RecapExport({
             opacity: pngBusy ? 0.6 : 1,
           }}>
             <Icon name="ios_share" size={14} color="#fff" />
-            {pngBusy ? 'Genero…' : 'Condividi immagine'}
+            {pngBusy ? 'Genero…' : 'Condividi locandina'}
           </button>
         </div>
       )}
