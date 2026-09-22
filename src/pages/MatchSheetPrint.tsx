@@ -102,7 +102,7 @@ export function MatchSheetPrint() {
       const { data: convRes } = await supabase.from('convocations')
         .select('player_id, is_captain, is_vice_captain, shirt_number_override, player:players(id, first_name, last_name, jersey_number, position)')
         .eq('match_id', matchId!)
-        .in('status', ['confirmed', 'convocated'])
+        .eq('status', 'accepted')
       const convocations = (convRes ?? []) as any[]
 
       // 3. Stats per capire chi è titolare e in che slot
@@ -260,10 +260,10 @@ export function MatchSheetPrint() {
           match={match} isHome={isHome} dateStr={dateStr} timeStr={timeStr}
         />
 
-        {/* CORPO — 3 colonne */}
+        {/* CORPO — 3 colonne. Layout ridimensionato per far respirare le tabelle centrali */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '55mm 82mm 1fr',
+          gridTemplateColumns: '52mm 92mm 1fr',
           gap: '1.5mm',
           minHeight: 0,
         }}>
@@ -404,6 +404,27 @@ function MiniPitch({ starters, teamColor }: { starters: StarterRow[]; teamColor:
       {/* Area rigore avversaria (in alto) */}
       <rect x={22} y={2} width={56} height={16} fill="none" stroke="#000" strokeWidth={0.3} />
       <rect x={35} y={2} width={30} height={6} fill="none" stroke="#000" strokeWidth={0.3} />
+      {/* Se la distinta non è stata compilata, messaggio in overlay */}
+      {starters.length === 0 && (
+        <>
+          <text x={50} y={68} textAnchor="middle" fontSize={5} fontWeight={800} fill="#93000a"
+            style={{ fontFamily: 'system-ui, sans-serif' }}>
+            Distinta non compilata
+          </text>
+          <text x={50} y={76} textAnchor="middle" fontSize={3.5} fill="#404751"
+            style={{ fontFamily: 'system-ui, sans-serif' }}>
+            Torna alla dashboard e compila
+          </text>
+          <text x={50} y={81} textAnchor="middle" fontSize={3.5} fill="#404751"
+            style={{ fontFamily: 'system-ui, sans-serif' }}>
+            la distinta tattica per vedere
+          </text>
+          <text x={50} y={86} textAnchor="middle" fontSize={3.5} fill="#404751"
+            style={{ fontFamily: 'system-ui, sans-serif' }}>
+            i titolari qui.
+          </text>
+        </>
+      )}
       {/* Giocatori: cerchi coi numeri */}
       {starters.map((s, i) => {
         const cx = s.x
@@ -436,65 +457,100 @@ function MiniPitch({ starters, teamColor }: { starters: StarterRow[]; teamColor:
 function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: BenchRow[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', minHeight: 0 }}>
-      {/* Titolari */}
+      {/* Titolari — 11 righe pre-compilate anche se la distinta non copre tutti gli slot */}
       <div className="box" style={{ padding: '1.5mm 2mm' }}>
         <div style={{
-          fontSize: '8pt', fontWeight: 800, textAlign: 'center',
-          borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1mm',
-        }}>TITOLARI (11)</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+          fontSize: '9pt', fontWeight: 800, textAlign: 'center',
+          borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm',
+          color: '#005f98', letterSpacing: '0.3pt',
+        }}>TITOLARI ({starters.length}/11)</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
           <thead>
-            <tr style={{ fontSize: '6.5pt', fontWeight: 800, background: '#f0f2f5' }}>
-              <th style={{ width: '5mm', textAlign: 'center', padding: '0.3mm' }}>#</th>
-              <th style={{ width: '9mm', textAlign: 'left', padding: '0.3mm 1mm' }}>Ruolo</th>
-              <th style={{ textAlign: 'left', padding: '0.3mm 1mm' }}>Nome</th>
-              <th style={{ width: '7mm', textAlign: 'center', padding: '0.3mm' }}>Cart</th>
-              <th style={{ width: '8mm', textAlign: 'center', padding: '0.3mm' }}>Uscita</th>
+            <tr style={{ fontSize: '7pt', fontWeight: 800, background: '#f0f2f5', color: '#404751' }}>
+              <th style={{ width: '6mm', textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #ccc' }}>#</th>
+              <th style={{ width: '10mm', textAlign: 'left', padding: '1mm' }}>Ruolo</th>
+              <th style={{ textAlign: 'left', padding: '1mm' }}>Cognome Nome</th>
+              <th style={{ width: '8mm', textAlign: 'center', padding: '1mm', border: '0.3pt solid #ccc' }}>Cart</th>
+              <th style={{ width: '10mm', textAlign: 'center', padding: '1mm', border: '0.3pt solid #ccc' }}>Uscita</th>
             </tr>
           </thead>
           <tbody>
-            {starters.map((s, i) => (
-              <tr key={i} style={{ borderBottom: '0.3pt dashed #999' }}>
-                <td style={{ textAlign: 'center', padding: '0.6mm 0.3mm', fontWeight: 800 }}>{s.jersey ?? ''}</td>
-                <td style={{ textAlign: 'left', padding: '0.6mm 1mm', color: '#404751', fontWeight: 700 }}>{s.slot_label}</td>
-                <td style={{ padding: '0.6mm 1mm', fontWeight: 600 }}>
-                  {s.last_name} {s.first_name[0]}.
-                  {s.is_captain && ' ⭐'}
-                  {s.is_vice_captain && ' ⭐'}
-                </td>
-                <td style={{ padding: '0.6mm', borderLeft: '0.3pt solid #999' }}>&nbsp;</td>
-                <td style={{ padding: '0.6mm', borderLeft: '0.3pt solid #999' }}>&nbsp;</td>
-              </tr>
-            ))}
+            {/* Rendo sempre 11 righe: prima i titolari compilati, poi righe vuote per riempire */}
+            {Array.from({ length: 11 }).map((_, i) => {
+              const s = starters[i]
+              const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
+              if (!s) {
+                return (
+                  <tr key={i} style={{ background: rowBg, height: '6.6mm' }}>
+                    <td style={{ textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #d9dde4', color: '#c0c7d2' }}>—</td>
+                    <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', color: '#c0c7d2', fontSize: '7pt' }}>—</td>
+                    <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
+                    <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                    <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                  </tr>
+                )
+              }
+              return (
+                <tr key={i} style={{ background: rowBg, height: '6.6mm' }}>
+                  <td style={{ textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '10pt' }}>{s.jersey ?? '—'}</td>
+                  <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7.5pt' }}>{s.slot_label}</td>
+                  <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', fontWeight: 600 }}>
+                    {s.last_name.toUpperCase()} {s.first_name}
+                    {s.is_captain && <span style={{ color: '#8e6300', marginLeft: 2, fontWeight: 900 }}> (C)</span>}
+                    {s.is_vice_captain && <span style={{ color: '#005f98', marginLeft: 2, fontWeight: 900 }}> (VC)</span>}
+                  </td>
+                  <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                  <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      {/* Panchina */}
+      {/* Panchina — 9 righe fisse (max convocazione 20 - 11 titolari = 9) */}
       <div className="box" style={{ padding: '1.5mm 2mm', flex: 1, minHeight: 0 }}>
         <div style={{
-          fontSize: '8pt', fontWeight: 800, textAlign: 'center',
-          borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1mm',
+          fontSize: '9pt', fontWeight: 800, textAlign: 'center',
+          borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm',
+          color: '#005f98', letterSpacing: '0.3pt',
         }}>PANCHINA ({bench.length})</div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
           <thead>
-            <tr style={{ fontSize: '6.5pt', fontWeight: 800, background: '#f0f2f5' }}>
-              <th style={{ width: '5mm', textAlign: 'center', padding: '0.3mm' }}>#</th>
-              <th style={{ width: '8mm', textAlign: 'left', padding: '0.3mm 1mm' }}>Ruo.</th>
-              <th style={{ textAlign: 'left', padding: '0.3mm 1mm' }}>Nome</th>
-              <th style={{ width: '8mm', textAlign: 'center', padding: '0.3mm' }}>Entra</th>
-              <th style={{ width: '10mm', textAlign: 'center', padding: '0.3mm' }}>Sostit.</th>
+            <tr style={{ fontSize: '7pt', fontWeight: 800, background: '#f0f2f5', color: '#404751' }}>
+              <th style={{ width: '6mm', textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #ccc' }}>#</th>
+              <th style={{ width: '10mm', textAlign: 'left', padding: '1mm' }}>Ruolo</th>
+              <th style={{ textAlign: 'left', padding: '1mm' }}>Cognome Nome</th>
+              <th style={{ width: '8mm', textAlign: 'center', padding: '1mm', border: '0.3pt solid #ccc' }}>Min. IN</th>
+              <th style={{ width: '18mm', textAlign: 'center', padding: '1mm', border: '0.3pt solid #ccc' }}>Sostituisce</th>
             </tr>
           </thead>
           <tbody>
-            {bench.map((b, i) => (
-              <tr key={i} style={{ borderBottom: '0.3pt dashed #999' }}>
-                <td style={{ textAlign: 'center', padding: '0.6mm 0.3mm', fontWeight: 800 }}>{b.jersey ?? ''}</td>
-                <td style={{ textAlign: 'left', padding: '0.6mm 1mm', color: '#404751', fontWeight: 700 }}>{b.role_group}</td>
-                <td style={{ padding: '0.6mm 1mm', fontWeight: 600 }}>{b.last_name} {b.first_name[0]}.</td>
-                <td style={{ padding: '0.6mm', borderLeft: '0.3pt solid #999' }}>&nbsp;</td>
-                <td style={{ padding: '0.6mm', borderLeft: '0.3pt solid #999' }}>&nbsp;</td>
-              </tr>
-            ))}
+            {Array.from({ length: 9 }).map((_, i) => {
+              const b = bench[i]
+              const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
+              if (!b) {
+                return (
+                  <tr key={i} style={{ background: rowBg, height: '6mm' }}>
+                    <td style={{ textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #d9dde4', color: '#c0c7d2' }}>—</td>
+                    <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', color: '#c0c7d2', fontSize: '7pt' }}>—</td>
+                    <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
+                    <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                    <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                  </tr>
+                )
+              }
+              return (
+                <tr key={i} style={{ background: rowBg, height: '6mm' }}>
+                  <td style={{ textAlign: 'center', padding: '1mm 0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '10pt' }}>{b.jersey ?? '—'}</td>
+                  <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7.5pt' }}>{b.role_group}</td>
+                  <td style={{ padding: '1mm', border: '0.3pt solid #d9dde4', fontWeight: 600 }}>
+                    {b.last_name.toUpperCase()} {b.first_name}
+                  </td>
+                  <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                  <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -507,35 +563,50 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
 function RightPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', minHeight: 0 }}>
-      {/* Gol Lenci: 15 slot in griglia 3x5 */}
+      {/* Gol Lenci: 15 slot in griglia 3x5 su tabella compatta */}
       <div className="box" style={{ padding: '1.5mm 2mm' }}>
         <div style={{
-          fontSize: '8.5pt', fontWeight: 800, textAlign: 'left',
+          fontSize: '9pt', fontWeight: 800, textAlign: 'left',
           borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm',
-          color: '#005f98',
+          color: '#005f98', letterSpacing: '0.3pt',
         }}>⚽ GOAL LENCI</div>
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '1mm 2mm',
+          gap: '1.5mm 3mm',
         }}>
           {Array.from({ length: 15 }).map((_, i) => (
-            <div key={i} style={{ fontSize: '7pt', display: 'flex', flexDirection: 'column', gap: '0.5mm' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '1mm' }}>
-                <span style={{ fontWeight: 700, minWidth: '7mm' }}>min:</span>
-                <span className="fill" style={{ flex: 1 }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '1mm' }}>
-                <span style={{ fontWeight: 700, minWidth: '7mm' }}>marc:</span>
-                <span className="fill" style={{ flex: 1 }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '1mm' }}>
-                <span style={{ fontWeight: 700, minWidth: '7mm' }}>ast:</span>
-                <span className="fill" style={{ flex: 1 }} />
-                <span style={{ fontSize: '6pt', marginLeft: '0.5mm' }}>
-                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.4pt solid #000', verticalAlign: 'middle' }} /> r
-                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.4pt solid #000', marginLeft: '1mm', verticalAlign: 'middle' }} /> p
-                </span>
+            <div key={i} style={{
+              display: 'grid',
+              gridTemplateColumns: '8mm 1fr 12mm',
+              gap: '1mm',
+              alignItems: 'center',
+              fontSize: '7.5pt',
+              padding: '1mm 0',
+              borderBottom: '0.4pt solid #d9dde4',
+            }}>
+              {/* Colonna 1: minuto in casella evidenziata */}
+              <div style={{
+                border: '0.5pt solid #000', height: '4.5mm',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800,
+              }}>&nbsp;</div>
+              {/* Colonna 2: marcatore (nome) */}
+              <div style={{
+                borderBottom: '0.5pt solid #000', height: '4.5mm',
+                display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.3mm',
+                fontSize: '6.5pt', color: '#707882',
+              }}>marcatore</div>
+              {/* Colonna 3: checkbox rig/pun */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5mm', fontSize: '6pt', color: '#404751' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.5pt solid #000' }} />
+                  <span>rig</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.5pt solid #000' }} />
+                  <span>pun</span>
+                </div>
               </div>
             </div>
           ))}
@@ -543,46 +614,62 @@ function RightPanel() {
       </div>
 
       {/* Gol avversari + sostituzioni affiancati */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5mm' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1.5mm' }}>
         {/* Gol avversari 8 slot */}
         <div className="box" style={{ padding: '1.5mm 2mm' }}>
           <div style={{
-            fontSize: '8.5pt', fontWeight: 800, textAlign: 'left',
+            fontSize: '9pt', fontWeight: 800, textAlign: 'left',
             borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm',
-            color: '#93000a',
+            color: '#93000a', letterSpacing: '0.3pt',
           }}>🎯 GOAL AVVERSARI</div>
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} style={{
-              fontSize: '7pt', display: 'flex', alignItems: 'baseline', gap: '1.5mm',
-              padding: '0.5mm 0', borderBottom: '0.3pt dashed #999',
+              display: 'grid', gridTemplateColumns: '8mm 1fr 16mm',
+              gap: '1mm', alignItems: 'center',
+              fontSize: '7pt', padding: '0.8mm 0',
+              borderBottom: '0.3pt dashed #999',
             }}>
-              <span style={{ fontWeight: 700 }}>min:</span>
-              <span className="fill" style={{ width: '10mm' }} />
-              <span style={{ fontSize: '6pt' }}>
-                <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.4pt solid #000', verticalAlign: 'middle' }} /> rig
-                <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.4pt solid #000', marginLeft: '1.5mm', verticalAlign: 'middle' }} /> autoret
-              </span>
+              <div style={{ border: '0.5pt solid #000', height: '4mm' }} />
+              <div style={{ borderBottom: '0.5pt solid #000', height: '4mm', fontSize: '6pt', color: '#707882', display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.3mm' }}>marcatore avv.</div>
+              <div style={{ display: 'flex', gap: '2mm', fontSize: '6pt' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.5pt solid #000' }} /> rig
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.8mm' }}>
+                  <span style={{ display: 'inline-block', width: '2mm', height: '2mm', border: '0.5pt solid #000' }} /> aut.
+                </span>
+              </div>
             </div>
           ))}
         </div>
         {/* Sostituzioni 10 slot */}
         <div className="box" style={{ padding: '1.5mm 2mm' }}>
           <div style={{
-            fontSize: '8.5pt', fontWeight: 800, textAlign: 'left',
+            fontSize: '9pt', fontWeight: 800, textAlign: 'left',
             borderBottom: '0.5pt solid #000', paddingBottom: '1mm', marginBottom: '1.5mm',
-            color: '#005f98',
+            color: '#005f98', letterSpacing: '0.3pt',
           }}>🔄 SOSTITUZIONI</div>
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} style={{
-              fontSize: '7pt', display: 'flex', alignItems: 'baseline', gap: '1mm',
-              padding: '0.3mm 0', borderBottom: '0.3pt dashed #999',
+              display: 'grid',
+              gridTemplateColumns: '7mm 1fr 1fr',
+              gap: '1mm', alignItems: 'center',
+              fontSize: '7pt', padding: '0.8mm 0',
+              borderBottom: '0.3pt dashed #999',
             }}>
-              <span style={{ fontWeight: 700, minWidth: '7mm' }}>min:</span>
-              <span className="fill" style={{ width: '5mm' }} />
-              <span style={{ fontWeight: 700 }}>⬆</span>
-              <span className="fill" style={{ flex: 1 }} />
-              <span style={{ fontWeight: 700 }}>⬇</span>
-              <span className="fill" style={{ flex: 1 }} />
+              <div style={{ border: '0.5pt solid #000', height: '4mm', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '5.5pt', color: '#707882' }}>min</div>
+              <div style={{
+                borderBottom: '0.5pt solid #000', height: '4mm', fontSize: '6pt', color: '#707882',
+                display: 'flex', alignItems: 'flex-end', gap: '1mm', padding: '0 1mm 0.3mm',
+              }}>
+                <span style={{ color: '#006e25', fontWeight: 700 }}>↑ ENTRA</span>
+              </div>
+              <div style={{
+                borderBottom: '0.5pt solid #000', height: '4mm', fontSize: '6pt', color: '#707882',
+                display: 'flex', alignItems: 'flex-end', gap: '1mm', padding: '0 1mm 0.3mm',
+              }}>
+                <span style={{ color: '#93000a', fontWeight: 700 }}>↓ ESCE</span>
+              </div>
             </div>
           ))}
         </div>
@@ -596,47 +683,48 @@ function RightPanel() {
 function Footer() {
   return (
     <div className="box" style={{ padding: '1.5mm 2mm', display: 'flex', flexDirection: 'column', gap: '1.5mm' }}>
-      {/* Ammonizioni: 8 slot orizzontali */}
+      {/* Ammonizioni: 8 slot orizzontali con caselle */}
       <div>
-        <div style={{ fontSize: '8pt', fontWeight: 800, color: '#8e6300', marginBottom: '1mm' }}>
+        <div style={{ fontSize: '8.5pt', fontWeight: 800, color: '#8e6300', marginBottom: '1mm', letterSpacing: '0.3pt' }}>
           🟨 AMMONIZIONI
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2mm', fontSize: '7pt' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '2mm' }}>
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '1mm' }}>
-              <span style={{ fontWeight: 700 }}>min:</span>
-              <span className="fill" style={{ width: '5mm' }} />
-              <span style={{ fontWeight: 700 }}>#:</span>
-              <span className="fill" style={{ flex: 1 }} />
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '7mm 6mm 1fr',
+              gap: '1mm', alignItems: 'center', fontSize: '6.5pt',
+            }}>
+              <div style={{ border: '0.5pt solid #000', height: '4mm', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#707882', fontSize: '5.5pt' }}>min</div>
+              <div style={{ border: '0.5pt solid #000', height: '4mm', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#707882', fontSize: '5.5pt' }}>#</div>
+              <div style={{ borderBottom: '0.5pt solid #000', height: '4mm' }} />
             </div>
           ))}
         </div>
       </div>
       {/* Espulsioni con motivo: 2 slot */}
       <div>
-        <div style={{ fontSize: '8pt', fontWeight: 800, color: '#93000a', marginBottom: '1mm' }}>
+        <div style={{ fontSize: '8.5pt', fontWeight: 800, color: '#93000a', marginBottom: '1mm', letterSpacing: '0.3pt' }}>
           🟥 ESPULSIONI
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3mm', fontSize: '7pt' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3mm' }}>
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '1mm' }}>
-              <span style={{ fontWeight: 700 }}>min:</span>
-              <span className="fill" style={{ width: '5mm' }} />
-              <span style={{ fontWeight: 700 }}>#:</span>
-              <span className="fill" style={{ width: '8mm' }} />
-              <span style={{ fontWeight: 700 }}>nome:</span>
-              <span className="fill" style={{ width: '30mm' }} />
-              <span style={{ fontWeight: 700 }}>motivo:</span>
-              <span className="fill" style={{ flex: 1 }} />
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '7mm 6mm 40mm 1fr',
+              gap: '1mm', alignItems: 'center', fontSize: '6.5pt',
+            }}>
+              <div style={{ border: '0.5pt solid #000', height: '4.5mm', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#707882', fontSize: '5.5pt' }}>min</div>
+              <div style={{ border: '0.5pt solid #000', height: '4.5mm', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#707882', fontSize: '5.5pt' }}>#</div>
+              <div style={{ borderBottom: '0.5pt solid #000', height: '4.5mm', fontSize: '6pt', color: '#707882', display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.3mm' }}>giocatore</div>
+              <div style={{ borderBottom: '0.5pt solid #000', height: '4.5mm', fontSize: '6pt', color: '#707882', display: 'flex', alignItems: 'flex-end', padding: '0 1mm 0.3mm' }}>motivo</div>
             </div>
           ))}
         </div>
       </div>
       {/* Note libere */}
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '8pt', fontWeight: 800, marginBottom: '1mm' }}>NOTE</div>
+        <div style={{ fontSize: '8.5pt', fontWeight: 800, marginBottom: '1mm', letterSpacing: '0.3pt' }}>📝 NOTE</div>
         <div style={{
-          height: '11mm', border: '0.3pt solid #999',
+          height: '12mm', border: '0.4pt solid #999',
           backgroundImage: 'repeating-linear-gradient(transparent, transparent 3.7mm, #ddd 3.7mm, #ddd 3.8mm)',
         }} />
       </div>

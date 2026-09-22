@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { PitchView, type PitchPlayer } from '../components/PitchView'
 import { MatchTimeline } from '../components/MatchTimeline'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
+import { makeMatchDuration } from '../lib/matchDuration'
 import { BottomSheet } from '../components/BottomSheet'
 import { Icon } from '../components/Icon'
 
@@ -539,7 +540,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     ;(async () => {
       const [mRes, cRes, sRes] = await Promise.all([
         supabase.from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation, team:teams(match_periods_count, match_period_duration_min)')
           .eq('id', matchId).maybeSingle(),
         supabase.from('convocations')
           .select('player_id, is_captain, is_vice_captain, shirt_number_override')
@@ -860,9 +861,15 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
               opponentOwnGoalMinutes: match.opponent_own_goal_minutes ?? [],
             })
             if (events.length === 0 && yellowCardsCount === 0) return null
+            // Estrae durata partita dalla squadra (join sopra); default 2×45 se non presente
+            const teamRow = (match as any).team
+            const matchDuration = makeMatchDuration(
+              teamRow?.match_periods_count,
+              teamRow?.match_period_duration_min,
+            )
             return (
               <div style={{ margin: '10px 0' }}>
-                <MatchTimeline events={events} yellowCardsCount={yellowCardsCount} />
+                <MatchTimeline events={events} yellowCardsCount={yellowCardsCount} matchDuration={matchDuration} />
               </div>
             )
           })()}

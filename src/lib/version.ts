@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.66'
+export const APP_VERSION = '1.9.67'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,21 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.67',
+    date: '2026-09-22',
+    title: 'Foglio partita: fix titolari mancanti + layout molto pi\u00f9 leggibile',
+    fixes: [
+      'Titolari e panchina ora vengono davvero pre-compilati dalla distinta tattica. Bug del fetch convocazioni che usava status inesistenti (\'confirmed\', \'convocated\') invece di quello reale (\'accepted\'): la tabella titolari e la panchina restavano vuote, il capitano/vice mostrava "?" invece del nome, e il mini-campo era senza puntini giocatori',
+    ],
+    features: [
+      'Layout tabelle titolari/panchina riscritto: righe con bordi netti (non pi\u00f9 tratteggi confusi), zebra background alternato bianco/grigio chiaro, numero maglia in font grosso 10pt, ruolo in blu 7.5pt, cognome in maiuscolo + nome. 11 righe fisse per titolari e 9 per panchina anche se la distinta \u00e8 parziale (righe vuote pronte da compilare a mano)',
+      'Sezione GOAL LENCI (15 slot) riorganizzata a griglia: casella minuto disegnata, linea marcatore con label sotto, checkbox rig/pun su due righe pulite. Niente pi\u00f9 "min:/marc:/ast:" affastellati',
+      'Sezione GOAL AVVERSARI e SOSTITUZIONI riscritte con casella minuto + campo ENTRA/ESCE dedicati per la sostituzione (colori verde/rosso per riconoscimento immediato)',
+      'AMMONIZIONI/ESPULSIONI con caselle disegnate, ETICHETTE piccole grigio-chiaro sotto i campi per orientarsi',
+      'Se apri il foglio prima di compilare la distinta, il mini-campo mostra un messaggio "Distinta non compilata / torna alla dashboard" invece di stare vuoto e confondere',
+    ],
+  },
   {
     version: '1.9.66',
     date: '2026-09-22',

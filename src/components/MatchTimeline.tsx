@@ -1,12 +1,19 @@
 /**
- * MatchTimeline — Timeline eventi orizzontale 0'-90' con puntini per gol e cartellini.
+ * MatchTimeline — Timeline eventi orizzontale con puntini per gol e cartellini.
  *
  * Usato in: vista giornalisti (sotto il campo grafico), preview past match in dashboard.
  *
  * Ogni evento è posizionato orizzontalmente al minuto in cui è avvenuto.
  * Eventi allo stesso minuto sono stackati verticalmente.
- * Per partite oltre 90' (recupero, supplementari), l'asse si adatta.
+ *
+ * La scala si adatta a `matchDuration` (dalla squadra): 2×45 = 90 min per Juniores/Prima,
+ * 3×15 = 45 min per Pulcini, 3×20 = 60 min per Esordienti, ecc.
+ * Se ci sono eventi oltre la durata configurata (tempi supplementari o recupero), la scala
+ * si espande automaticamente al prossimo blocco da 15 min.
  */
+
+import type { MatchDuration } from '../lib/matchDuration'
+import { makeMatchDuration } from '../lib/matchDuration'
 
 export type TimelineEventType =
   | 'goal_lenci'        // Gol Lenci (giallo)
@@ -29,7 +36,9 @@ interface Props {
   events: TimelineEvent[]
   /** Conteggio dei cartellini gialli (mostrati come legenda perché non abbiamo minuti) */
   yellowCardsCount?: number
-  /** Durata massima da visualizzare sull'asse (default 90). Se ci sono eventi oltre 90, si espande automaticamente al valore più alto arrotondato a 90/105/120 */
+  /** Durata partita configurata per la squadra. Se omessa: 2×45=90 min (default per Juniores/Prima) */
+  matchDuration?: MatchDuration
+  /** DEPRECATO: fissa un massimo esplicito. Usa matchDuration per default e auto-espansione */
   maxMinute?: number
 }
 
@@ -54,14 +63,19 @@ const LABELS: Record<TimelineEventType, string> = {
   sub: 'Sostituzione',
 }
 
-export function MatchTimeline({ events, yellowCardsCount = 0, maxMinute }: Props) {
+export function MatchTimeline({ events, yellowCardsCount = 0, matchDuration, maxMinute }: Props) {
   if (events.length === 0 && yellowCardsCount === 0) return null
 
-  // Determina scala asse: default 90, ma se ci sono eventi oltre passa a 105/120
+  // Determina la durata di gioco (default 2×45 = 90 se non specificata)
+  const duration = matchDuration ?? makeMatchDuration(2, 45)
+
+  // Determina la scala dell'asse. Base = durata partita.
+  // Se ci sono eventi oltre (recupero/supplementari), espandi al prossimo blocco da 15 min.
   const maxEventMinute = events.reduce((m, e) => Math.max(m, e.minute), 0)
   const axisMax = maxMinute ?? (
-    maxEventMinute <= 90 ? 90 :
-    maxEventMinute <= 105 ? 105 : 120
+    maxEventMinute <= duration.totalMin
+      ? duration.totalMin
+      : Math.ceil(maxEventMinute / 15) * 15
   )
 
   // Raggruppa eventi per minuto per stack verticale
@@ -79,12 +93,20 @@ export function MatchTimeline({ events, yellowCardsCount = 0, maxMinute }: Props
 
   const maxStack = Math.max(1, ...Array.from(byMinute.values()).map(a => a.length))
 
-  // Marker asse: 0, 15, 30, 45 (HT), 60, 75, 90 (+ eventuale 105, 120)
-  const axisMarkers = axisMax <= 90
-    ? [0, 15, 30, 45, 60, 75, 90]
-    : axisMax === 105
-      ? [0, 15, 30, 45, 60, 75, 90, 105]
-      : [0, 15, 30, 45, 60, 75, 90, 105, 120]
+  // Marker asse:
+  //  - 0' iniziale
+  //  - fine di ogni tempo (30', 60' per 2×30; 15', 30', 45' per 3×15)
+  //  - eventuali overflow per recupero/supplementari (blocchi da 15)
+  const markers = new Set<number>([0])
+  duration.periodEndMarkers.forEach(m => markers.add(m))
+  // Se axisMax è oltre la durata configurata, aggiungi marker intermedi ogni 15 min oltre
+  if (axisMax > duration.totalMin) {
+    let m = duration.totalMin + 15
+    while (m <= axisMax) { markers.add(m); m += 15 }
+  }
+  // Assicura che il finale ci sia
+  markers.add(axisMax)
+  const axisMarkers = Array.from(markers).sort((a, b) => a - b)
 
   return (
     <div style={{
@@ -97,6 +119,12 @@ export function MatchTimeline({ events, yellowCardsCount = 0, maxMinute }: Props
       }}>
         <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#005f98' }}>timeline</span>
         <span>Timeline eventi</span>
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: '#707882',
+          padding: '1px 6px', borderRadius: 4, background: '#f1f3fa',
+        }}>
+          {duration.periodsCount}×{duration.periodDurationMin}′ · {duration.totalMin} min
+        </span>
         {yellowCardsCount > 0 && (
           <span style={{
             marginLeft: 'auto', fontSize: 10.5, fontWeight: 600,
@@ -153,40 +181,74 @@ export function MatchTimeline({ events, yellowCardsCount = 0, maxMinute }: Props
           })}
         </div>
 
-        {/* Barra 0-90 */}
-        <div style={{
-          position: 'relative',
-          height: 6,
-          background: 'linear-gradient(90deg, #005f98 0%, #005f98 49.5%, #d32f2f 49.5%, #d32f2f 50.5%, #005f98 50.5%, #005f98 100%)',
-          borderRadius: 3,
-        }}>
-          {/* Marker verticali dei minuti chiave */}
-          {axisMarkers.map(m => {
-            const leftPct = Math.min(100, (m / axisMax) * 100)
-            return (
-              <div key={m} style={{
-                position: 'absolute', left: `${leftPct}%`, top: -2,
-                width: 1, height: 10, background: '#404751',
-                transform: 'translateX(-50%)',
-              }} />
-            )
-          })}
-        </div>
+        {/* Barra colorata: alternata blu/rosso per ogni tempo, con banda rossa sottile tra i tempi */}
+        {(() => {
+          // Costruisco un gradient a bande per rappresentare i N tempi.
+          // Ogni tempo è blu, tra un tempo e l'altro un bordo rosso di 1% larghezza.
+          // In caso di overflow oltre la durata configurata, l'ultima banda è disegnata comunque blu.
+          const stops: string[] = []
+          const bandColor = '#005f98'
+          const dividerColor = '#d32f2f'
+          const dividerHalfPct = 0.5  // metà larghezza di ciascun divisore, in %
+          // Segno tutti gli end-of-period che stanno DENTRO axisMax e non sono il finale
+          const dividerPcts = duration.periodEndMarkers
+            .filter(m => m < axisMax)
+            .map(m => (m / axisMax) * 100)
+          if (dividerPcts.length === 0) {
+            stops.push(`${bandColor} 0%`, `${bandColor} 100%`)
+          } else {
+            let cursor = 0
+            for (const p of dividerPcts) {
+              stops.push(`${bandColor} ${cursor}%`, `${bandColor} ${p - dividerHalfPct}%`)
+              stops.push(`${dividerColor} ${p - dividerHalfPct}%`, `${dividerColor} ${p + dividerHalfPct}%`)
+              cursor = p + dividerHalfPct
+            }
+            stops.push(`${bandColor} ${cursor}%`, `${bandColor} 100%`)
+          }
+          const gradient = `linear-gradient(90deg, ${stops.join(', ')})`
+
+          return (
+            <div style={{
+              position: 'relative',
+              height: 6,
+              background: gradient,
+              borderRadius: 3,
+            }}>
+              {/* Marker verticali dei minuti chiave */}
+              {axisMarkers.map(m => {
+                const leftPct = Math.min(100, (m / axisMax) * 100)
+                return (
+                  <div key={m} style={{
+                    position: 'absolute', left: `${leftPct}%`, top: -2,
+                    width: 1, height: 10, background: '#404751',
+                    transform: 'translateX(-50%)',
+                  }} />
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* Labels asse sotto */}
         <div style={{ position: 'relative', height: 14, marginTop: 2 }}>
           {axisMarkers.map(m => {
             const leftPct = Math.min(100, (m / axisMax) * 100)
-            const isHT = m === 45
+            // È fine di un tempo? (marker rosso in evidenza).
+            // Il totale finale della partita (ultimo periodo) NON viene etichettato "fine T2" ecc,
+            // resta la label del minuto liscia per non confondere con "fine partita".
+            const periodIdx = duration.periodEndMarkers.indexOf(m)
+            const isPeriodEnd = periodIdx >= 0 && periodIdx < duration.periodsCount - 1
+            const isFinalEnd = m === duration.totalMin && m === axisMax
             return (
               <span key={m} style={{
                 position: 'absolute', left: `${leftPct}%`,
                 transform: 'translateX(-50%)',
-                fontSize: 9.5, fontWeight: isHT ? 800 : 600,
-                color: isHT ? '#d32f2f' : '#707882',
+                fontSize: 9.5, fontWeight: isPeriodEnd || isFinalEnd ? 800 : 600,
+                color: isPeriodEnd ? '#d32f2f' : isFinalEnd ? '#404751' : '#707882',
                 whiteSpace: 'nowrap',
               }}>
-                {m}′{isHT && ' HT'}
+                {m}′{isPeriodEnd && ` fine T${periodIdx + 1}`}
+                {isFinalEnd && duration.periodsCount > 1 && ' FINE'}
               </span>
             )
           })}

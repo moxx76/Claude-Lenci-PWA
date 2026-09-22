@@ -21,6 +21,8 @@ export interface PostMatchData {
   team_color: string | null
   home_score: number | null
   away_score: number | null
+  team_match_periods_count?: number | null
+  team_match_period_duration_min?: number | null
 }
 
 interface Player {

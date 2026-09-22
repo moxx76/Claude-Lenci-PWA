@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
+import { DURATION_PRESETS } from '../lib/matchDuration'
 
 interface Profile { id: string; full_name: string | null; email: string }
 
@@ -26,6 +27,8 @@ interface ExistingTeam {
   away_shirt_color?: string | null
   away_gk_shirt_color?: string | null
   public_presence_enabled?: boolean | null
+  match_periods_count?: number | null
+  match_period_duration_min?: number | null
 }
 
 interface Props {
@@ -59,6 +62,9 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
   const [thirdManagerId, setThirdManagerId] = useState<string>('')
   const [masseurId, setMasseurId] = useState<string>('')
   const [publicPresence, setPublicPresence] = useState(false)
+  // Durata partita: 2×45 default (retrocompatibile con vecchio hardcoded)
+  const [periodsCount, setPeriodsCount] = useState<number>(2)
+  const [periodDuration, setPeriodDuration] = useState<number>(45)
   const [coaches, setCoaches] = useState<Profile[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -95,6 +101,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setThirdManagerId(existingTeam.third_manager_id || '')
       setMasseurId(existingTeam.masseur_id || '')
       setPublicPresence(!!existingTeam.public_presence_enabled)
+      setPeriodsCount(existingTeam.match_periods_count ?? 2)
+      setPeriodDuration(existingTeam.match_period_duration_min ?? 45)
     } else {
       setName('')
       setCategory('U-13')
@@ -113,6 +121,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setThirdManagerId('')
       setMasseurId('')
       setPublicPresence(false)
+      setPeriodsCount(2)
+      setPeriodDuration(45)
     }
     setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +134,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
     if (!open || !existingTeam?.id) return
     if (existingTeam.home_shirt_color != null && existingTeam.assistant_coach_id !== undefined) return
     supabase.from('teams')
-      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, third_manager_id, masseur_id')
+      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, match_periods_count, match_period_duration_min, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, third_manager_id, masseur_id')
       .eq('id', existingTeam.id)
       .single()
       .then(({ data }) => {
@@ -134,6 +144,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         setAwayShirt(data.away_shirt_color || 'Bianco/Blu')
         setAwayGkShirt(data.away_gk_shirt_color || 'Giallo')
         setPublicPresence(!!data.public_presence_enabled)
+        if ((data as any).match_periods_count != null) setPeriodsCount((data as any).match_periods_count)
+        if ((data as any).match_period_duration_min != null) setPeriodDuration((data as any).match_period_duration_min)
         if (data.head_coach_id) setHeadCoachId(data.head_coach_id)
         if (data.team_manager_id) setTeamManagerId(data.team_manager_id)
         if (data.assistant_coach_id) setAssistantCoachId(data.assistant_coach_id)
@@ -173,6 +185,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         third_manager_id: thirdManagerId || null,
         masseur_id: masseurId || null,
         public_presence_enabled: publicPresence,
+        match_periods_count: periodsCount,
+        match_period_duration_min: periodDuration,
       }
       if (isEdit) {
         const { data, error: err } = await supabase.from('teams').update(payload).eq('id', existingTeam!.id).select('id')
@@ -419,6 +433,76 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
             lineHeight: 1.4,
           }}>
             Tutti i ruoli compilati compariranno automaticamente nella sezione staff della distinta FIGC generata prima della partita.
+          </div>
+        </div>
+
+        {/* Durata partita — configura tempi e minuti per l'annata */}
+        <div style={{
+          padding: '12px 14px', background: '#f8fbff', borderRadius: 10,
+          border: '1px solid #cfe3f5', marginTop: 6,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#005f98' }}>timer</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20' }}>
+                Durata partita
+              </div>
+              <div style={{ fontSize: 11, color: '#707882', marginTop: 2 }}>
+                Scegli un preset in base alla categoria FIGC, o imposta valori personalizzati. Usato dalla timeline eventi per calcolare i tempi.
+              </div>
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: 10.5, fontWeight: 700, color: '#404751', display: 'block', marginBottom: 4 }}>
+              Preset FIGC
+            </label>
+            <select
+              value={(() => {
+                const match = DURATION_PRESETS.find(p => p.periodsCount === periodsCount && p.periodDurationMin === periodDuration)
+                return match ? `${match.periodsCount}x${match.periodDurationMin}` : 'custom'
+              })()}
+              onChange={(e) => {
+                if (e.target.value === 'custom') return
+                const [p, d] = e.target.value.split('x').map(Number)
+                setPeriodsCount(p); setPeriodDuration(d)
+              }}
+              style={{
+                width: '100%', padding: '10px 12px', border: '1px solid #cfd4de', borderRadius: 8,
+                background: '#fff', fontSize: 12.5, fontFamily: 'inherit',
+              }}
+            >
+              {DURATION_PRESETS.map(p => (
+                <option key={`${p.periodsCount}x${p.periodDurationMin}`} value={`${p.periodsCount}x${p.periodDurationMin}`}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="custom">Personalizzato…</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: '#404751', display: 'block', marginBottom: 4 }}>
+                Numero tempi
+              </label>
+              <input type="number" min={1} max={4} value={periodsCount}
+                onChange={e => setPeriodsCount(Math.max(1, Math.min(4, parseInt(e.target.value, 10) || 2)))}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #cfd4de', borderRadius: 8, fontSize: 12.5, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10.5, fontWeight: 700, color: '#404751', display: 'block', marginBottom: 4 }}>
+                Minuti per tempo
+              </label>
+              <input type="number" min={5} max={60} value={periodDuration}
+                onChange={e => setPeriodDuration(Math.max(5, Math.min(60, parseInt(e.target.value, 10) || 45)))}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid #cfd4de', borderRadius: 8, fontSize: 12.5, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+          <div style={{
+            padding: '8px 10px', background: '#e6f3ff', borderRadius: 6,
+            fontSize: 11.5, fontWeight: 700, color: '#005f98', textAlign: 'center',
+          }}>
+            Totale partita: <strong>{periodsCount} × {periodDuration}′ = {periodsCount * periodDuration} minuti</strong>
           </div>
         </div>
 
