@@ -247,9 +247,30 @@ export function CalendarPage() {
     }
   }
 
-  const openMatchReport = (event: CalendarEvent) => {
+  // Utility resiliente: recupera la durata partita configurata sulla squadra e la aggiunge al payload
+  // PostMatchData, così la Timeline live nel recap si scala correttamente (U14 = 70', U16 = 80', ecc.).
+  // Se la query fallisce, ritorna i due campi null → PostMatchSheet cadrà sul default 2×45=90'.
+  // Serve perché PostMatchData.team_match_periods_count/team_match_period_duration_min sono opzionali
+  // ma senza di essi la Timeline mostra sempre 90' anche per categorie con tempi diversi.
+  const fetchTeamDuration = async (teamId: string): Promise<{ periods: number | null; dur: number | null }> => {
+    try {
+      const { data } = await supabase.from('teams')
+        .select('match_periods_count, match_period_duration_min')
+        .eq('id', teamId)
+        .maybeSingle()
+      return {
+        periods: (data as any)?.match_periods_count ?? null,
+        dur: (data as any)?.match_period_duration_min ?? null,
+      }
+    } catch {
+      return { periods: null, dur: null }
+    }
+  }
+
+  const openMatchReport = async (event: CalendarEvent) => {
     const isMatchLike = event.kind === 'match' || event.kind === 'tournament'
     if (!isMatchLike || !event.raw?.id || !event.teamId) return
+    const teamDur = await fetchTeamDuration(event.teamId)
     setPostMatchData({
       id: event.raw.id,
       opponent: event.opponent || '',
@@ -262,6 +283,8 @@ export function CalendarPage() {
       team_color: event.teamColor || null,
       home_score: event.raw.home_score ?? null,
       away_score: event.raw.away_score ?? null,
+      team_match_periods_count: teamDur.periods,
+      team_match_period_duration_min: teamDur.dur,
     })
     setPostMatchOpen(true)
   }
@@ -663,7 +686,7 @@ export function CalendarPage() {
         onOpenReport={async (matchId) => {
           // Fetch match e apri PostMatchSheet
           const { data } = await supabase.from('matches')
-            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, team:teams(name, category, color)')
+            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
             .eq('id', matchId).maybeSingle()
           if (data) {
             const teamObj = Array.isArray((data as any).team) ? (data as any).team[0] : (data as any).team
@@ -680,6 +703,9 @@ export function CalendarPage() {
               team_color: teamObj?.color || null,
               home_score: data.home_score,
               away_score: data.away_score,
+              // Durata partita: la Timeline live nel recap la usa per scalare la barra 0'-N'
+              team_match_periods_count: teamObj?.match_periods_count ?? null,
+              team_match_period_duration_min: teamObj?.match_period_duration_min ?? null,
             })
             setPostMatchOpen(true)
           }

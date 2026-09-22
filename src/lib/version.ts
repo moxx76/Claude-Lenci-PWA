@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.72'
+export const APP_VERSION = '1.9.73'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.73',
+    date: '2026-09-22',
+    title: 'Pulsante Foglio A4 sticky dopo save distinta + Timeline durata anche da Calendario',
+    fixes: [
+      'Distinta tattica: il pulsante "Foglio partita A4 (stampa / PDF)" nella distinta appariva subito dopo il salvataggio e poi spariva dopo circa 1.5 secondi. Causa: la condizione era `savedOk || match.lineup_completed_at`, ma savedOk torna a false dopo 1500ms e la prop `match.lineup_completed_at` (che arriva dal parent) non veniva ricaricata in tempo. Fix: nuovo state locale `hasLineupSaved` che parte dal valore della prop ma diventa true al salvataggio e ci resta finch\u00e9 la sheet resta aperta, cos\u00ec il pulsante rimane visibile dopo il save senza dipendere dal ricaricamento del parent',
+      'Timeline eventi nel Post-Match report ora usa la durata partita anche quando il recap viene aperto dalla pagina Calendario (in aggiunta alla dashboard Manager gi\u00e0 sistemata in v1.9.71). Erano rimasti 2 chiamanti in CalendarPage non aggiornati: apertura da evento calendario e apertura dallo storico partite di un giocatore. Ora entrambi popolano team_match_periods_count/team_match_period_duration_min tramite una fetch resiliente dei campi durata dal team, cos\u00ec la Timeline si scala correttamente (U14 70\u2019, U16 80\u2019, ecc.) da ogni punto di ingresso',
+    ],
+  },
   {
     version: '1.9.72',
     date: '2026-09-22',

@@ -75,6 +75,15 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savedOk, setSavedOk] = useState(false)
+  // BUG FIX v1.9.72: dopo il save, `savedOk` torna a false dopo 1500ms e `match.lineup_completed_at`
+  // (prop dal parent) non era ancora stato ricaricato → il pulsante "Foglio partita A4" appariva
+  // e sparava dopo 1.5s. Fix: state locale che parte dalla prop ma diventa true al save e ci resta,
+  // così il pulsante rimane visibile finché la sheet è aperta anche se il parent non ricarica in tempo.
+  const [hasLineupSaved, setHasLineupSaved] = useState<boolean>(!!match?.lineup_completed_at)
+  useEffect(() => {
+    // Se la prop cambia (parent ricarica, altro match aperto), risincronizzo lo state
+    setHasLineupSaved(!!match?.lineup_completed_at)
+  }, [match?.lineup_completed_at, match?.id])
   const [convocati, setConvocati] = useState<Convocato[]>([])
   const [formation, setFormation] = useState<string>('4-4-2')
   const [slots, setSlots] = useState<SlotAssignment[]>([])
@@ -472,6 +481,7 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
       }
 
       setSavedOk(true)
+      setHasLineupSaved(true)
       onSaved?.()
       setTimeout(() => setSavedOk(false), 1500)
     } catch (err: any) {
@@ -823,8 +833,10 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
                   </button>
                 </div>
 
-                {/* Foglio partita: appare come CTA secondaria dopo il salvataggio (o se la distinta era già salvata all'apertura) */}
-                {(savedOk || match.lineup_completed_at) && (
+                {/* Foglio partita: appare come CTA secondaria dopo il salvataggio (o se la distinta era già salvata all'apertura).
+                    Uso hasLineupSaved (state locale sticky) invece di match.lineup_completed_at (prop) perché la prop
+                    non veniva ricaricata in tempo dopo il save → pulsante appariva e spariva dopo 1.5s. */}
+                {(savedOk || hasLineupSaved) && (
                   <a
                     href={`/foglio-partita/${match.id}`}
                     target="_blank"
