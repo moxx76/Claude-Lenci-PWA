@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.73'
+export const APP_VERSION = '1.9.74'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.74',
+    date: '2026-09-22',
+    title: 'Diagnostica temporanea sotto Timeline recap per capire perch\u00e9 mostra 90\u2019',
+    fixes: [
+      'DEBUG TEMPORANEO: sotto la Timeline nel Post-Match recap ora compare una riga grigia in corsivo che mostra la durata usata e i valori grezzi dei campi ricevuti dal chiamante. Serve a distinguere se il problema \u00e8 (a) cache PWA vecchia che serve codice pre-v1.9.71, (b) chiamante non aggiornato che non popola i campi durata, o (c) altro bug. Verr\u00e0 rimossa nella prossima release una volta capita la causa',
+    ],
+  },
   {
     version: '1.9.73',
     date: '2026-09-22',

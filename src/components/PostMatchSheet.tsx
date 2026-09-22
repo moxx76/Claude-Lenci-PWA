@@ -1957,14 +1957,27 @@ function RecapExport({
             Timeline eventi ({timelineEvents.length} {timelineEvents.length === 1 ? 'evento' : 'eventi'}{yellowCardsCount > 0 ? ` + ${yellowCardsCount} 🟨` : ''})
           </summary>
           <div style={{ marginTop: 6 }}>
-            <MatchTimeline
-              events={timelineEvents}
-              yellowCardsCount={yellowCardsCount}
-              matchDuration={makeMatchDuration(
+            {(() => {
+              const dur = makeMatchDuration(
                 match.team_match_periods_count ?? null,
                 match.team_match_period_duration_min ?? null,
-              )}
-            />
+              )
+              return (
+                <>
+                  <MatchTimeline
+                    events={timelineEvents}
+                    yellowCardsCount={yellowCardsCount}
+                    matchDuration={dur}
+                  />
+                  {/* DEBUG v1.9.74: rimuovere dopo verifica che la durata sia corretta */}
+                  <div style={{ fontSize: 10, color: '#8993a3', marginTop: 4, textAlign: 'center', fontStyle: 'italic' }}>
+                    Barra tarata su {dur.totalMin}′ ({dur.periodsCount}×{dur.periodDurationMin}′)
+                    {' — '}
+                    campi ricevuti: periods={String(match.team_match_periods_count)}, dur={String(match.team_match_period_duration_min)}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </details>
       )}
