@@ -16,12 +16,46 @@ export function Profile() {
   const { profile, signOut, refreshProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleLogout = async () => {
     if (!confirm('Vuoi davvero uscire?')) return
     setLoading(true)
     await signOut()
     setLoading(false)
+  }
+
+  // Forza l'aggiornamento della app: la PWA (Service Worker + cache Workbox) può servire
+  // asset vecchi anche dopo un deploy, in particolare al primo caricamento dopo l'update.
+  // Questa procedura combina i 3 step necessari a garantire un refresh pulito:
+  //  1. Unregister di TUTTI i service worker registrati per questo origin
+  //  2. Eliminazione di TUTTE le Cache API (Workbox precache, runtime cache, ecc.)
+  //  3. Hard reload della pagina — al reload il browser scarica bundle e SW freschi da zero
+  // Utile all'utente quando ha visto le vecchie schermate dopo un annuncio di aggiornamento.
+  const handleForceUpdate = async () => {
+    if (!confirm(
+      'Vuoi aggiornare la app ora?\n\n' +
+      'Verranno svuotate le cache locali e la pagina verrà ricaricata da zero. ' +
+      'Serve quando dopo un aggiornamento vedi ancora i vecchi schermi. ' +
+      'I tuoi dati e il login non verranno persi (restano sul server).'
+    )) return
+    setRefreshing(true)
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(registrations.map(r => r.unregister()))
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys()
+        await Promise.all(cacheNames.map(n => caches.delete(n)))
+      }
+    } catch (err) {
+      console.warn('[Profile] Errore durante svuota cache', err)
+      // Vado avanti col reload comunque — meglio provare a ricaricare che bloccare
+    }
+    // Hard reload: query string cache-buster + location.reload forza il fetch fresco dell'index
+    const sep = window.location.href.includes('?') ? '&' : '?'
+    window.location.href = window.location.href + sep + '_fresh=' + Date.now()
   }
 
   const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'Utente'
@@ -169,6 +203,31 @@ export function Profile() {
           </div>
         ))}
       </div>
+
+      {/* Aggiorna app / svuota cache — pulsante prominente per bypassare il problema PWA
+          (Service Worker che serve chunk vecchi dopo un deploy). Card separata perché è
+          un'azione di manutenzione che l'utente potrebbe dover trovare in fretta. */}
+      <button
+        onClick={handleForceUpdate}
+        disabled={refreshing}
+        style={{
+          background: '#fff', border: '1px solid #005f98', color: '#005f98',
+          borderRadius: 14, padding: '13px 14px', fontSize: 13, fontWeight: 700,
+          display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left',
+          cursor: refreshing ? 'wait' : 'pointer',
+          opacity: refreshing ? 0.6 : 1,
+          fontFamily: 'inherit',
+        }}
+      >
+        <Icon name="refresh" size={20} color="#005f98" />
+        <div style={{ flex: 1 }}>
+          <div>{refreshing ? 'Aggiornamento…' : 'Aggiorna app / svuota cache'}</div>
+          <div style={{ fontSize: 11, color: '#707882', fontWeight: 500, marginTop: 2, lineHeight: 1.4 }}>
+            Usa questo pulsante se dopo un aggiornamento vedi ancora le vecchie schermate.
+            Ricarica la app da zero senza toccare i tuoi dati.
+          </div>
+        </div>
+      </button>
 
       {/* Logout */}
       <button

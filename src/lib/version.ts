@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.75'
+export const APP_VERSION = '1.9.76'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.76',
+    date: '2026-09-22',
+    title: 'Nuovo pulsante "Aggiorna app / svuota cache" nel Profilo',
+    fixes: [
+      'Aggiunto un pulsante blu prominente in cima alla sezione Profilo: "Aggiorna app / svuota cache". Serve quando dopo un aggiornamento della app vedi ancora le vecchie schermate: la PWA (Service Worker + cache Workbox) pu\u00f2 continuare a servire chunk vecchi per un po\u2019, ed evita di dover andare nelle impostazioni del browser per ripulire i dati',
+      'Cosa fa il pulsante: (1) disinstalla i Service Worker registrati, (2) svuota tutte le Cache API di Workbox, (3) ricarica la pagina con un cache-buster nell\u2019URL cos\u00ec il browser scarica tutto da zero. I dati e il login non vengono persi (restano sul server Supabase)',
+    ],
+  },
   {
     version: '1.9.75',
     date: '2026-09-22',
