@@ -12,6 +12,7 @@ import { AnnouncementsPage } from './pages/AnnouncementsPage'
 import { MarketingPage } from './pages/Marketing'
 import { JournalistPage } from './pages/Journalist'
 import { ComunicatiPage } from './pages/Comunicati'
+import { Referti } from './pages/Referti'
 import { EserciziPage } from './pages/EserciziPage'
 import { MatchSheetPrint } from './pages/MatchSheetPrint'
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
@@ -102,6 +103,7 @@ export default function App() {
           <Route path="esercizi" element={<TeamAssignedGuard><EserciziPage /></TeamAssignedGuard>} />
           <Route path="annunci" element={<TeamAssignedGuard><AnnouncementsPage /></TeamAssignedGuard>} />
           <Route path="comunicati" element={<TeamAssignedGuard><ComunicatiPage /></TeamAssignedGuard>} />
+          <Route path="referti" element={<TeamAssignedGuard><Referti /></TeamAssignedGuard>} />
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="giornalisti" element={<JournalistPage />} />
           <Route path="stats" element={<Navigate to="/" replace />} />

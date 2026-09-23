@@ -36,6 +36,9 @@ const DESKTOP_TABS_BASE: NavTab[] = [
 const MARKETING_TAB: NavTab = { to: '/marketing', label: 'Marketing', icon: 'campaign', accent: '#7a0071' }
 const COMUNICATI_TAB: NavTab = { to: '/comunicati', label: 'Comunicati LND', labelShort: 'Comunicati', icon: 'article', accent: '#005f98' }
 const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labelShort: 'Esercizi', icon: 'fitness_center', accent: '#c73434' }
+// Referti: pagina centralizzata di tutti i post-match report delle squadre a carico.
+// Accento rosa Lenci per il legame diretto con la squadra
+const REFERTI_TAB: NavTab = { to: '/referti', label: 'Referti partite', labelShort: 'Referti', icon: 'edit_note', accent: '#b3005c' }
 const GIORNALISTI_TAB: NavTab = { to: '/giornalisti', label: 'Risultati e distinte', labelShort: 'Distinte', icon: 'article_person', accent: '#005f98' }
 
 export function Layout() {
@@ -79,6 +82,7 @@ export function Layout() {
     ? [DESKTOP_TABS_BASE[0], { to: '/profilo', label: 'Profilo', icon: 'person' }] // Solo Dashboard + Profilo
     : [
         ...DESKTOP_TABS_BASE,
+        ...(isStaff ? [REFERTI_TAB] : []),
         ...(isStaff ? [ESERCIZI_TAB] : []),
         ...(isStaff ? [COMUNICATI_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),

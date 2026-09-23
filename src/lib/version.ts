@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.77'
+export const APP_VERSION = '1.9.78'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.78',
+    date: '2026-09-22',
+    title: 'Nuova voce menu "Referti partite" per compilare i post-match da un unico posto',
+    fixes: [
+      'Aggiunta la pagina Referti nel menu laterale (per staff: admin/coach). Mostra l\u2019elenco di tutte le partite passate delle squadre a carico, ordinate dalla pi\u00f9 recente, con badge dello stato: "\u2705 Compilato" se ci sono statistiche, "\u26a0\ufe0f Da compilare" altrimenti (evidenziate in giallo). Tap sulla card apre lo stesso Post-Match report gi\u00e0 usato da dashboard e calendario',
+      'Filtri: dropdown squadra (se l\u2019utente ne ha pi\u00f9 di una) e segmented control per stato (Tutti / Da compilare / Compilati) con conteggio a fianco. Ordinamento fisso per data decrescente. Cap a ultimi 200 referti — pi\u00f9 che sufficiente per una stagione',
+      'Design coerente: barra colorata del team a sinistra della card, badge team + stato in alto, avversario con icona 🏠/✈️, data e ora, competizione, e il risultato a destra col verdetto Vittoria/Pareggio/Sconfitta. Al salvataggio del referto la card si aggiorna automaticamente da "Da compilare" a "Compilato" senza dover ricaricare',
+    ],
+  },
   {
     version: '1.9.77',
     date: '2026-09-22',
