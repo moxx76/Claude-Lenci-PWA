@@ -18,8 +18,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/auth'
 import { useMyTeam } from '../hooks/useMyTeam'
+import { isAdmin } from '../lib/types'
 import { PostMatchSheet, type PostMatchData } from '../components/PostMatchSheet'
 import { Icon } from '../components/Icon'
+
+/**
+ * Elenco squadre "visibili": per un admin sono TUTTE le squadre del club Lenci
+ * (l'admin ha responsabilità trasversale), per uno staff/coach solo quelle a cui
+ * è assegnato (head/assistant/helper coach o team/second manager).
+ */
+interface VisibleTeam {
+  id: string
+  name: string
+  category: string | null
+}
 
 /**
  * Riga elenco: ogni match arricchito col nome/categoria/colore del team
@@ -53,16 +65,38 @@ export function Referti() {
   const [openReport, setOpenReport] = useState<PostMatchData | null>(null)
   const [selectedTeamId, setSelectedTeamId] = useState<string>('all')  // 'all' = tutte le squadre
   const [filtroStato, setFiltroStato] = useState<FiltroStato>('tutti')
+  // Elenco squadre visibili: per admin = TUTTE (fetchate a parte), per coach/staff = myTeams
+  const [visibleTeams, setVisibleTeams] = useState<VisibleTeam[]>([])
 
-  // Carica tutte le partite passate delle squadre dell'utente.
-  // NB: non uso il join `team:teams(...)` in un unico select perché con l'ordine
-  // "SELECT ... FROM matches m JOIN teams t ..." su Supabase la sintassi è
-  // via .select con relazione — funziona ma richiede che la FK sia esposta.
-  // Preferisco 2 query in parallelo (matches + teams) e merge lato client, più predicibile.
+  const userIsAdmin = isAdmin(profile?.role)
+
+  // Popola visibleTeams: se admin fetch di tutte le squadre, altrimenti usa myTeams del coach.
+  // Separato dal load dei matches per due motivi: (1) le squadre servono per il dropdown filtro
+  // e (2) l'admin potrebbe non avere match_id_in ma comunque volere il dropdown popolato con
+  // TUTTI i team del club, per poter filtrare a volontà.
+  useEffect(() => {
+    if (!profile) return
+    if (userIsAdmin) {
+      // Admin: fetch TUTTE le squadre (di tutti i club — di fatto Lenci è unico)
+      supabase.from('teams')
+        .select('id, name, category')
+        .order('category', { ascending: true })
+        .order('name', { ascending: true })
+        .then(({ data }) => {
+          setVisibleTeams((data ?? []) as VisibleTeam[])
+        })
+    } else {
+      // Coach/staff: solo le squadre a cui è assegnato
+      setVisibleTeams(myTeams.map(t => ({ id: t.id, name: t.name, category: t.category ?? null })))
+    }
+  }, [profile, userIsAdmin, myTeams])
+
+  // Carica tutte le partite passate delle squadre visibili all'utente.
   useEffect(() => {
     if (!profile || teamsLoading) return
-    const teamIds = myTeams.map(t => t.id)
-    if (teamIds.length === 0) {
+    // Aspetto che visibleTeams sia popolato (evita fetch a vuoto)
+    if (visibleTeams.length === 0 && !userIsAdmin) {
+      // Coach senza squadre: niente da mostrare
       setRows([])
       setLoading(false)
       return
@@ -70,15 +104,25 @@ export function Referti() {
     const load = async () => {
       setLoading(true)
       try {
-        // Solo partite passate (< now) + solo dei miei team
-        // Fetch match + join teams (per nome, categoria, colore, durata partita)
-        const { data: matchData, error: matchErr } = await supabase
+        // Base query: partite passate + join teams per nome/categoria/colore/durata
+        // Per admin: nessun filtro team_id (vede tutte).
+        // Per coach: filtro .in('team_id', myTeamIds)
+        let query = supabase
           .from('matches')
           .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
-          .in('team_id', teamIds)
           .lt('match_date', new Date().toISOString())
           .order('match_date', { ascending: false })
-          .limit(200)  // ultimi 200 referti — più che sufficiente per la stagione
+          .limit(200)
+        if (!userIsAdmin) {
+          const teamIds = myTeams.map(t => t.id)
+          if (teamIds.length === 0) {
+            setRows([])
+            setLoading(false)
+            return
+          }
+          query = query.in('team_id', teamIds)
+        }
+        const { data: matchData, error: matchErr } = await query
         if (matchErr) throw matchErr
         const matchIds = (matchData ?? []).map(m => m.id)
         if (matchIds.length === 0) {
@@ -125,7 +169,7 @@ export function Referti() {
       }
     }
     load()
-  }, [profile, myTeams, teamsLoading])
+  }, [profile, myTeams, teamsLoading, userIsAdmin, visibleTeams.length])
 
   // Filtri applicati alla lista
   const filtered = useMemo(() => {
@@ -174,7 +218,9 @@ export function Referti() {
     )
   }
 
-  if (myTeams.length === 0) {
+  // Solo i coach senza squadra vedono questo messaggio — un admin senza squadre
+  // assegnate direttamente vede comunque tutte le partite di tutte le categorie.
+  if (!userIsAdmin && myTeams.length === 0) {
     return (
       <div style={{ padding: 20, textAlign: 'center', color: '#8993a3' }}>
         Non hai squadre assegnate: nessun referto da mostrare.
@@ -187,14 +233,23 @@ export function Referti() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Icon name="edit_note" size={26} color="#b3005c" />
         <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#1a1a1a' }}>Referti partite</h1>
+        {userIsAdmin && (
+          <span style={{
+            fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 4,
+            background: '#b3005c', color: '#fff', letterSpacing: 0.5,
+          }}>
+            ADMIN · TUTTE LE CATEGORIE
+          </span>
+        )}
       </div>
       <p style={{ fontSize: 13, color: '#707882', marginTop: 0, marginBottom: 16 }}>
-        Tutte le partite passate delle tue squadre. Le partite senza referto sono evidenziate in giallo —
-        tap sulla card per aprire il report e compilare gol, cartellini, sostituzioni e pagelle.
+        {userIsAdmin
+          ? 'Tutte le partite passate di tutte le squadre del club, ordinate dalla più recente. Le partite senza referto sono evidenziate in giallo — tap sulla card per aprire il report.'
+          : 'Tutte le partite passate delle tue squadre. Le partite senza referto sono evidenziate in giallo — tap sulla card per aprire il report e compilare gol, cartellini, sostituzioni e pagelle.'}
       </p>
 
-      {/* Filtro squadra (solo se >1 team, altrimenti implicito) */}
-      {myTeams.length > 1 && (
+      {/* Filtro squadra: mostrato se ci sono più squadre visibili (per admin sempre, per coach solo se ha più team) */}
+      {visibleTeams.length > 1 && (
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 11, color: '#707882', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             Squadra
@@ -208,7 +263,7 @@ export function Referti() {
             }}
           >
             <option value="all">Tutte le squadre ({rows.length})</option>
-            {myTeams.map(t => (
+            {visibleTeams.map(t => (
               <option key={t.id} value={t.id}>{t.name}{t.category ? ` — ${t.category}` : ''}</option>
             ))}
           </select>

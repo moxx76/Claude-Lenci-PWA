@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.78'
+export const APP_VERSION = '1.9.79'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.79',
+    date: '2026-09-22',
+    title: 'Pagina Referti: gli admin vedono tutte le squadre di tutte le categorie',
+    fixes: [
+      'La pagina Referti ora distingue admin dai coach: gli admin vedono TUTTE le partite di TUTTE le squadre del club, non solo di quelle a cui sono formalmente assegnati come head/assistant coach o team manager. Fetch di tutte le teams al load per popolare il dropdown filtro squadra, e query matches senza il filtro .in(team_id) per gli admin',
+      'Badge "ADMIN · TUTTE LE CATEGORIE" mostrato nell\u2019header solo per gli admin, per rendere esplicita la vista trasversale. Descrizione della pagina adattata di conseguenza',
+      'Dropdown filtro squadra ora sempre visibile per gli admin (con la lista completa delle squadre del club, ordinata per categoria + nome), invece che solo quando il coach ha \u2265 2 squadre assegnate. Per i coach il comportamento resta invariato',
+    ],
+  },
   {
     version: '1.9.78',
     date: '2026-09-22',
