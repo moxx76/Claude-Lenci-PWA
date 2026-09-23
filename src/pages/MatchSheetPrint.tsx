@@ -221,16 +221,18 @@ export function MatchSheetPrint() {
         }
         .sheet {
           box-sizing: border-box;
-          padding: 3mm;
+          padding: 0;
           font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
           font-size: 9pt;
           color: #000;
           overflow: hidden;
           display: grid;
-          /* 18mm header + 137mm corpo + 45mm footer = 200mm (A4 landscape usable).
-             Header più alto per far entrare senza schiacciare le 3 righe testo (titoli + data/venue + arbitro/terreno/meteo) */
-          grid-template-rows: 18mm 137mm 45mm;
-          gap: 1.5mm;
+          /* Print area A4 landscape = 297×200mm (con @page margin 5mm).
+             Somma: 18mm header + 1mm gap + 140mm body + 1mm gap + 40mm footer = 200mm.
+             Prima era 209mm (padding 3mm + header 18 + gap 1.5 + body 137 + gap 1.5 + footer 45)
+             → sforava di 9mm e finiva su 2 pagine, con anche l'ultima riga panchina tagliata. */
+          grid-template-rows: 18mm 140mm 40mm;
+          gap: 1mm;
         }
         .box { border: 0.5pt solid #000; box-sizing: border-box; }
         .fill { width: 100%; border-bottom: 0.4pt solid #000; display: inline-block; min-height: 3.4mm; }
@@ -499,7 +501,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
               const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
               if (!s) {
                 return (
-                  <tr key={i} style={{ background: rowBg, height: '5.5mm' }}>
+                  <tr key={i} style={{ background: rowBg, height: '5mm' }}>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
@@ -509,7 +511,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
                 )
               }
               return (
-                <tr key={i} style={{ background: rowBg, height: '5.5mm' }}>
+                <tr key={i} style={{ background: rowBg, height: '5mm' }}>
                   {/* Numero maglia: se presente lo scrivo, altrimenti casella vuota da compilare a mano */}
                   <td style={{ textAlign: 'center', padding: '0.5mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '9.5pt' }}>
                     {s.jersey ?? ''}
@@ -558,7 +560,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
               const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
               if (!b) {
                 return (
-                  <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
+                  <tr key={i} style={{ background: rowBg, height: '4mm' }}>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
@@ -568,7 +570,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
                 )
               }
               return (
-                <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
+                <tr key={i} style={{ background: rowBg, height: '4mm' }}>
                   <td style={{ textAlign: 'center', padding: '0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '8.5pt', lineHeight: 1 }}>
                     {b.jersey ?? ''}
                   </td>

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.76'
+export const APP_VERSION = '1.9.77'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.77',
+    date: '2026-09-22',
+    title: 'Foglio partita A4: stampa su 1 sola pagina + fix definitivo taglio panchina',
+    fixes: [
+      'Stampa foglio partita sforava su 2 fogli. Causa: la somma delle altezze del layout era 209mm (padding 3mm×2 + header 18 + gap 1.5×2 + body 137 + footer 45) mentre l\u2019area utile A4 landscape con margini stampa 5mm \u00e8 200mm. Fix: eliminato padding del container sheet, ridotti i gap (1.5\u21921mm), footer (45\u219240mm) e ribilanciato il body (137\u2192140mm). Totale ora esattamente 200mm — sta su 1 sola pagina',
+      'Ultima riga panchina (9\u00b0 giocatore) veniva tagliata dall\u2019overflow del container. Complice del bug pagina 2: il body non aveva abbastanza spazio per contenere 11 titolari + 9 panchinari. Con il body ora a 140mm e le righe compattate (titolari 5\u21925mm da 5.5, panchina 4mm da 4.5) tutti i 20 posti entrano senza sforare',
+    ],
+  },
   {
     version: '1.9.76',
     date: '2026-09-22',
