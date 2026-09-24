@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.90'
+export const APP_VERSION = '1.9.91'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.91',
+    date: '2026-09-22',
+    title: 'Presenze staff: il secondo dirigente ora può marcare le presenze (bug RLS)',
+    fixes: [
+      'Bug bloccante segnalato: il secondo dirigente accompagnatore (ruolo second_manager_id sulla squadra) non riusciva a modificare le presenze staff, la app mostrava "new row violates row-level security policy for table staff_attendances". La policy WRITE della tabella era stata scritta con solo 4 dei 6+2 ruoli staff (head_coach, assistant_coach, helper_coach, team_manager) escludendo second_manager, third_manager, linesman e masseur',
+      'Ricreate policy staff_att_write e staff_att_select su staff_attendances includendo tutti i ruoli staff della squadra. Ora chi copre uno qualsiasi degli 8 ruoli (i 3 allenatori + i 3 dirigenti accompagnatori + guardalinee + massaggiatore) può leggere e modificare le presenze staff di training e partite della propria squadra. Admin e director hanno sempre permessi pieni via policy separata',
+      'Verificato con test SQL diretto: massimopitstop@gmail.com (second_manager di Primi Calci 2019) può ora fare UPDATE su staff_attendances senza errori RLS',
+    ],
+  },
   {
     version: '1.9.90',
     date: '2026-09-22',
