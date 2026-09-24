@@ -199,6 +199,12 @@ export function Referti() {
    * Toggla exclude_from_stats sulla partita. UPDATE ottimistico:
    * modifico subito il row nello state, poi faccio la UPDATE al DB.
    * Se fallisce, revert e mostro alert.
+   *
+   * Al successo dispatcho l'evento globale 'lenci:match-exclude-changed' con
+   * detail { matchId, teamId, excluded }: la dashboard statistiche giocatori
+   * (CoachPlayerStatsDashboard) e la scheda personale (PlayerDetailSheet)
+   * ci si sottoscrivono per rifare il calcolo LIVE senza che l'utente debba
+   * navigare avanti e indietro.
    */
   const toggleExcludeFromStats = async (rowId: string, currentValue: boolean) => {
     const newValue = !currentValue
@@ -212,6 +218,17 @@ export function Referti() {
       // Revert
       setRows(prev => prev.map(r => r.id === rowId ? { ...r, exclude_from_stats: currentValue } : r))
       alert('Errore nel modificare l\'esclusione: ' + error.message)
+      return
+    }
+    // Notifica ai listener (dashboard stats giocatori + scheda personale) che
+    // i dati aggregati vanno ricalcolati. Il team_id serve al listener per
+    // filtrare solo se sta guardando lo stesso team (evita refresh inutili
+    // quando la dashboard è su un'altra squadra).
+    const changedRow = rows.find(r => r.id === rowId)
+    if (changedRow) {
+      window.dispatchEvent(new CustomEvent('lenci:match-exclude-changed', {
+        detail: { matchId: rowId, teamId: changedRow.team_id, excluded: newValue },
+      }))
     }
   }
 

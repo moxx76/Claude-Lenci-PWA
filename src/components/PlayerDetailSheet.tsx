@@ -105,6 +105,18 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
     loadGoals()
   }, [open, player?.id])
 
+  // Refresh LIVE quando cambia exclude_from_stats su una partita: se lo sheet
+  // è aperto per un giocatore, i suoi dati devono aggiornarsi senza chiudere/
+  // riaprire. Non filtro per teamId qui perché il giocatore potrebbe essere
+  // in prestito e comparire in match di team diversi: meglio ricaricare sempre
+  // se lo sheet è aperto.
+  useEffect(() => {
+    if (!open || !player?.id) return
+    const handler = () => { loadGoals() }
+    window.addEventListener('lenci:match-exclude-changed', handler)
+    return () => window.removeEventListener('lenci:match-exclude-changed', handler)
+  }, [open, player?.id])
+
   const loadHistory = async () => {
     if (!player) return
     setLoadingHistory(true)

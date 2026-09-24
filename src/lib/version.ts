@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.88'
+export const APP_VERSION = '1.9.89'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.89',
+    date: '2026-09-22',
+    title: 'Statistiche giocatori: refresh LIVE quando cambia il flag "escludi da statistiche"',
+    fixes: [
+      'La dashboard mister e la scheda personale giocatore ora si ricalcolano automaticamente quando l\'utente toggla il flag "Escludi dalle statistiche" su una partita nella pagina Referti. Prima serviva chiudere e riaprire per vedere i nuovi valori. Implementato via evento custom globale window (\'lenci:match-exclude-changed\') con detail {matchId, teamId, excluded}',
+      'CoachPlayerStatsDashboard filtra il refresh per teamId: se stai guardando Under 14 e viene modificata una partita dell\'Under 16, non ricarica inutilmente. PlayerDetailSheet ricarica sempre se lo sheet è aperto (perché un giocatore in prestito può comparire in match di team diversi)',
+    ],
+  },
   {
     version: '1.9.88',
     date: '2026-09-22',

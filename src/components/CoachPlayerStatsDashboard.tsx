@@ -87,6 +87,23 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
     load()
   }, [teamId])
 
+  // Refresh LIVE quando l'utente toggla exclude_from_stats su una partita nella
+  // pagina Referti (o altrove che dispatchi lo stesso evento). Filtro per teamId
+  // così se la dashboard sta guardando Under 14 e viene modificata una partita
+  // dell'Under 16, non ricarico inutilmente. Se detail.teamId non è presente
+  // (dispatch senza contesto), ricarico comunque per sicurezza.
+  useEffect(() => {
+    if (!teamId) return
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ matchId?: string; teamId?: string; excluded?: boolean }>).detail
+      if (!detail || !detail.teamId || detail.teamId === teamId) {
+        load()
+      }
+    }
+    window.addEventListener('lenci:match-exclude-changed', handler)
+    return () => window.removeEventListener('lenci:match-exclude-changed', handler)
+  }, [teamId])
+
   async function load() {
     setLoading(true)
     try {
