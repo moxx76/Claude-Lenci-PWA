@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.89'
+export const APP_VERSION = '1.9.90'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.90',
+    date: '2026-09-22',
+    title: 'Autoesclusione dirigente: fix definitivo (RLS WITH CHECK)',
+    fixes: [
+      'Il fix della v1.9.80 (trigger prevent_self_removal_from_team) NON bloccava effettivamente l\'autoesclusione: il trigger dipendeva da auth.uid() che in alcuni contesti pu\u00f2 essere NULL, e la guardia interna "if current_user_id IS NULL then RETURN NEW" lasciava passare l\'update. Ora la protezione \u00e8 spostata dentro le RLS WITH CHECK delle policy UPDATE non-admin ("dirigente aggiorna propria squadra" e "staff aggiorna squadra propria"), che scattano sempre nel contesto del vero utente autenticato',
+      'Regola RLS: se dopo l\'UPDATE l\'utente non-admin non \u00e8 pi\u00f9 in nessuno dei 6 ruoli della squadra (head_coach, assistant_coach, helper_coach, team_manager, second_manager, third_manager), la modifica viene rifiutata con errore 42501 (row-level security violation). Verificato con test SQL: eletachis@gmail.com (dirigente Pulcini 2017) non pu\u00f2 pi\u00f9 mettere se stesso a NULL nel campo Dirigente accompagnatore. Un admin invece pu\u00f2 farlo tramite la sua policy separata "admin gestisce squadre"',
+      'TeamEditSheet: il messaggio d\'errore quando la RLS blocca il salvataggio \u00e8 stato tradotto da "new row violates row-level security policy" al testo comprensibile "Non puoi rimuovere la tua assegnazione alla squadra. La modifica deve essere effettuata da un amministratore o da un altro utente autorizzato." Il vecchio frontend guard rimane come prima linea di difesa; questa fix backend \u00e8 la rete di sicurezza definitiva',
+    ],
+  },
   {
     version: '1.9.89',
     date: '2026-09-22',

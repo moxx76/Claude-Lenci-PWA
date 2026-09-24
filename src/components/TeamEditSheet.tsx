@@ -233,7 +233,16 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       onSaved?.()
       onClose()
     } catch (e: any) {
-      setError('Errore salvataggio: ' + (e.message || 'sconosciuto'))
+      // La RLS "dirigente/staff aggiorna propria squadra" blocca con codice 42501
+      // se un non-admin cerca di rimuoversi da tutti i 6 ruoli della squadra.
+      // Trasformo il messaggio tecnico in un testo comprensibile.
+      const msg = String(e?.message || e?.error_description || '')
+      const code = String(e?.code || '')
+      if (code === '42501' || /row-level security/i.test(msg)) {
+        setError('Non puoi rimuovere la tua assegnazione alla squadra. La modifica deve essere effettuata da un amministratore o da un altro utente autorizzato.')
+      } else {
+        setError('Errore salvataggio: ' + (e.message || 'sconosciuto'))
+      }
     } finally {
       setSaving(false)
     }
