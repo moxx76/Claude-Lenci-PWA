@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.80'
+export const APP_VERSION = '1.9.81'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.81',
+    date: '2026-09-22',
+    title: 'Distinta tattica: campo numero di maglia per partita → finisce nel foglio A4 stampato',
+    fixes: [
+      'Nella distinta tattica (step 3, dopo capitano/vice) nuova sezione "🎽 Numeri di maglia" con un input compatto per ogni convocato (titolari + panchina). Il numero inserito viene salvato in convocations.shirt_number_override (colonna gi\u00e0 esistente) e viene stampato nel foglio partita A4 con precedenza sul numero di anagrafica del giocatore. Utile quando i giocatori non hanno un numero fisso in anagrafica (comune nel giovanile) o si assegnano numeri diversi partita per partita',
+      'Salvataggio efficiente: al save vengono aggiornati SOLO i numeri effettivamente modificati rispetto allo stato di apertura (snapshot iniziale confrontato con lo stato corrente), non l\u2019intera tabella convocations. Le UPDATE vengono lanciate in parallelo con Promise.allSettled, i fallimenti loggano un warning ma non bloccano il salvataggio di distinta e capitani',
+    ],
+  },
   {
     version: '1.9.80',
     date: '2026-09-22',

@@ -97,6 +97,11 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
   // Nomi dei giocatori esclusi (in una distinta precedente ma non convocati per questa)
   const [importSkipped, setImportSkipped] = useState<{ name: string; role: string }[]>([])
   const [originalCaptainId, setOriginalCaptainId] = useState<string | null>(null)
+  // Salvo i numeri di maglia originali (allo state di apertura sheet) per calcolare
+  // quali cambiare in DB al save. Serve solo per efficienza: senza questo, farei
+  // UPDATE di tutti i convocati sempre. Con questa mappa faccio UPDATE solo dei modificati.
+  // Chiave: player_id, valore: shirt_number_override originale (null = non impostato).
+  const [originalShirtNumbers, setOriginalShirtNumbers] = useState<Record<string, number | null>>({})
   const [originalViceId, setOriginalViceId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -130,6 +135,10 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
       }))
       .sort((a, b) => (a.jersey_number ?? 999) - (b.jersey_number ?? 999) || a.last_name.localeCompare(b.last_name))
     setConvocati(conv)
+    // Snapshot dei numeri di maglia iniziali per calcolare i diff al save.
+    const origShirt: Record<string, number | null> = {}
+    conv.forEach(c => { origShirt[c.player_id] = c.shirt_number_override })
+    setOriginalShirtNumbers(origShirt)
 
     // Precompilo capitano/vice dalla convocazione
     const cap = conv.find(c => c.is_captain)?.player_id ?? null
@@ -366,6 +375,19 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
     setBenchIds(prev => prev.includes(playerId) ? prev.filter(p => p !== playerId) : [...prev, playerId])
   }
 
+  /**
+   * Aggiorna il numero di maglia override per un convocato (titolare o panchina).
+   * Passare null per rimuovere l'override (torna al jersey_number di anagrafica).
+   * Non validate qui il range (0-999) né l'unicità — lo faccio al render dell'input
+   * per feedback immediato, ma tecnicamente il DB accetta qualsiasi int.
+   */
+  function updateShirtNumber(playerId: string, num: number | null) {
+    setConvocati(prev => prev.map(c => c.player_id === playerId
+      ? { ...c, shirt_number_override: num, jersey_number: num ?? c.jersey_number }
+      : c
+    ))
+  }
+
   // Titolari assegnati (chi ha uno slot con player_id)
   const starterIds = useMemo(
     () => new Set(slots.map(s => s.player_id).filter(Boolean) as string[]),
@@ -478,6 +500,34 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
         }
         setOriginalCaptainId(captainId)
         setOriginalViceId(viceCaptainId)
+      }
+
+      // 4. Numeri di maglia: UPDATE convocations.shirt_number_override per i convocati modificati.
+      // Faccio una UPDATE per convocato solo se il numero è cambiato rispetto all'originale,
+      // per evitare traffico DB inutile. Convertire number|null in una PATCH mirata.
+      const shirtChanges = convocati.filter(c => {
+        const orig = originalShirtNumbers[c.player_id] ?? null
+        const curr = c.shirt_number_override ?? null
+        return orig !== curr
+      })
+      if (shirtChanges.length > 0) {
+        // Uso Promise.all per farle in parallelo; se una fallisce non blocco il resto
+        // (l'utente ha comunque salvato distinta + capitani, i numeri sono un extra)
+        const results = await Promise.allSettled(
+          shirtChanges.map(c => supabase.from('convocations')
+            .update({ shirt_number_override: c.shirt_number_override })
+            .eq('match_id', match.id)
+            .eq('player_id', c.player_id)
+          )
+        )
+        const failed = results.filter(r => r.status === 'rejected').length
+        if (failed > 0) {
+          console.warn(`[Distinta] ${failed} numeri di maglia non salvati (verificare RLS convocations)`)
+        }
+        // Aggiorno snapshot originale per non riprovare al prossimo save
+        const newOrig = { ...originalShirtNumbers }
+        shirtChanges.forEach(c => { newOrig[c.player_id] = c.shirt_number_override })
+        setOriginalShirtNumbers(newOrig)
       }
 
       setSavedOk(true)
@@ -822,6 +872,90 @@ export function DistintaTatticaSheet({ open, onClose, match, onSaved }: Props) {
                     </select>
                   </label>
                 </div>
+
+                {/* Numeri di maglia — sezione dedicata dopo capitano/vice.
+                    Elenca TUTTI i convocati (titolari + panchina) con un input compatto.
+                    Il numero salvato qui va in convocations.shirt_number_override e viene
+                    letto dal foglio A4 stampabile con precedenza su players.jersey_number.
+                    Utile quando i giocatori non hanno un numero fisso in anagrafica (comune
+                    nel giovanile) o si assegnano numeri diversi partita per partita. */}
+                {convocati.length > 0 && (
+                  <div style={{
+                    padding: 12, borderRadius: 10, background: '#fff8e0',
+                    border: '1px solid #f0c040', marginBottom: 14,
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#8e6300', marginBottom: 3 }}>
+                      🎽 Numeri di maglia
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#8e6300', opacity: 0.85, marginBottom: 8, lineHeight: 1.4 }}>
+                      Assegna il numero di maglia per questa partita. Sovrascrive quello in anagrafica
+                      e viene stampato nel foglio partita A4.
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {convocati
+                        .filter(c => starterIds.has(c.player_id) || benchIds.includes(c.player_id))
+                        .sort((a, b) => {
+                          // Prima titolari (per slot_index), poi panchina (per cognome)
+                          const aStart = starterIds.has(a.player_id)
+                          const bStart = starterIds.has(b.player_id)
+                          if (aStart && !bStart) return -1
+                          if (!aStart && bStart) return 1
+                          if (aStart && bStart) {
+                            const aIdx = slots.findIndex(s => s.player_id === a.player_id)
+                            const bIdx = slots.findIndex(s => s.player_id === b.player_id)
+                            return aIdx - bIdx
+                          }
+                          return a.last_name.localeCompare(b.last_name)
+                        })
+                        .map(c => {
+                          const isStarter = starterIds.has(c.player_id)
+                          return (
+                            <div key={c.player_id} style={{
+                              display: 'grid', gridTemplateColumns: '48px 1fr auto',
+                              gap: 8, alignItems: 'center',
+                              padding: '5px 8px', borderRadius: 6,
+                              background: '#fff', border: '1px solid #f0e0a0',
+                            }}>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={999}
+                                placeholder="—"
+                                value={c.shirt_number_override ?? ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value.trim()
+                                  if (raw === '') { updateShirtNumber(c.player_id, null); return }
+                                  const n = parseInt(raw, 10)
+                                  if (isNaN(n) || n < 0 || n > 999) return
+                                  updateShirtNumber(c.player_id, n)
+                                }}
+                                style={{
+                                  width: '100%', padding: '6px 4px', textAlign: 'center',
+                                  fontSize: 15, fontWeight: 800, color: '#181c20',
+                                  border: '1px solid #d9dde4', borderRadius: 6,
+                                  fontFamily: 'inherit', boxSizing: 'border-box',
+                                  MozAppearance: 'textfield',
+                                }}
+                              />
+                              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#181c20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {c.last_name.toUpperCase()} {c.first_name}
+                              </span>
+                              <span style={{
+                                fontSize: 9.5, fontWeight: 800,
+                                padding: '2px 6px', borderRadius: 4,
+                                background: isStarter ? '#005f98' : '#e6e8ee',
+                                color: isStarter ? '#fff' : '#404751',
+                                letterSpacing: 0.3,
+                              }}>
+                                {isStarter ? 'TIT' : 'PAN'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <button onClick={() => setStep(2)} style={btnSecondary}>← Titolari</button>
