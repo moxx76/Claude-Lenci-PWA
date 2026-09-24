@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.82'
+export const APP_VERSION = '1.9.83'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.83',
+    date: '2026-09-22',
+    title: 'Dashboard mister: tabella completa statistiche giocatori (presenze, %, minuti, gol, assist, cartellini)',
+    fixes: [
+      'Nuova sezione "Statistiche giocatori" nella dashboard del mister (ManagerDashboard per allenatore-dirigente, CoachDashboard per allenatore semplice). Tabella riassuntiva di TUTTO il roster della squadra con: numero maglia, cognome/nome, presenze (titolare + subentri), % presenza calcolata su partite disputate, minuti giocati totali, gol (rigori inclusi con asterisco), assist, gialli, rossi. Header cliccabili per ordinare per qualsiasi colonna. Tap sul nome apre la scheda personale del giocatore. Sezione collassabile',
+      '% presenza colorata: verde ≥70%, giallo 40-70%, rosso <40%. Giocatori mai convocati appaiono in grigio in fondo alla lista, cos\u00ec il mister vede a colpo d\u2019occhio chi non gioca. La cella presenze mostra split "totale (N T)" con N = titolarit\u00e0. Il calcolo minuti usa la durata partita configurata sul team (35\'x2 per U14, ecc.) per gestire correttamente titolari fino alla fine e subentri',
+      'Nessuna migration DB: query aggregata client-side su match_player_stats join matches del team. Testato su Under 14 (21 giocatori, 7 partite disputate, 95 righe stats): la classifica minuti mette in cima chi ha giocato pi\u00f9 partite intere, quella gol Mantovani Nicol\u00f2 con 7 marcature',
+    ],
+  },
   {
     version: '1.9.82',
     date: '2026-09-22',

@@ -12,6 +12,7 @@ import { makeMatchDuration, type MatchDuration } from '../lib/matchDuration'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
+import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
 
 interface MatchWithConv {
   id: string
@@ -856,6 +857,16 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* DASHBOARD STATISTICHE GIOCATORI — vista mister aggregata su tutto il roster.
+          Appare solo quando abbiamo un team attivo (currentTeam). Sezione collassabile. */}
+      {currentTeam?.id && (
+        <CoachPlayerStatsDashboard
+          teamId={currentTeam.id}
+          teamColor={teamColor}
+          categoryName={currentTeam.name}
+        />
       )}
 
       {/* ANNUNCI SQUADRA */}

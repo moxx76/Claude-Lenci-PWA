@@ -17,6 +17,7 @@ import { ParentAttendanceSheet } from '../components/ParentAttendanceSheet'
 import { CalendarSubscribeSheet } from '../components/CalendarSubscribeSheet'
 import { DirectorDashboard } from '../components/DirectorDashboard'
 import { ManagerDashboard } from '../components/ManagerDashboard'
+import { CoachPlayerStatsDashboard } from '../components/CoachPlayerStatsDashboard'
 import { ShuttleServiceCard } from '../components/ShuttleServiceCard'
 import { AdminStaffOverviewCard } from '../components/AdminStaffOverviewCard'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
@@ -1038,6 +1039,9 @@ function CoachDashboard({ firstName }: { firstName: string }) {
           </button>
         </div>
       )}
+
+      {/* Statistiche giocatori — vista mister aggregata (presenze, minuti, gol, assist, cartellini) */}
+      <CoachPlayerStatsDashboard teamId={myTeam.id} categoryName={myTeam.name} />
 
       {/* Rosa Attuale */}
       <div style={{ background: '#fff', borderRadius: 18, padding: 18, boxShadow: '0 10px 24px rgba(0,120,191,0.06)' }}>
