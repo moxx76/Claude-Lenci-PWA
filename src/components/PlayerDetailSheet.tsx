@@ -130,14 +130,17 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
    * ora è generalizzata: presenze + gol + assist + minuti giocati).
    * Join matches → teams per prendere la durata partita (per il calcolo minuti effettivi
    * quando il giocatore è arrivato "fino alla fine" — minute_out=null).
+   * Escludo le partite marcate exclude_from_stats=true (referto non compilato): sarebbero
+   * dati fuorvianti nella scheda giocatore, meglio non mostrarle affatto.
    */
   const loadGoals = async () => {
     if (!player) return
     setLoadingGoals(true)
     const { data } = await supabase
       .from('match_player_stats')
-      .select('goals, penalties_scored, assists, was_starter, minute_in, minute_out, match:matches!inner(id, match_date, opponent, venue, home_score, away_score, team:teams(match_periods_count, match_period_duration_min))')
+      .select('goals, penalties_scored, assists, was_starter, minute_in, minute_out, match:matches!inner(id, match_date, opponent, venue, home_score, away_score, exclude_from_stats, team:teams(match_periods_count, match_period_duration_min))')
       .eq('player_id', player.id)
+      .eq('match.exclude_from_stats', false)
     const rows: PlayerMatchStatEntry[] = (data ?? [])
       .map((r: any) => {
         const m = Array.isArray(r.match) ? r.match[0] : r.match

@@ -57,6 +57,10 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
   const [loading, setLoading] = useState(true)
   const [aggregates, setAggregates] = useState<PlayerAggregate[]>([])
   const [totalMatchesPlayed, setTotalMatchesPlayed] = useState<number>(0)
+  // Partite disputate ma escluse dalle statistiche (referto non compilato).
+  // Usato solo per informare il mister ("14 disputate, 2 escluse dal calcolo")
+  // così sa perché le presenze non tornano con il calendario.
+  const [totalMatchesExcluded, setTotalMatchesExcluded] = useState<number>(0)
   const [sortKey, setSortKey] = useState<SortKey>('minuti')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerDetailData | null>(null)
@@ -93,11 +97,16 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
       // 2) Partite del team con risultato: quelle "disputate" contano per % presenza.
       //    Anche partite senza referto pieno ma con score valorizzato sono presenze potenziali.
       //    Prendo anche la durata dal team per il calcolo minuti.
+      //    IMPORTANTE: escludo le partite con exclude_from_stats=true (referto non
+      //    compilato o dati troppo parziali) sia dal count "partite disputate"
+      //    (denominatore % presenza) sia dal join stats (che gonfierebbe minuti/gol
+      //    con dati inaffidabili).
       const [matchesRes, teamRes, statsRes] = await Promise.all([
         supabase
           .from('matches')
           .select('id')
           .eq('team_id', teamId)
+          .eq('exclude_from_stats', false)
           .not('home_score', 'is', null)
           .not('away_score', 'is', null),
         supabase
@@ -107,12 +116,24 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
           .maybeSingle(),
         supabase
           .from('match_player_stats')
-          .select('player_id, was_starter, minute_in, minute_out, goals, penalties_scored, assists, yellow_cards, red_card, match:matches!inner(id, team_id, home_score, away_score)')
-          .eq('match.team_id', teamId),
+          .select('player_id, was_starter, minute_in, minute_out, goals, penalties_scored, assists, yellow_cards, red_card, match:matches!inner(id, team_id, home_score, away_score, exclude_from_stats)')
+          .eq('match.team_id', teamId)
+          .eq('match.exclude_from_stats', false),
       ])
 
       const totalMatches = (matchesRes.data ?? []).length
       setTotalMatchesPlayed(totalMatches)
+
+      // Conteggio separato delle partite escluse (per l'header informativo).
+      // Query leggera, solo il count non i dati.
+      const excludedRes = await supabase
+        .from('matches')
+        .select('id', { count: 'exact', head: true })
+        .eq('team_id', teamId)
+        .eq('exclude_from_stats', true)
+        .not('home_score', 'is', null)
+        .not('away_score', 'is', null)
+      setTotalMatchesExcluded(excludedRes.count ?? 0)
 
       // Durata partita del team per il calcolo minuti (fallback 90')
       const teamRow = teamRes.data as { match_periods_count?: number | null; match_period_duration_min?: number | null } | null
@@ -333,6 +354,11 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
             <div style={{ fontSize: 11, color: '#707882', marginTop: 1 }}>
               {categoryName ? `${categoryName} · ` : ''}
               {aggregates.length} giocatori · {totalMatchesPlayed} partite disputate
+              {totalMatchesExcluded > 0 && (
+                <span style={{ color: '#8e6300', fontWeight: 700 }}>
+                  {' '}· {totalMatchesExcluded} escluse
+                </span>
+              )}
             </div>
           </div>
           <Icon name={expanded ? 'expand_less' : 'expand_more'} size={20} color="#707882" />

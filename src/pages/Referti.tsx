@@ -53,9 +53,10 @@ interface RefertoRow {
   away_score: number | null
   stats_count: number    // count(match_player_stats) per la partita
   conv_count: number     // count(convocations accepted) per la partita
+  exclude_from_stats: boolean  // se true, la partita è esclusa dalle statistiche giocatori
 }
 
-type FiltroStato = 'tutti' | 'da_compilare' | 'compilati'
+type FiltroStato = 'tutti' | 'da_compilare' | 'compilati' | 'escluse'
 
 export function Referti() {
   const { profile } = useAuth()
@@ -109,7 +110,7 @@ export function Referti() {
         // Per coach: filtro .in('team_id', myTeamIds)
         let query = supabase
           .from('matches')
-          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
+          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, exclude_from_stats, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
           .lt('match_date', new Date().toISOString())
           .order('match_date', { ascending: false })
           .limit(200)
@@ -158,6 +159,7 @@ export function Referti() {
             away_score: m.away_score,
             stats_count: statsCounts[m.id] ?? 0,
             conv_count: convCounts[m.id] ?? 0,
+            exclude_from_stats: !!m.exclude_from_stats,
           }
         })
         setRows(enriched)
@@ -177,6 +179,7 @@ export function Referti() {
       if (selectedTeamId !== 'all' && r.team_id !== selectedTeamId) return false
       if (filtroStato === 'da_compilare' && r.stats_count > 0) return false
       if (filtroStato === 'compilati' && r.stats_count === 0) return false
+      if (filtroStato === 'escluse' && !r.exclude_from_stats) return false
       return true
     })
   }, [rows, selectedTeamId, filtroStato])
@@ -188,8 +191,29 @@ export function Referti() {
       tutti: perTeam.length,
       da_compilare: perTeam.filter(r => r.stats_count === 0).length,
       compilati: perTeam.filter(r => r.stats_count > 0).length,
+      escluse: perTeam.filter(r => r.exclude_from_stats).length,
     }
   }, [rows, selectedTeamId])
+
+  /**
+   * Toggla exclude_from_stats sulla partita. UPDATE ottimistico:
+   * modifico subito il row nello state, poi faccio la UPDATE al DB.
+   * Se fallisce, revert e mostro alert.
+   */
+  const toggleExcludeFromStats = async (rowId: string, currentValue: boolean) => {
+    const newValue = !currentValue
+    // Ottimistico
+    setRows(prev => prev.map(r => r.id === rowId ? { ...r, exclude_from_stats: newValue } : r))
+    const { error } = await supabase
+      .from('matches')
+      .update({ exclude_from_stats: newValue })
+      .eq('id', rowId)
+    if (error) {
+      // Revert
+      setRows(prev => prev.map(r => r.id === rowId ? { ...r, exclude_from_stats: currentValue } : r))
+      alert('Errore nel modificare l\'esclusione: ' + error.message)
+    }
+  }
 
   const handleOpenReport = (r: RefertoRow) => {
     setOpenReport({
@@ -276,6 +300,7 @@ export function Referti() {
           { key: 'tutti' as const, label: 'Tutti', count: conteggi.tutti },
           { key: 'da_compilare' as const, label: '⚠️ Da compilare', count: conteggi.da_compilare },
           { key: 'compilati' as const, label: '✅ Compilati', count: conteggi.compilati },
+          { key: 'escluse' as const, label: '🚫 Escluse', count: conteggi.escluse },
         ]).map(f => (
           <button
             key={f.key}
@@ -309,7 +334,12 @@ export function Referti() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(r => (
-            <RefertoCard key={r.id} row={r} onOpen={() => handleOpenReport(r)} />
+            <RefertoCard
+              key={r.id}
+              row={r}
+              onOpen={() => handleOpenReport(r)}
+              onToggleExclude={() => toggleExcludeFromStats(r.id, r.exclude_from_stats)}
+            />
           ))}
         </div>
       )}
@@ -337,17 +367,25 @@ export function Referti() {
   )
 }
 
-/** Card singola del referto: colore del team a sinistra, dati partita al centro, risultato a destra */
-function RefertoCard({ row, onOpen }: { row: RefertoRow; onOpen: () => void }) {
+/** Card singola del referto: colore del team a sinistra, dati partita al centro, risultato a destra.
+ *  Sotto: barra azioni con toggle "Escludi da statistiche" (utile per partite senza referto compilato
+ *  che gonfierebbero il denominatore della % presenza nella dashboard mister). */
+function RefertoCard({ row, onOpen, onToggleExclude }: {
+  row: RefertoRow;
+  onOpen: () => void;
+  onToggleExclude: () => void;
+}) {
   const d = new Date(row.match_date)
   const dataStr = d.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: '2-digit' })
   const oraStr = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
   const hasScore = row.home_score != null && row.away_score != null
   const isCompilato = row.stats_count > 0
+  const isExcluded = row.exclude_from_stats
   const teamColor = row.team_color || '#b3005c'
-  const bgBadge = isCompilato ? '#e6f7ea' : '#fff8e0'
-  const colorBadge = isCompilato ? '#005520' : '#8e6300'
-  const labelBadge = isCompilato ? '✅ Compilato' : '⚠️ Da compilare'
+  // Il badge stato: se esclusa vince "escluso", altrimenti compilato/da compilare
+  const bgBadge = isExcluded ? '#f0f2f5' : (isCompilato ? '#e6f7ea' : '#fff8e0')
+  const colorBadge = isExcluded ? '#5c6773' : (isCompilato ? '#005520' : '#8e6300')
+  const labelBadge = isExcluded ? '🚫 Esclusa da stats' : (isCompilato ? '✅ Compilato' : '⚠️ Da compilare')
 
   // Risultato per Lenci: se casa, home_score è nostro; se trasferta, away_score è nostro
   const ourScore = hasScore ? (row.venue === 'home' ? row.home_score : row.away_score) : null
@@ -356,77 +394,121 @@ function RefertoCard({ row, onOpen }: { row: RefertoRow; onOpen: () => void }) {
     ? (ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'D')
     : null
 
+  // Il card diventa un <div> (non <button>) perché deve contenere DUE aree cliccabili
+  // separate: il click principale che apre il referto, e il toggle escludi. Button-in-button
+  // sarebbe HTML invalido. L'area principale resta un button interno per accessibilità.
   return (
-    <button
-      onClick={onOpen}
-      style={{
-        display: 'grid', gridTemplateColumns: '4px 1fr auto',
-        gap: 10, alignItems: 'stretch',
-        background: '#fff', border: `1px solid ${isCompilato ? '#e0e2e9' : '#f0c040'}`,
-        borderRadius: 12, padding: 0, cursor: 'pointer', textAlign: 'left',
-        fontFamily: 'inherit', width: '100%',
-        boxShadow: isCompilato ? 'none' : '0 1px 3px rgba(240,192,64,0.15)',
-      }}
-    >
-      {/* Barra colorata a sinistra col colore del team */}
-      <div style={{ background: teamColor, borderRadius: '12px 0 0 12px' }} />
+    <div style={{
+      background: '#fff', border: `1px solid ${isExcluded ? '#c8ccd4' : (isCompilato ? '#e0e2e9' : '#f0c040')}`,
+      borderRadius: 12, overflow: 'hidden',
+      opacity: isExcluded ? 0.72 : 1,  // Esclusa = più tenue visivamente
+      boxShadow: isCompilato || isExcluded ? 'none' : '0 1px 3px rgba(240,192,64,0.15)',
+    }}>
+      {/* Riga principale cliccabile: apre il referto */}
+      <button
+        onClick={onOpen}
+        style={{
+          display: 'grid', gridTemplateColumns: '4px 1fr auto',
+          gap: 10, alignItems: 'stretch',
+          background: 'transparent', border: 'none', padding: 0,
+          cursor: 'pointer', textAlign: 'left',
+          fontFamily: 'inherit', width: '100%',
+        }}
+      >
+        {/* Barra colorata a sinistra col colore del team */}
+        <div style={{ background: teamColor }} />
 
-      {/* Corpo centrale */}
-      <div style={{ padding: '10px 4px 10px 10px', minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <span style={{
-            fontSize: 10, fontWeight: 800, color: '#fff', background: teamColor,
-            padding: '2px 6px', borderRadius: 4, letterSpacing: 0.3,
-          }}>
-            {row.team_name.toUpperCase()}
-          </span>
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: colorBadge, background: bgBadge,
-            padding: '2px 6px', borderRadius: 4,
-          }}>
-            {labelBadge}
-          </span>
+        {/* Corpo centrale */}
+        <div style={{ padding: '10px 4px 10px 10px', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 10, fontWeight: 800, color: '#fff', background: teamColor,
+              padding: '2px 6px', borderRadius: 4, letterSpacing: 0.3,
+            }}>
+              {row.team_name.toUpperCase()}
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: colorBadge, background: bgBadge,
+              padding: '2px 6px', borderRadius: 4,
+            }}>
+              {labelBadge}
+            </span>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {row.venue === 'home' ? '🏠' : '✈️'} {row.opponent}
+          </div>
+          <div style={{ fontSize: 11.5, color: '#707882' }}>
+            {dataStr} · {oraStr}
+            {row.competition && (
+              <span style={{ marginLeft: 6, opacity: 0.8 }}>· {row.competition}</span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {row.venue === 'home' ? '🏠' : '✈️'} {row.opponent}
-        </div>
-        <div style={{ fontSize: 11.5, color: '#707882' }}>
-          {dataStr} · {oraStr}
-          {row.competition && (
-            <span style={{ marginLeft: 6, opacity: 0.8 }}>· {row.competition}</span>
+
+        {/* Risultato a destra */}
+        <div style={{
+          padding: '10px 14px', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', minWidth: 60,
+          borderLeft: '1px solid #f0f2f5',
+        }}>
+          {hasScore ? (
+            <>
+              <div style={{
+                fontSize: 22, fontWeight: 900, color: '#1a1a1a',
+                lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {ourScore}-{theirScore}
+              </div>
+              {esito && (
+                <div style={{
+                  fontSize: 9, fontWeight: 800, marginTop: 3,
+                  color: esito === 'W' ? '#005520' : esito === 'L' ? '#8e0000' : '#404751',
+                }}>
+                  {esito === 'W' ? 'VITTORIA' : esito === 'L' ? 'SCONFITTA' : 'PAREGGIO'}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: 11, color: '#8993a3', fontStyle: 'italic' }}>
+              no risultato
+            </div>
           )}
         </div>
-      </div>
+      </button>
 
-      {/* Risultato a destra */}
-      <div style={{
-        padding: '10px 14px', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', minWidth: 60,
-        borderLeft: '1px solid #f0f2f5',
-      }}>
-        {hasScore ? (
-          <>
-            <div style={{
-              fontSize: 22, fontWeight: 900, color: '#1a1a1a',
-              lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-            }}>
-              {ourScore}-{theirScore}
-            </div>
-            {esito && (
-              <div style={{
-                fontSize: 9, fontWeight: 800, marginTop: 3,
-                color: esito === 'W' ? '#005520' : esito === 'L' ? '#8e0000' : '#404751',
-              }}>
-                {esito === 'W' ? 'VITTORIA' : esito === 'L' ? 'SCONFITTA' : 'PAREGGIO'}
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{ fontSize: 11, color: '#8993a3', fontStyle: 'italic' }}>
-            no risultato
-          </div>
-        )}
-      </div>
-    </button>
+      {/* Toolbar in fondo: toggle "escludi da statistiche". Bottone separato con la sua
+          area di tap, così non triggerra l'apertura del referto. */}
+      <button
+        onClick={onToggleExclude}
+        title={isExcluded
+          ? 'La partita è esclusa dalle statistiche giocatori. Clicca per reincluderla.'
+          : 'Escludi la partita dalle statistiche giocatori (utile se il referto non è mai stato compilato correttamente).'
+        }
+        style={{
+          width: '100%', padding: '6px 10px',
+          background: isExcluded ? '#eef1f5' : '#fafbfd',
+          border: 'none', borderTop: '1px solid #eef1f5',
+          cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 700,
+          color: isExcluded ? '#005f98' : '#707882',
+        }}
+      >
+        <span style={{
+          width: 28, height: 16, borderRadius: 999,
+          background: isExcluded ? '#8e6300' : '#c8ccd4',
+          position: 'relative', flexShrink: 0, transition: 'background 0.15s',
+        }}>
+          <span style={{
+            position: 'absolute', top: 2, left: isExcluded ? 14 : 2,
+            width: 12, height: 12, borderRadius: '50%',
+            background: '#fff', transition: 'left 0.15s',
+          }} />
+        </span>
+        <span>
+          {isExcluded ? 'Esclusa dalle statistiche · tap per reincludere' : 'Escludi dalle statistiche giocatori'}
+        </span>
+      </button>
+    </div>
   )
 }

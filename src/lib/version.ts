@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.86'
+export const APP_VERSION = '1.9.87'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.87',
+    date: '2026-09-22',
+    title: 'Flag "escludi da statistiche" per partite senza referto compilato',
+    fixes: [
+      'Nuova migration matches.exclude_from_stats (BOOLEAN, default false, con indice parziale). Le partite marcate come escluse non contano nei calcoli aggregati della dashboard mister: non entrano nel denominatore della % presenza, non gonfiano i minuti totali della squadra e i loro dati non alimentano le medie. Utile per partite giocate ma il cui referto non è mai stato compilato (o compilato in modo troppo parziale) — includerle penalizzava tutti i giocatori con presenze fittiziamente basse',
+      'Toggle nella pagina Referti: sotto ogni riga partita c\'è ora una piccola barra con switch "Escludi dalle statistiche giocatori" (o "Esclusa dalle statistiche · tap per reincludere" se già attivo). Update ottimistico: la card diventa immediatamente pi\u00f9 tenue (opacity ridotta) e il badge diventa "🚫 Esclusa da stats" grigio; se il DB rifiuta l\'update, revert automatico con alert',
+      'Nuovo chip filtro "🚫 Escluse" nella pagina Referti (accanto a Tutti / Da compilare / Compilati) per vedere in un colpo d\'occhio quali partite sono state escluse dalla stagione. Contatore per squadra',
+      'Header card statistiche giocatori mostra "N escluse" in giallo quando ci sono partite escluse ("21 giocatori · 2 partite disputate · 5 escluse"), cos\u00ec il mister vede subito perch\u00e9 il denominatore non torna col calendario. Sia CoachPlayerStatsDashboard che PlayerDetailSheet applicano il filtro',
+    ],
+  },
   {
     version: '1.9.86',
     date: '2026-09-22',
