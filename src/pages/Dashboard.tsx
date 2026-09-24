@@ -18,6 +18,7 @@ import { CalendarSubscribeSheet } from '../components/CalendarSubscribeSheet'
 import { DirectorDashboard } from '../components/DirectorDashboard'
 import { ManagerDashboard } from '../components/ManagerDashboard'
 import { CoachPlayerStatsDashboard } from '../components/CoachPlayerStatsDashboard'
+import { TeamPickerSheet } from '../components/TeamPickerSheet'
 import { ShuttleServiceCard } from '../components/ShuttleServiceCard'
 import { AdminStaffOverviewCard } from '../components/AdminStaffOverviewCard'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
@@ -118,6 +119,7 @@ function AdminDashboard({ firstName }: { firstName: string }) {
   // l'admin non ha una propria squadra, quindi deve poter scegliere quale vedere.
   // Default = prima squadra caricata (impostato via useEffect dopo load).
   const [statsTeamId, setStatsTeamId] = useState<string | null>(null)
+  const [statsPickerOpen, setStatsPickerOpen] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -513,61 +515,70 @@ function AdminDashboard({ firstName }: { firstName: string }) {
       <AdminStaffOverviewCard />
 
       {/* Selettore squadra per il pannello statistiche giocatori sotto.
-          L'admin non ha una propria squadra: sceglie quale vedere. La card sotto
-          (CoachPlayerStatsDashboard) è già una card bianca con la propria intestazione,
-          quindi qui uso una card compatta solo per il selettore, per non annidare card. */}
-      {teams.length > 0 && (
-        <>
-          <div style={{
-            background: '#fff', borderRadius: 14, padding: '12px 14px',
-            boxShadow: '0 6px 16px rgba(0,120,191,0.06)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Icon name="groups" size={16} color="#005f98" />
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#005f98', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                Statistiche giocatori — squadra
+          Stesso pattern usato in Calendario e Squadre: pulsante colorato col
+          nome squadra che apre TeamPickerSheet (bottom sheet). Coerenza UI
+          con il resto dell'app invece di chip scorrevoli custom. */}
+      {teams.length > 0 && (() => {
+        const selectedTeam = teams.find(t => t.id === statsTeamId) || teams[0]
+        const color = selectedTeam?.color || '#005f98'
+        return (
+          <>
+            <button
+              onClick={() => setStatsPickerOpen(true)}
+              style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: color, color: '#fff', border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 10,
+                textAlign: 'left',
+                boxShadow: '0 4px 12px rgba(0,60,94,0.12)',
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(255,255,255,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Icon name="leaderboard" size={18} color="#fff" />
               </div>
-            </div>
-            <div style={{
-              display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
-              margin: '0 -4px', padding: '0 4px 4px',
-            }}>
-              {teams.map(t => {
-                const active = t.id === statsTeamId
-                const color = t.color || '#005f98'
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setStatsTeamId(t.id)}
-                    style={{
-                      padding: '6px 12px', borderRadius: 999,
-                      border: `1.5px solid ${active ? color : '#dfe6ef'}`,
-                      background: active ? color : '#fff',
-                      color: active ? '#fff' : '#404751',
-                      fontSize: 11.5, fontWeight: 700,
-                      cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {t.name}
-                    <span style={{ marginLeft: 6, opacity: 0.75, fontSize: 10 }}>
-                      · {t.count}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, opacity: 0.9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>
+                  Statistiche giocatori
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedTeam?.name || 'Seleziona squadra'}
+                </div>
+                {selectedTeam && teams.length > 1 && (
+                  <div style={{ fontSize: 10.5, opacity: 0.9, marginTop: 2 }}>
+                    {selectedTeam.count} tesserati · Cambia squadra
+                  </div>
+                )}
+              </div>
+              <Icon name="expand_more" size={20} color="#fff" />
+            </button>
 
-          {statsTeamId && (
-            <CoachPlayerStatsDashboard
-              teamId={statsTeamId}
-              teamColor={teams.find(t => t.id === statsTeamId)?.color || undefined}
-              categoryName={teams.find(t => t.id === statsTeamId)?.name}
+            {statsTeamId && (
+              <CoachPlayerStatsDashboard
+                teamId={statsTeamId}
+                teamColor={selectedTeam?.color || undefined}
+                categoryName={selectedTeam?.name}
+              />
+            )}
+
+            <TeamPickerSheet
+              open={statsPickerOpen}
+              onClose={() => setStatsPickerOpen(false)}
+              teams={teams.map(t => ({
+                id: t.id, name: t.name, color: t.color,
+                n_players: t.count,
+              }))}
+              selectedId={statsTeamId}
+              onSelect={(id) => setStatsTeamId(id)}
             />
-          )}
-        </>
-      )}
+          </>
+        )
+      })()}
 
       {/* Prossimi impegni (14 giorni) */}
       <div>

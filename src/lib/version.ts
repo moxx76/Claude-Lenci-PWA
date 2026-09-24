@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.85'
+export const APP_VERSION = '1.9.86'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.86',
+    date: '2026-09-22',
+    title: 'Statistiche giocatori admin: selettore squadra uniformato a Calendario e Squadre',
+    fixes: [
+      'Nella dashboard admin (e direttore) il selettore squadra della card "Statistiche giocatori" era una fila di chip scorrevoli custom, diversa dal resto dell\'app. Ora usa lo stesso pattern di Calendario e Squadre: pulsante grande colorato col nome della squadra attiva (colore = colore squadra, sottotitolo "N tesserati · Cambia squadra", icona expand_more) che apre TeamPickerSheet — il bottom sheet condiviso con la lista completa. Interazione, layout e stili identici alle altre pagine',
+    ],
+  },
   {
     version: '1.9.85',
     date: '2026-09-22',

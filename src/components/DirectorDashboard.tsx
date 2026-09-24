@@ -10,6 +10,7 @@ import { MedicalComplianceSheet } from './MedicalComplianceSheet'
 import { PresenceLogSheet } from './PresenceLogSheet'
 import { AdminStaffOverviewCard } from './AdminStaffOverviewCard'
 import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
+import { TeamPickerSheet } from './TeamPickerSheet'
 import { sortTeamsByAge } from '../lib/teamOrder'
 
 interface Team {
@@ -67,6 +68,7 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const [statsTeamId, setStatsTeamId] = useState<string | null>(null)
+  const [statsPickerOpen, setStatsPickerOpen] = useState(false)
   const [upcoming, setUpcoming] = useState<UpcomingEvent[]>([])
   const [expiring, setExpiring] = useState<ExpiringPlayer[]>([])
   const [loading, setLoading] = useState(true)
@@ -294,62 +296,71 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
       {/* Panoramica staff (presenze allenamenti/partite + servizi navetta) */}
       <AdminStaffOverviewCard />
 
-      {/* Statistiche giocatori per squadra — vista mister disponibile al direttore
-          (che, come admin, non ha una propria squadra). Card leggera per il selettore,
-          poi renderizza il componente CoachPlayerStatsDashboard (già una card con la
-          sua intestazione) per non annidare card. */}
-      {teams.length > 0 && (
-        <>
-          <div style={{
-            background: '#fff', borderRadius: 14, padding: '12px 14px',
-            boxShadow: '0 6px 16px rgba(0,120,191,0.06)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Icon name="groups" size={16} color="#005f98" />
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#005f98', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                Statistiche giocatori — squadra
+      {/* Selettore squadra per il pannello statistiche giocatori.
+          Stesso pattern usato in Calendario e Squadre: pulsante colorato +
+          TeamPickerSheet (bottom sheet). */}
+      {teams.length > 0 && (() => {
+        const selectedTeam = teams.find(t => t.id === statsTeamId) || teams[0]
+        const color = selectedTeam?.color || '#005f98'
+        return (
+          <>
+            <button
+              onClick={() => setStatsPickerOpen(true)}
+              style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: color, color: '#fff', border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: 10,
+                textAlign: 'left',
+                boxShadow: '0 4px 12px rgba(0,60,94,0.12)',
+              }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(255,255,255,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Icon name="leaderboard" size={18} color="#fff" />
               </div>
-            </div>
-            <div style={{
-              display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
-              margin: '0 -4px', padding: '0 4px 4px',
-            }}>
-              {teams.map(t => {
-                const active = t.id === statsTeamId
-                const color = t.color || '#005f98'
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setStatsTeamId(t.id)}
-                    style={{
-                      padding: '6px 12px', borderRadius: 999,
-                      border: `1.5px solid ${active ? color : '#dfe6ef'}`,
-                      background: active ? color : '#fff',
-                      color: active ? '#fff' : '#404751',
-                      fontSize: 11.5, fontWeight: 700,
-                      cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {t.name}
-                    <span style={{ marginLeft: 6, opacity: 0.75, fontSize: 10 }}>
-                      · {t.players_count}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, opacity: 0.9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>
+                  Statistiche giocatori
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedTeam?.name || 'Seleziona squadra'}
+                </div>
+                {selectedTeam && teams.length > 1 && (
+                  <div style={{ fontSize: 10.5, opacity: 0.9, marginTop: 2 }}>
+                    {selectedTeam.players_count} tesserati · Cambia squadra
+                  </div>
+                )}
+              </div>
+              <Icon name="expand_more" size={20} color="#fff" />
+            </button>
 
-          {statsTeamId && (
-            <CoachPlayerStatsDashboard
-              teamId={statsTeamId}
-              teamColor={teams.find(t => t.id === statsTeamId)?.color || undefined}
-              categoryName={teams.find(t => t.id === statsTeamId)?.name}
+            {statsTeamId && (
+              <CoachPlayerStatsDashboard
+                teamId={statsTeamId}
+                teamColor={selectedTeam?.color || undefined}
+                categoryName={selectedTeam?.name}
+              />
+            )}
+
+            <TeamPickerSheet
+              open={statsPickerOpen}
+              onClose={() => setStatsPickerOpen(false)}
+              teams={teams.map(t => ({
+                id: t.id, name: t.name, color: t.color,
+                category: t.category,
+                n_players: t.players_count,
+              }))}
+              selectedId={statsTeamId}
+              onSelect={(id) => setStatsTeamId(id)}
             />
-          )}
-        </>
-      )}
+          </>
+        )
+      })()}
 
       {/* Snapshot societario */}
       <div>
