@@ -52,15 +52,27 @@ interface DisciplinaryEntry {
   created_at: string
 }
 
-interface PlayerGoalEntry {
+/**
+ * Statistica del giocatore per una singola partita. Racchiude tutti i dati numerici
+ * che alimentano il riepilogo aggregato nella scheda personale (presenze, gol, assist,
+ * minuti giocati). Un giocatore compare qui se ha almeno una stats row per la partita
+ * (ergo è stato convocato e ha ricevuto gestione minuti, o ha segnato/assistito).
+ */
+interface PlayerMatchStatEntry {
   match_id: string
   match_date: string
   opponent: string
   venue: 'home' | 'away' | null
   home_score: number | null
   away_score: number | null
+  was_starter: boolean
+  minute_in: number | null    // 0 = titolare, N = subentrato al min N, null = non giocato
+  minute_out: number | null   // N = uscito al min N, null = fino alla fine (o non giocato)
   goals: number
   penalties_scored: number
+  assists: number
+  minutes_played: number      // calcolato: quanti minuti effettivi ha giocato in questa partita
+  team_total_minutes: number  // durata totale della partita (per calcolare "%" contributo)
 }
 
 const NOTE_TYPE_STYLE: Record<NoteType, { bg: string; color: string; label: string; icon: string }> = {
@@ -78,7 +90,7 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
   const [saving, setSaving] = useState(false)
   const [history, setHistory] = useState<DisciplinaryEntry[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [goals, setGoals] = useState<PlayerGoalEntry[]>([])
+  const [goals, setGoals] = useState<PlayerMatchStatEntry[]>([])  // ora tiene TUTTE le stats per partita, non solo gol
   const [loadingGoals, setLoadingGoals] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [assessOpen, setAssessOpen] = useState(false)
@@ -113,20 +125,52 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
     setLoadingHistory(false)
   }
 
+  /**
+   * Carica tutte le statistiche del giocatore per singola partita (era loadGoals ma
+   * ora è generalizzata: presenze + gol + assist + minuti giocati).
+   * Join matches → teams per prendere la durata partita (per il calcolo minuti effettivi
+   * quando il giocatore è arrivato "fino alla fine" — minute_out=null).
+   */
   const loadGoals = async () => {
     if (!player) return
     setLoadingGoals(true)
     const { data } = await supabase
       .from('match_player_stats')
-      .select('goals, penalties_scored, match:matches!inner(id, match_date, opponent, venue, home_score, away_score)')
+      .select('goals, penalties_scored, assists, was_starter, minute_in, minute_out, match:matches!inner(id, match_date, opponent, venue, home_score, away_score, team:teams(match_periods_count, match_period_duration_min))')
       .eq('player_id', player.id)
-    const rows: PlayerGoalEntry[] = (data ?? [])
+    const rows: PlayerMatchStatEntry[] = (data ?? [])
       .map((r: any) => {
         const m = Array.isArray(r.match) ? r.match[0] : r.match
         if (!m) return null
+        const teamObj = Array.isArray(m.team) ? m.team[0] : m.team
+        // Durata totale partita per calcolare minuti "fino alla fine" (minute_out=null).
+        // Fallback 90 min se il team non ha i campi settati.
+        const teamTotalMin = teamObj
+          ? (teamObj.match_periods_count ?? 2) * (teamObj.match_period_duration_min ?? 45)
+          : 90
         const goals = Number(r.goals || 0)
         const pens = Number(r.penalties_scored || 0)
-        if (goals + pens <= 0) return null
+        const assists = Number(r.assists || 0)
+        const wasStarter = !!r.was_starter
+        const mIn = r.minute_in
+        const mOut = r.minute_out
+
+        // Calcolo minuti giocati:
+        //  - Non ha giocato: was_starter=false E minute_in=null → 0
+        //  - Titolare che finisce la partita: minute_in=0, minute_out=null → totale
+        //  - Titolare sostituito al min X: minute_out=X → X - 0 = X
+        //  - Subentrato al min Y, fino alla fine: totale - Y
+        //  - Subentrato al min Y, sostituito al min Z: Z - Y
+        let minutesPlayed = 0
+        if (wasStarter || mIn != null) {
+          const startMin = wasStarter ? 0 : (mIn ?? 0)
+          const endMin = mOut ?? teamTotalMin
+          minutesPlayed = Math.max(0, endMin - startMin)
+        }
+
+        // Skippo righe totalmente vuote (non giocato + no gol/assist): non è una vera presenza
+        if (!wasStarter && mIn == null && goals === 0 && pens === 0 && assists === 0) return null
+
         return {
           match_id: m.id,
           match_date: m.match_date,
@@ -134,11 +178,17 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
           venue: m.venue,
           home_score: m.home_score,
           away_score: m.away_score,
+          was_starter: wasStarter,
+          minute_in: mIn,
+          minute_out: mOut,
           goals,
           penalties_scored: pens,
-        } as PlayerGoalEntry
+          assists,
+          minutes_played: minutesPlayed,
+          team_total_minutes: teamTotalMin,
+        } as PlayerMatchStatEntry
       })
-      .filter((x: any): x is PlayerGoalEntry => x !== null)
+      .filter((x: any): x is PlayerMatchStatEntry => x !== null)
       .sort((a, b) => (a.match_date > b.match_date ? -1 : 1))
     setGoals(rows)
     setLoadingGoals(false)
@@ -285,13 +335,16 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
           )}
         </div>
 
-        {/* Gol stagione — solo per giocatori */}
+        {/* Statistiche stagione — presenze, gol, assist e minuti giocati per singola partita.
+            Aggregati dal referto partita (tabella match_player_stats). Un giocatore compare
+            qui se ha almeno una statistica valorizzata (era stato convocato + gestione minuti,
+            oppure ha segnato/assistito). */}
         {!isLead && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Icon name="sports_soccer" size={18} color="#005f98" />
               <h3 style={{ fontFamily: 'Anybody', fontWeight: 800, fontSize: 14, color: '#181c20', margin: 0 }}>
-                Gol stagione
+                Statistiche stagione
               </h3>
             </div>
             {loadingGoals ? (
@@ -300,40 +353,37 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
               </div>
             ) : goals.length === 0 ? (
               <div style={{ padding: 14, background: '#f7f9ff', borderRadius: 12, fontSize: 12, color: '#7a8290', textAlign: 'center' }}>
-                Nessun gol registrato in referto partita
+                Nessuna partita registrata a referto. Le statistiche appariranno qui appena
+                un referto post-partita verrà salvato con questo giocatore convocato.
               </div>
             ) : (() => {
+              // Aggregati stagione
               const totGoals = goals.reduce((s, g) => s + g.goals, 0)
               const totPens = goals.reduce((s, g) => s + g.penalties_scored, 0)
               const totalNet = totGoals + totPens
+              const totAssists = goals.reduce((s, g) => s + g.assists, 0)
+              const totMinutes = goals.reduce((s, g) => s + g.minutes_played, 0)
+              const totTitolare = goals.filter(g => g.was_starter).length
+              const totSubentri = goals.filter(g => !g.was_starter && g.minute_in != null).length
+              const totPresenze = totTitolare + totSubentri
               return (
                 <div>
-                  {/* Riepilogo top */}
+                  {/* Griglia riepilogo 4 KPI: Presenze / Gol / Assist / Minuti */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #005f98 0%, #003c5e 100%)',
-                    borderRadius: 14, padding: '14px 16px', color: '#fff',
-                    marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14,
+                    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
+                    marginBottom: 10,
                   }}>
-                    <div style={{
-                      width: 56, height: 56, borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.15)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'Anybody', fontWeight: 900, fontSize: 26,
-                    }}>
-                      {totalNet}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.9 }}>
-                        Totale marcature
-                      </div>
-                      <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
-                        {totGoals} su azione{totPens > 0 ? ` · ${totPens} su rigore` : ''} · in {goals.length} partit{goals.length === 1 ? 'a' : 'e'}
-                      </div>
-                    </div>
+                    <StatKpi label="Presenze" value={String(totPresenze)} sub={`${totTitolare} tit · ${totSubentri} sub`} color="#005f98" />
+                    <StatKpi label="Gol" value={String(totalNet)} sub={totPens > 0 ? `${totGoals}+${totPens}rig` : totalNet === 0 ? '—' : 'su azione'} color="#b3005c" />
+                    <StatKpi label="Assist" value={String(totAssists)} sub={totAssists === 0 ? '—' : `in ${goals.filter(g => g.assists > 0).length} partite`} color="#7a0071" />
+                    <StatKpi label="Minuti" value={String(totMinutes)} sub={totPresenze > 0 ? `~${Math.round(totMinutes/totPresenze)}′/pres` : '—'} color="#006e25" />
                   </div>
 
-                  {/* Lista partite con gol */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {/* Lista dettagliata per singola partita */}
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#7a8290', textTransform: 'uppercase', letterSpacing: 0.3, margin: '8px 0 6px', paddingLeft: 4 }}>
+                    Partita per partita
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {goals.map(g => {
                       const dateStr = formatDate(g.match_date)
                       const scoreStr = (g.home_score != null && g.away_score != null)
@@ -344,33 +394,54 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
                               : `${g.home_score}-${g.away_score}`)
                         : null
                       const netGoals = g.goals + g.penalties_scored
+                      // Tag ruolo nella partita: TIT (titolare) / SUB (subentrato)
+                      const roleTag = g.was_starter ? 'TIT' : (g.minute_in != null ? 'SUB' : '—')
+                      const roleColor = g.was_starter ? '#005f98' : (g.minute_in != null ? '#7a4b00' : '#8993a3')
                       return (
                         <div key={g.match_id} style={{
                           background: '#f7f9ff', border: '1px solid #dfe6ef',
-                          borderRadius: 10, padding: '10px 12px',
-                          display: 'flex', alignItems: 'center', gap: 10,
+                          borderRadius: 10, padding: '8px 10px',
+                          display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 10, alignItems: 'center',
                         }}>
+                          {/* Ruolo nella partita */}
                           <div style={{
-                            minWidth: 32, height: 32, borderRadius: 8,
-                            background: '#005f98', color: '#fff',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontFamily: 'Anybody', fontWeight: 900, fontSize: 16,
+                            padding: '3px 7px', borderRadius: 5,
+                            background: roleColor, color: '#fff',
+                            fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3,
+                            minWidth: 30, textAlign: 'center',
                           }}>
-                            {netGoals}
+                            {roleTag}
                           </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#181c20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {/* Info partita */}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {g.venue === 'home' ? 'vs ' : g.venue === 'away' ? '@ ' : ''}{g.opponent}
                               {scoreStr && <span style={{ marginLeft: 6, color: '#5c6773', fontWeight: 600 }}>({scoreStr})</span>}
                             </div>
-                            <div style={{ fontSize: 11, color: '#7a8290', marginTop: 1 }}>
-                              {dateStr}
-                              {g.penalties_scored > 0 && (
-                                <span style={{ marginLeft: 6, color: '#004a78', fontWeight: 700 }}>
-                                  · {g.penalties_scored} rig.
+                            <div style={{ fontSize: 10.5, color: '#7a8290', marginTop: 1, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <span>{dateStr}</span>
+                              {/* Range minuti effettivo se subentrato o sostituito */}
+                              {(g.minute_in != null && g.minute_in > 0) || g.minute_out != null ? (
+                                <span style={{ color: '#404751' }}>
+                                  {g.minute_in ?? 0}′-{g.minute_out ?? g.team_total_minutes}′
                                 </span>
-                              )}
+                              ) : null}
                             </div>
+                          </div>
+                          {/* Stats compatte a destra: min | gol | assist */}
+                          <div style={{ display: 'flex', gap: 5, alignItems: 'stretch' }}>
+                            <StatCell value={String(g.minutes_played)} suffix="′" color="#006e25" title="Minuti giocati" />
+                            {netGoals > 0 && (
+                              <StatCell
+                                value={String(netGoals)}
+                                suffix={g.penalties_scored > 0 ? `⚽${g.penalties_scored > 0 ? '*' : ''}` : '⚽'}
+                                color="#b3005c"
+                                title={g.penalties_scored > 0 ? `${g.goals} su azione + ${g.penalties_scored} rig.` : 'Gol'}
+                              />
+                            )}
+                            {g.assists > 0 && (
+                              <StatCell value={String(g.assists)} suffix="🅰" color="#7a0071" title="Assist" />
+                            )}
                           </div>
                         </div>
                       )
@@ -588,4 +659,51 @@ function InfoTile({ label, value, action, icon }: { label: string; value: string
     return <a href={action} style={style}>{content}</a>
   }
   return <div style={style}>{content}</div>
+}
+
+/**
+ * KPI compatto usato nella griglia riepilogo stats stagione.
+ * Grande valore centrale (font Anybody), label sotto e sub-label per dettaglio.
+ * Sfondo pastello con la variante del colore passato come prop.
+ */
+function StatKpi({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+  return (
+    <div style={{
+      background: `${color}14`,  // hex + alpha 8% per pastello leggero
+      border: `1px solid ${color}30`,
+      borderRadius: 10, padding: '8px 6px 6px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+      minWidth: 0,
+    }}>
+      <div style={{ fontFamily: 'Anybody', fontWeight: 900, fontSize: 22, color, lineHeight: 1 }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 9.5, fontWeight: 800, color: '#404751', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 9, color: '#7a8290', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+        {sub}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Cella statistica compatta usata nella riga per singola partita (a destra dopo il nome).
+ * Valore + suffisso (es. "72′" oppure "2⚽"). Colorata per dominio.
+ */
+function StatCell({ value, suffix, color, title }: { value: string; suffix: string; color: string; title?: string }) {
+  return (
+    <div title={title} style={{
+      background: `${color}14`,
+      border: `1px solid ${color}30`,
+      borderRadius: 6, padding: '3px 6px',
+      display: 'flex', alignItems: 'center', gap: 2,
+      fontSize: 11, fontWeight: 800, color,
+      whiteSpace: 'nowrap',
+    }}>
+      <span>{value}</span>
+      <span style={{ fontSize: 10, opacity: 0.85 }}>{suffix}</span>
+    </div>
+  )
 }

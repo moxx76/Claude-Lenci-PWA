@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.81'
+export const APP_VERSION = '1.9.82'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.82',
+    date: '2026-09-22',
+    title: 'Scheda giocatore: presenze, gol, assist e minuti giocati per singola partita',
+    fixes: [
+      'La scheda personale del giocatore (PlayerDetailSheet) mostrava solo la storia dei gol. Ora mostra la vista completa "Statistiche stagione" con 4 KPI aggregati (Presenze / Gol / Assist / Minuti) e la lista partita-per-partita di ogni presenza (titolare o subentro) con badge TIT/SUB, range minuti in-out, gol, assist e minuti effettivi giocati',
+      'Calcolo minuti giocati robusto per singola partita: titolare fino alla fine = durata totale (2\u00d735=70\u2019 per U14, 2\u00d745=90\u2019 per Juniores, ecc.); titolare sostituito al min X = X; subentrato al min Y fino alla fine = totale − Y; subentrato al min Y sostituito al min Z = Z − Y. La durata partita arriva dal join con teams (fallback 90 minuti). Media minuti per presenza mostrata come sub-label del KPI',
+      'Nessuna migration DB necessaria: tutti i dati (goals, assists, minute_in, minute_out, was_starter) erano gi\u00e0 salvati correttamente in match_player_stats dal referto post-partita e dalla distinta tattica. Mancava solo la vista aggregata sul lato giocatore. Verificato lo stato: gi\u00e0 40 giocatori con 114 righe di stats storiche, quindi la scheda comincia a essere significativa da subito',
+    ],
+  },
   {
     version: '1.9.81',
     date: '2026-09-22',
