@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.83'
+export const APP_VERSION = '1.9.84'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.84',
+    date: '2026-09-22',
+    title: 'Dashboard mister: filtri (ricerca, ruolo, stato) e confronto giocatori side-by-side',
+    fixes: [
+      'Nuova barra filtri sopra la tabella "Statistiche giocatori": ricerca testuale su nome/cognome (con pulsante clear), chip ruolo (🧤Portieri / 🛡️Difensori / ⚙️Centrocampisti / ⚔️Attaccanti) e chip stato (✅Attivi / 👻Mai giocato). I filtri si combinano in AND; contatore "N su M" mostra quanti giocatori restano visibili. Empty-state con pulsante "Azzera filtri" se la selezione svuota la lista',
+      'Confronto tra 2 giocatori: nuova colonna checkbox nella prima posizione della tabella. Tappa la casella per aggiungere un giocatore al confronto (max 2, il 3° espelle il pi\u00f9 vecchio in FIFO). La riga selezionata resta evidenziata in azzurro. Appare una barra blu in basso al box con i cognomi selezionati e il pulsante "Confronta →"',
+      'Vista confronto (bottom sheet dedicato): 2 card header con numero maglia, cognome, nome, ruolo e contatore "N vinte". Sotto, griglia di 11 KPI a colonne affiancate (Presenze, Titolarit\u00e0, Subentri, %, Minuti tot, Media min/presenza, Gol, Media gol/presenza, Assist, 🟨, 🟥). Il valore migliore di ogni riga viene evidenziato in verde. Per cartellini vince chi ne ha meno (logica invertita). Include metriche derivate (medie) per confronto equo anche tra giocatori con numero di partite diverso',
+    ],
+  },
   {
     version: '1.9.83',
     date: '2026-09-22',
