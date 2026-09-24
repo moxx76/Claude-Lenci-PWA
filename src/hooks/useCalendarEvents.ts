@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { sortTeamsByAge } from '../lib/teamOrder'
 
-export type EventKind = 'training' | 'match' | 'tournament' | 'marketing'
+export type EventKind = 'training' | 'match' | 'tournament' | 'marketing' | 'meeting'
 
 export interface CalendarEvent {
   id: string
@@ -97,14 +97,30 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
       if (to) marketingQuery = marketingQuery.lte('event_date', to)
       marketingQuery = marketingQuery.order('event_date').limit(limit)
 
-      const [trainingsSettled, matchesSettled, marketingSettled] = await Promise.allSettled([
+      // 5. Meetings (RLS filtra già in base ad audience/team_ids)
+      let meetingsQuery = supabase
+        .from('meetings')
+        .select('*')
+        .gte('meeting_date', from)
+      if (to) meetingsQuery = meetingsQuery.lte('meeting_date', to)
+      // Se è specificato un teamId filtriamo: la riunione appare se non è team-specific
+      // (team_ids null/empty = riunione per tutte le squadre) o se include quel team.
+      // NB: PostgREST supporta il filter 'cs' (contains) su array.
+      if (teamId) {
+        meetingsQuery = meetingsQuery.or(`team_ids.is.null,team_ids.cs.{${teamId}}`)
+      }
+      meetingsQuery = meetingsQuery.order('meeting_date').order('start_time').limit(limit)
+
+      const [trainingsSettled, matchesSettled, marketingSettled, meetingsSettled] = await Promise.allSettled([
         trainingsQuery,
         matchesQuery,
         marketingQuery,
+        meetingsQuery,
       ])
       const trainingsRes = trainingsSettled.status === 'fulfilled' ? trainingsSettled.value : { data: [], error: trainingsSettled.reason }
       const matchesRes   = matchesSettled.status   === 'fulfilled' ? matchesSettled.value   : { data: [], error: matchesSettled.reason }
       const marketingRes = marketingSettled.status === 'fulfilled' ? marketingSettled.value : { data: [], error: marketingSettled.reason }
+      const meetingsRes  = meetingsSettled.status  === 'fulfilled' ? meetingsSettled.value  : { data: [], error: meetingsSettled.reason }
 
       const errs: string[] = []
       if ((trainingsRes as any).error) errs.push('trainings: ' + ((trainingsRes as any).error.message ?? 'errore'))
@@ -201,6 +217,40 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
         })
       }
 
+      // Meetings: mostrate come card evento nel calendario per chi rientra nell'audience.
+      // Se team_ids è valorizzato, mostro il nome della prima squadra come "team" della card
+      // (per il colore/etichetta); altrimenti resta neutra col colore blu di default.
+      for (const mt of (meetingsRes.data ?? []) as any[]) {
+        const firstTeamId = Array.isArray(mt.team_ids) && mt.team_ids.length > 0 ? mt.team_ids[0] : null
+        const firstTeam = firstTeamId ? teamsMap.get(firstTeamId) : null
+        // Etichetta più utile per il titolo card: se è multiplo, aggiungo "+N"
+        const teamsLabel = Array.isArray(mt.team_ids) && mt.team_ids.length > 1
+          ? `${firstTeam?.name || 'Squadra'} +${mt.team_ids.length - 1}`
+          : (firstTeam?.name || null)
+        norm.push({
+          id: `meeting-${mt.id}`,
+          kind: 'meeting',
+          date: mt.meeting_date,
+          startTime: (mt.start_time as string)?.slice(0, 5) || '',
+          endTime: (mt.end_time as string)?.slice(0, 5) || null,
+          title: mt.title,
+          location: mt.location,
+          address: null,
+          teamId: firstTeamId,
+          teamName: teamsLabel,
+          teamCategory: firstTeam?.category || null,
+          // Colore: personalizzato se impostato, altrimenti viola per interne, blu per esterne
+          teamColor: mt.color || (mt.kind === 'external' ? '#005f98' : '#7a0071'),
+          opponent: null,
+          venue: null,
+          competition: null,
+          focus: null,
+          notes: mt.notes || mt.description,
+          marketingCategory: null,
+          raw: mt,
+        })
+      }
+
       // Ordina
       norm.sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date)
@@ -237,5 +287,7 @@ export function eventBadgeStyle(kind: EventKind): { bg: string; color: string; l
       return { bg: 'rgba(255,209,0,0.25)', color: '#8e6300', label: 'Torneo', icon: 'emoji_events' }
     case 'marketing':
       return { bg: '#f4d0f2', color: '#7a0071', label: 'Evento club', icon: 'campaign' }
+    case 'meeting':
+      return { bg: '#e6dbf5', color: '#4a1e78', label: 'Riunione', icon: 'groups' }
   }
 }

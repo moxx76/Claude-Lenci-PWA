@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.91'
+export const APP_VERSION = '1.9.92'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.92',
+    date: '2026-09-24',
+    title: 'Nuovo tipo evento nel calendario: Riunioni (interne staff / esterne genitori)',
+    fixes: [
+      'Nuova tabella meetings + policy RLS + helper user_in_meeting_audience. Le riunioni vengono create dal calendario da chi ha ruolo admin, direttore o dirigente (is_manager). Due tipi: INTERNE con audience selezionabile (allenatori / dirigenti / tutto lo staff) o ESTERNE per i genitori. In entrambi i casi è possibile filtrare per squadre specifiche (una o più) o lasciare il filtro vuoto per raggiungere tutto il club',
+      'Nella pagina Calendario appare un nuovo pulsante viola "Riunione" accanto al pulsante blu "Evento" (visibile solo ai ruoli abilitati). Al click apre il MeetingEditSheet con: tipo (Interna/Esterna), destinatari staff con checkbox, chip squadre target, titolo, data, orari, luogo, link online (Meet/Zoom/Teams), descrizione/ordine del giorno. Le riunioni compaiono poi nel calendario come card viola con icona groups (interne) o blu con family_restroom (esterne), etichetta "Riunione", ed è possibile modificarle/eliminarle tappando sul pulsante di modifica',
+      'Notifiche automatiche: alla creazione di una riunione, un trigger DB genera automaticamente notifiche in-app per ogni destinatario nell\'audience (esclude il creatore). Il trigger send_push_on_notification esistente inoltra anche la push notification agli utenti con notifiche abilitate. Test verificato: creando una riunione staff per l\'Under 14 sono state generate 13 notifiche (4 staff U14 + admin/director del club)',
+      'RLS blindata: gli utenti vedono nel calendario solo le riunioni per cui rientrano nell\'audience (via helper user_in_meeting_audience). Admin/director vedono tutto per moderazione. Solo il creatore, admin e director possono modificare/eliminare una riunione. Tutti i controlli sono a livello DB, non solo UI',
+    ],
+  },
   {
     version: '1.9.91',
     date: '2026-09-22',

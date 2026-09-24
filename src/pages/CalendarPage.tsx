@@ -9,6 +9,7 @@ import { Icon } from '../components/Icon'
 import { AttendanceSheet } from '../components/AttendanceSheet'
 import { CalendarSubscribeSheet } from '../components/CalendarSubscribeSheet'
 import { EventEditSheet } from '../components/EventEditSheet'
+import { MeetingEditSheet } from '../components/MeetingEditSheet'
 import { PostMatchSheet, type PostMatchData } from '../components/PostMatchSheet'
 import { TeamPickerSheet } from '../components/TeamPickerSheet'
 import { TeamTrainingHistorySheet } from '../components/TeamTrainingHistorySheet'
@@ -82,6 +83,10 @@ export function CalendarPage() {
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editExistingEvent, setEditExistingEvent] = useState<any>(null)
+  // Riunioni (meetings): sheet + existing separati da quelli allenamento/partita
+  // perché usano un componente dedicato (MeetingEditSheet)
+  const [meetingSheetOpen, setMeetingSheetOpen] = useState(false)
+  const [meetingExisting, setMeetingExisting] = useState<any>(null)
   const [programOpen, setProgramOpen] = useState(false)
   const [programEvent, setProgramEvent] = useState<CalendarEvent | null>(null)
   const [parentRespOpen, setParentRespOpen] = useState(false)
@@ -124,6 +129,11 @@ export function CalendarPage() {
 
   const isStaff = isAdmin(profile?.role) || isCoach(profile?.role)
   const canWrite = isStaff && !profile?.is_readonly
+  // Riunioni: solo admin, director, dirigenti (is_manager). Un allenatore puro senza
+  // ruolo dirigente non può creare/modificare riunioni.
+  const canCreateMeeting = !profile?.is_readonly && (
+    isAdmin(profile?.role) || !!profile?.is_director || !!profile?.is_manager
+  )
   const { events, teams, loading, error, refresh } = useCalendarEvents({
     teamId: effectiveTeamId,
     limit: 200,
@@ -304,6 +314,17 @@ export function CalendarPage() {
   }
 
   const openEdit = async (event: CalendarEvent) => {
+    // Meetings: aprono un sheet dedicato (MeetingEditSheet) invece che EventEditSheet
+    if (event.kind === 'meeting') {
+      const raw = event.raw || {}
+      if (!raw.id) { console.error('Missing raw.id for meeting', event); return }
+      // Fetch fresco per avere audience/team_ids aggiornati
+      const { data, error } = await supabase.from('meetings').select('*').eq('id', raw.id).maybeSingle()
+      if (error || !data) { console.error('Errore fetch meeting per edit:', error); return }
+      setMeetingExisting(data)
+      setMeetingSheetOpen(true)
+      return
+    }
     // Tournament è comunque un record 'matches' con competition=Torneo → tratto come match
     const isMatchLike = event.kind === 'match' || event.kind === 'tournament'
     if (event.kind !== 'training' && !isMatchLike) return
@@ -391,6 +412,24 @@ export function CalendarPage() {
           >
             <Icon name="add" size={16} color="#fff" />
             Evento
+          </button>
+        )}
+        {canCreateMeeting && (
+          <button
+            onClick={() => { setMeetingExisting(null); setMeetingSheetOpen(true) }}
+            title="Crea una riunione (interna staff o esterna genitori)"
+            style={{
+              flexShrink: 0,
+              background: 'linear-gradient(135deg, #7a0071, #a71a9a)',
+              color: '#fff', border: 'none', borderRadius: 12,
+              padding: '10px 14px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit',
+              boxShadow: '0 4px 12px rgba(122,0,113,0.2)',
+            }}
+          >
+            <Icon name="groups" size={16} color="#fff" />
+            Riunione
           </button>
         )}
       </div>
@@ -616,6 +655,17 @@ export function CalendarPage() {
         existingEvent={editExistingEvent}
         onSaved={() => { refresh?.(); setHistoryReloadTick(t => t + 1) }}
         onDeleted={() => { refresh?.(); setHistoryReloadTick(t => t + 1) }}
+      />
+
+      {/* Sheet dedicato per riunioni (crea/modifica). Il salvataggio triggera
+          il refresh del calendario così la nuova/modificata riunione appare subito. */}
+      <MeetingEditSheet
+        open={meetingSheetOpen}
+        onClose={() => setMeetingSheetOpen(false)}
+        clubId={profile?.club_id || ''}
+        currentUserId={profile?.id ?? null}
+        existing={meetingExisting}
+        onSaved={() => { refresh?.() }}
       />
 
       {/* Report post-partita (staff, dal calendario) */}
