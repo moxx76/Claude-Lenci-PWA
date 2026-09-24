@@ -40,11 +40,16 @@ interface PlayerAggregate {
   assists: number
   yellows: number
   reds: number
+  // Metrica di efficienza realizzativa: minuti giocati per ogni gol segnato
+  // (gol totali = goals + penalties). Null se il giocatore non ha ancora
+  // segnato (evita divisione per zero e nella tabella si mostra come "—").
+  // Interpretazione: pi\u00f9 basso = pi\u00f9 efficiente ("segna ogni N minuti").
+  minutiPerGol: number | null
 }
 
 type SortKey =
   | 'name' | 'presenze' | 'percent' | 'minuti'
-  | 'goals' | 'assists' | 'yellows' | 'reds'
+  | 'goals' | 'assists' | 'yellows' | 'reds' | 'minPerGoal'
 
 interface Props {
   teamId: string
@@ -196,6 +201,13 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
         }
         const presenzeTot = agg.titolare + agg.subentro
         const percent = totalMatches > 0 ? Math.round((presenzeTot / totalMatches) * 100) : 0
+        const totGoals = agg.goals + agg.penalties
+        // Minuti per gol: solo se ha segnato almeno una volta E ha minuti > 0.
+        // Se ha segnato senza aver giocato (edge case, ma teoricamente possibile per
+        // errore di data-entry), consideralo null per non stampare "0 min per gol".
+        const minutiPerGol = (totGoals > 0 && agg.minuti > 0)
+          ? Math.round(agg.minuti / totGoals)
+          : null
         return {
           playerId: p.id,
           lastName: p.last_name,
@@ -212,6 +224,7 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
           assists: agg.assists,
           yellows: agg.yellows,
           reds: agg.reds,
+          minutiPerGol,
         }
       })
       setAggregates(rows)
@@ -249,6 +262,17 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
         case 'assists': return dir * (a.assists - b.assists)
         case 'yellows': return dir * (a.yellows - b.yellows)
         case 'reds': return dir * (a.reds - b.reds)
+        case 'minPerGoal': {
+          // Chi non ha segnato (null) va sempre in fondo, indipendentemente
+          // dalla direzione: non ha senso mostrare "0 gol" tra i migliori attaccanti.
+          if (a.minutiPerGol == null && b.minutiPerGol == null) return 0
+          if (a.minutiPerGol == null) return 1
+          if (b.minutiPerGol == null) return -1
+          // NB: pi\u00f9 BASSO = pi\u00f9 efficiente, quindi asc = migliori in cima.
+          // Uso il dir "logico opposto" per far s\u00ec che desc metta i migliori in cima
+          // come fanno le altre colonne (dove desc = valore pi\u00f9 alto = "meglio").
+          return -dir * (a.minutiPerGol - b.minutiPerGol)
+        }
       }
     })
     return arr
@@ -480,6 +504,7 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
                       <ThCell onClick={() => toggleSort('percent')} active={sortKey==='percent'} dir={sortDir}>%</ThCell>
                       <ThCell onClick={() => toggleSort('minuti')} active={sortKey==='minuti'} dir={sortDir}>Min</ThCell>
                       <ThCell onClick={() => toggleSort('goals')} active={sortKey==='goals'} dir={sortDir}>Gol</ThCell>
+                      <ThCell onClick={() => toggleSort('minPerGoal')} active={sortKey==='minPerGoal'} dir={sortDir}>Min/G</ThCell>
                       <ThCell onClick={() => toggleSort('assists')} active={sortKey==='assists'} dir={sortDir}>Ast</ThCell>
                       <ThCell onClick={() => toggleSort('yellows')} active={sortKey==='yellows'} dir={sortDir}>🟨</ThCell>
                       <ThCell last onClick={() => toggleSort('reds')} active={sortKey==='reds'} dir={sortDir}>🟥</ThCell>
@@ -571,6 +596,16 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
                             )}
                           </TdCell>
                           <TdCell>
+                            {r.minutiPerGol != null ? (
+                              <>
+                                <span style={{ fontWeight: 700, color: '#b3005c' }}>{r.minutiPerGol}</span>
+                                <span style={{ fontSize: 9.5, color: '#8993a3' }}>′</span>
+                              </>
+                            ) : (
+                              <span style={{ color: '#c8ccd4' }}>—</span>
+                            )}
+                          </TdCell>
+                          <TdCell>
                             <span style={{ fontWeight: 800, color: r.assists > 0 ? '#7a0071' : '#c8ccd4' }}>
                               {r.assists}
                             </span>
@@ -599,6 +634,7 @@ export function CoachPlayerStatsDashboard({ teamId, teamColor, categoryName }: P
                   <strong>Pres.</strong> = titolare + subentri (T = titolare) &nbsp;·&nbsp;
                   <strong>%</strong> = presenze / partite disputate ({totalMatchesPlayed}) &nbsp;·&nbsp;
                   <strong>Gol</strong> include rigori (* se ce ne sono) &nbsp;·&nbsp;
+                  <strong>Min/G</strong> = minuti giocati per ogni gol (più basso = più efficiente) &nbsp;·&nbsp;
                   tap sul nome per il dettaglio · spunta la casella a sinistra per confrontare 2 giocatori
                 </div>
               </div>
@@ -780,6 +816,18 @@ function CompareView({ a, b, accent, totalMatches }: {
     { label: 'Media min/presenza', valA: aMinPerPres, valB: bMinPerPres, wins: winner(aMinPerPres, bMinPerPres), suffix: '′' },
     { label: 'Gol', valA: aTotGoals, valB: bTotGoals, wins: winner(aTotGoals, bTotGoals) },
     { label: 'Media gol/presenza', valA: aGolPerPres, valB: bGolPerPres, wins: winner(parseFloat(aGolPerPres), parseFloat(bGolPerPres)) },
+    // Minuti per gol: qui vince chi ne ha MENO (più efficiente).
+    // Se uno dei due non ha segnato (null), l'altro vince automaticamente.
+    // Se nessuno dei due ha segnato, pareggio "tie".
+    {
+      label: 'Min per gol',
+      valA: a.minutiPerGol != null ? `${a.minutiPerGol}′` : '—',
+      valB: b.minutiPerGol != null ? `${b.minutiPerGol}′` : '—',
+      wins: (a.minutiPerGol == null && b.minutiPerGol == null) ? 'tie'
+        : a.minutiPerGol == null ? 'b'
+        : b.minutiPerGol == null ? 'a'
+        : winner(a.minutiPerGol, b.minutiPerGol, false),
+    },
     { label: 'Assist', valA: a.assists, valB: b.assists, wins: winner(a.assists, b.assists) },
     { label: '🟨 Ammonizioni', valA: a.yellows, valB: b.yellows, wins: winner(a.yellows, b.yellows, false) },
     { label: '🟥 Espulsioni', valA: a.reds, valB: b.reds, wins: winner(a.reds, b.reds, false) },

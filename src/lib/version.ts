@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.87'
+export const APP_VERSION = '1.9.88'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.88',
+    date: '2026-09-22',
+    title: 'Dashboard mister: nuova colonna "Min/G" — minuti giocati per ogni gol',
+    fixes: [
+      'Nella tabella statistiche giocatori aggiunta la colonna "Min/G" tra Gol e Assist: quanti minuti giocati servono per ogni gol segnato (più basso = più efficiente). Un giocatore che non ha ancora segnato mostra "—" e finisce sempre in fondo all\'ordinamento indipendentemente da asc/desc. Header cliccabile per ordinare i migliori bomber per efficienza. Test Under 14: Mantovani Nicolò 45\'/gol, Magnotta Diego 48\', Tedesco Nicolas 59\'',
+      'Vista confronto giocatori (bottom sheet): nuova riga "Min per gol" tra Gol e Assist. Vince chi ha il numero più basso (più efficiente); se uno dei due non ha segnato l\'altro vince automaticamente. Se nessuno ha segnato è pareggio. Aiuta a distinguere tra "prolifico ma gioca sempre" (tanti gol, tanti minuti) e "cecchino subentrato" (pochi gol ma in pochi minuti)',
+      'Legenda in fondo alla tabella aggiornata con la spiegazione della nuova metrica',
+    ],
+  },
   {
     version: '1.9.87',
     date: '2026-09-22',
