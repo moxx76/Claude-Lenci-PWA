@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.79'
+export const APP_VERSION = '1.9.80'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.80',
+    date: '2026-09-22',
+    title: 'Fix 3 bug ruolo Dirigente: autoesclusione, multi-categoria calendari, convocazioni cross-team',
+    fixes: [
+      'BUG 1 (Squadre): un dirigente poteva selezionare "Nessuno" nel proprio ruolo di Dirigente accompagnatore nella schermata Modifica squadra e perdere l\u2019accesso alla propria squadra. Ora bloccato lato frontend (messaggio "Non puoi rimuovere la tua assegnazione alla squadra. Contatta un amministratore.") E lato backend con un trigger BEFORE UPDATE sulla tabella teams che verifica per non-admin che almeno uno dei 6 ruoli (head/assistant/helper coach + team/second/third manager) resti assegnato all\u2019utente corrente se ci era prima. Gli admin possono modificare senza limiti',
+      'BUG 2 (Calendario): un dirigente assegnato a due categorie vedeva nel Calendario solo la prima squadra (nessun modo di switchare). Causa: CalendarPage usava useMyTeam().myTeam (singolare, prima squadra) invece di myTeams (array). Ora se lo staff ha \u2265 2 squadre assegnate compare il selettore squadra in cima alla pagina (lo stesso usato dagli admin, ma filtrato solo sulle squadre a cui l\u2019utente ha accesso — senza opzione "Tutte le squadre" che sarebbe fuorviante). Passare da una squadra all\u2019altra ricarica gli eventi correnti; creare/modificare eventi finisce sempre nella squadra selezionata',
+      'BUG 3 (Convocazioni): la funzione "Da altra categoria" ritornava elenco vuoto per i dirigenti (funzionava solo per gli admin). Causa: le RLS su players filtravano su team_id IN my_team_ids() per gli staff, impedendo la lettura di giocatori di altre categorie. Aggiunta nuova policy SELECT permissiva ("staff legge tutti i giocatori per convocazioni cross-team") che consente a qualsiasi coach/dirigente di LEGGERE anagrafiche di tutti i giocatori del club per formare convocazioni miste. Le operazioni INSERT/UPDATE/DELETE restano ristrette ai propri team — nessun cambio di permessi di gestione',
+    ],
+  },
   {
     version: '1.9.79',
     date: '2026-09-22',

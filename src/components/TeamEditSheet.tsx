@@ -3,6 +3,8 @@ import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
 import { DURATION_PRESETS } from '../lib/matchDuration'
+import { useAuth } from '../store/auth'
+import { isAdmin } from '../lib/types'
 
 interface Profile { id: string; full_name: string | null; email: string }
 
@@ -44,6 +46,9 @@ interface Props {
 const PRESET_COLORS = ['#005f98', '#c1006c', '#00a86b', '#ff6b00', '#7a0071', '#8e6300', '#404751', '#e64a19']
 
 export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete = true, onSaved, onDeleted }: Props) {
+  const { profile } = useAuth()
+  const userIsAdmin = isAdmin(profile?.role)
+  const currentUserId = profile?.id
   const isEdit = !!existingTeam
   const [name, setName] = useState('')
   const [category, setCategory] = useState('U-13')
@@ -159,6 +164,32 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Il nome della squadra è obbligatorio'); return }
+    // BUG 1 FIX: guard frontend contro l'autoesclusione dai propri ruoli.
+    // Se un non-admin era assegnato a uno dei 6 ruoli sulla squadra e la modifica
+    // lo rimuoverebbe da TUTTI, blocco il save senza fare la round-trip al backend
+    // (dove comunque c'è il trigger prevent_self_removal_from_team come rete di sicurezza).
+    if (!userIsAdmin && currentUserId && isEdit && existingTeam) {
+      const wasAssigned = (
+        existingTeam.head_coach_id === currentUserId
+        || existingTeam.assistant_coach_id === currentUserId
+        || existingTeam.helper_coach_id === currentUserId
+        || existingTeam.team_manager_id === currentUserId
+        || existingTeam.second_manager_id === currentUserId
+        || existingTeam.third_manager_id === currentUserId
+      )
+      const willStayAssigned = (
+        headCoachId === currentUserId
+        || assistantCoachId === currentUserId
+        || helperCoachId === currentUserId
+        || teamManagerId === currentUserId
+        || secondManagerId === currentUserId
+        || thirdManagerId === currentUserId
+      )
+      if (wasAssigned && !willStayAssigned) {
+        setError('Non puoi rimuovere la tua assegnazione alla squadra. Contatta un amministratore.')
+        return
+      }
+    }
     setSaving(true)
     setError(null)
     try {

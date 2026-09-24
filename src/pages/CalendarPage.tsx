@@ -57,7 +57,11 @@ interface MatchBreakdown { yes: number; no: number; maybe: number; played: numbe
 
 export function CalendarPage() {
   const { profile } = useAuth()
-  const { myTeam } = useMyTeam()
+  // BUG 2 FIX: prima si usava `myTeam` (singolare) → un dirigente/coach con più squadre
+  // vedeva solo il calendario della PRIMA squadra restituita dal hook, senza modo di
+  // switchare. Ora uso `myTeams` (array) e lascio attivo il teamFilter esistente,
+  // così può scegliere tra tutte le squadre a cui è assegnato.
+  const { myTeam, myTeams } = useMyTeam()
   const { showToast } = useToast()
   const [searchParams] = useSearchParams()
   const initialFilter: FilterKey = (() => {
@@ -101,12 +105,22 @@ export function CalendarPage() {
   const [postMatchData, setPostMatchData] = useState<PostMatchData | null>(null)
   const [distintaMatch, setDistintaMatch] = useState<DistintaTatticaData | null>(null)
 
-  // Se coach con squadra assegnata → filtro automatico e nascondi chips
-  // È un membro staff (coach o dirigente) associato a una singola squadra?
+  // Se coach/dirigente con squadra assegnata → filtro automatico e nascondi chips
+  // È un membro staff (coach o dirigente) associato ad ALMENO una squadra?
   // I dirigenti hanno is_manager=true ma role diverso da 'coach': vanno inclusi qui
   // altrimenti il planner e altri strumenti team-scoped non filtrano la loro squadra.
-  const isCoachWithTeam = (isCoach(profile?.role) || !!profile?.is_manager) && !!myTeam
-  const effectiveTeamId = isCoachWithTeam ? myTeam!.id : teamFilter
+  //
+  // BUG 2 FIX: distinguo caso single-team da multi-team.
+  //  - single-team: effectiveTeamId = quella (comportamento pre-1.9.80, chips nascoste)
+  //  - multi-team: se l'utente ha scelto via teamFilter uso quello, altrimenti default alla
+  //    prima squadra; ma il picker resta ATTIVO cosí può switchare. Chips visibili.
+  const isStaffWithTeam = (isCoach(profile?.role) || !!profile?.is_manager) && myTeams.length > 0
+  const hasMultipleTeams = isStaffWithTeam && myTeams.length > 1
+  // Se ha più team e ha scelto uno via picker → quello; altrimenti default alla prima (myTeam)
+  // Se è admin senza team assegnati → usa teamFilter normale (null = tutte)
+  const effectiveTeamId = isStaffWithTeam
+    ? (hasMultipleTeams ? (teamFilter ?? myTeam!.id) : myTeam!.id)
+    : teamFilter
 
   const isStaff = isAdmin(profile?.role) || isCoach(profile?.role)
   const canWrite = isStaff && !profile?.is_readonly
@@ -313,13 +327,19 @@ export function CalendarPage() {
 
   const grouped = groupByDate(filtered)
 
+  // BUG 2 FIX: per multi-team calcolo il team attivo così label/subscribe puntano
+  // al team correntemente selezionato (non sempre al primo di myTeams).
+  const activeTeam = isStaffWithTeam
+    ? (myTeams.find(t => t.id === effectiveTeamId) ?? myTeam)
+    : null
+
   // Determina scope + id per sottoscrizione calendario
-  const subscribeScope: 'team' | 'all' = isCoachWithTeam || teamFilter ? 'team' : 'all'
-  const subscribeScopeId: string | null = isCoachWithTeam
-    ? myTeam.id
+  const subscribeScope: 'team' | 'all' = isStaffWithTeam || teamFilter ? 'team' : 'all'
+  const subscribeScopeId: string | null = isStaffWithTeam
+    ? (activeTeam?.id ?? null)
     : teamFilter || null
-  const subscribeLabel = isCoachWithTeam
-    ? `Lenci Poirino · ${myTeam.name}`
+  const subscribeLabel = isStaffWithTeam
+    ? `Lenci Poirino · ${activeTeam?.name ?? ''}`
     : teamFilter && teams.length > 0
       ? `Lenci Poirino · ${teams.find(t => t.id === teamFilter)?.name || ''}`
       : 'ASD Lenci Poirino · Tutti gli impegni'
@@ -335,9 +355,9 @@ export function CalendarPage() {
             Calendario
           </h2>
           <p style={{ fontSize: 12.5, color: '#707882', margin: '4px 0 0' }}>
-            {isCoachWithTeam && (
-              <span style={{ color: myTeam.color || '#005f98', fontWeight: 700 }}>
-                {myTeam.name} · 
+            {isStaffWithTeam && activeTeam && (
+              <span style={{ color: activeTeam.color || '#005f98', fontWeight: 700 }}>
+                {activeTeam.name} · 
               </span>
             )}{' '}
             {filtered.length} {filtered.length === 1 ? 'evento' : 'eventi'} in programma
@@ -375,9 +395,15 @@ export function CalendarPage() {
         )}
       </div>
 
-      {/* Selettore squadra: dropdown → bottom sheet (solo admin con più squadre) */}
-      {isAdmin(profile?.role) && teams.length > 1 && (() => {
-        const selectedTeam = teamFilter ? teams.find(t => t.id === teamFilter) : null
+      {/* Selettore squadra: dropdown → bottom sheet.
+          BUG 2 FIX v1.9.80: appare anche per staff multi-team (dirigente/coach con
+          più squadre assegnate), non solo per admin. Per lo staff mostro solo le sue
+          squadre; per l'admin mostro tutte + opzione "Tutte le squadre". */}
+      {((isAdmin(profile?.role) && teams.length > 1) || hasMultipleTeams) && (() => {
+        // Per staff multi: se non c'è teamFilter, considero selezionato il myTeam (default)
+        // così il chip mostra il team attivo, non "Tutte le squadre".
+        const staffCurrentId = hasMultipleTeams ? (teamFilter ?? myTeam?.id ?? null) : teamFilter
+        const selectedTeam = staffCurrentId ? teams.find(t => t.id === staffCurrentId) : null
         const color = selectedTeam?.color || '#005f98'
         const label = selectedTeam?.name || 'Tutte le squadre'
         const sublabel = selectedTeam
@@ -600,19 +626,31 @@ export function CalendarPage() {
         onSaved={() => { refresh?.(); setHistoryReloadTick(t => t + 1) }}
       />
 
-      {/* Team picker per admin: prima riga è l'opzione "Tutte le squadre" */}
+      {/* Team picker: per admin mostra tutte le squadre + "Tutte le squadre".
+          Per staff multi-team (BUG 2 FIX v1.9.80): mostra SOLO le squadre a cui è assegnato,
+          senza opzione "Tutte" (che sarebbe fuorviante — non ha accesso a tutte le squadre). */}
       <TeamPickerSheet        open={teamPickerOpen}
         onClose={() => setTeamPickerOpen(false)}
-        teams={[
-          { id: '__all__', name: 'Tutte le squadre', color: '#005f98', category: `${teams.length} squadre visualizzate`, age_range: null, n_players: null },
-          ...teams.map(t => ({
-            id: t.id,
-            name: t.name,
-            color: t.color,
-            category: t.category,
-            age_range: null,
-            n_players: null,
-          })),
+        teams={
+          hasMultipleTeams && !isAdmin(profile?.role)
+            ? myTeams.map(t => ({
+                id: t.id,
+                name: t.name,
+                color: t.color ?? null,
+                category: t.category ?? null,
+                age_range: null,
+                n_players: null,
+              }))
+            : [
+                { id: '__all__', name: 'Tutte le squadre', color: '#005f98', category: `${teams.length} squadre visualizzate`, age_range: null, n_players: null },
+                ...teams.map(t => ({
+                  id: t.id,
+                  name: t.name,
+                  color: t.color,
+                  category: t.category,
+                  age_range: null,
+                  n_players: null,
+                })),
         ]}
         selectedId={teamFilter || '__all__'}
         onSelect={(id) => setTeamFilter(id === '__all__' ? null : id)}
