@@ -9,6 +9,7 @@ import { TrainingExerciseCatalogSheet } from './TrainingExerciseCatalogSheet'
 import { MedicalComplianceSheet } from './MedicalComplianceSheet'
 import { PresenceLogSheet } from './PresenceLogSheet'
 import { AdminStaffOverviewCard } from './AdminStaffOverviewCard'
+import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
 import { sortTeamsByAge } from '../lib/teamOrder'
 
 interface Team {
@@ -65,6 +66,7 @@ interface ExpiringPlayer {
 export function DirectorDashboard({ firstName }: { firstName: string }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
+  const [statsTeamId, setStatsTeamId] = useState<string | null>(null)
   const [upcoming, setUpcoming] = useState<UpcomingEvent[]>([])
   const [expiring, setExpiring] = useState<ExpiringPlayer[]>([])
   const [loading, setLoading] = useState(true)
@@ -249,6 +251,10 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
       announcementsTotal: annCount.count ?? 0,
     })
     setTeams(sortTeamsByAge(teamsFull))
+    // Default della squadra da mostrare nel pannello stats giocatori (una volta sola)
+    if (teamsFull.length > 0) {
+      setStatsTeamId(prev => prev ?? sortTeamsByAge(teamsFull)[0].id)
+    }
     setLoading(false)
   }
 
@@ -287,6 +293,63 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
 
       {/* Panoramica staff (presenze allenamenti/partite + servizi navetta) */}
       <AdminStaffOverviewCard />
+
+      {/* Statistiche giocatori per squadra — vista mister disponibile al direttore
+          (che, come admin, non ha una propria squadra). Card leggera per il selettore,
+          poi renderizza il componente CoachPlayerStatsDashboard (già una card con la
+          sua intestazione) per non annidare card. */}
+      {teams.length > 0 && (
+        <>
+          <div style={{
+            background: '#fff', borderRadius: 14, padding: '12px 14px',
+            boxShadow: '0 6px 16px rgba(0,120,191,0.06)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Icon name="groups" size={16} color="#005f98" />
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#005f98', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Statistiche giocatori — squadra
+              </div>
+            </div>
+            <div style={{
+              display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
+              margin: '0 -4px', padding: '0 4px 4px',
+            }}>
+              {teams.map(t => {
+                const active = t.id === statsTeamId
+                const color = t.color || '#005f98'
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setStatsTeamId(t.id)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 999,
+                      border: `1.5px solid ${active ? color : '#dfe6ef'}`,
+                      background: active ? color : '#fff',
+                      color: active ? '#fff' : '#404751',
+                      fontSize: 11.5, fontWeight: 700,
+                      cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {t.name}
+                    <span style={{ marginLeft: 6, opacity: 0.75, fontSize: 10 }}>
+                      · {t.players_count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {statsTeamId && (
+            <CoachPlayerStatsDashboard
+              teamId={statsTeamId}
+              teamColor={teams.find(t => t.id === statsTeamId)?.color || undefined}
+              categoryName={teams.find(t => t.id === statsTeamId)?.name}
+            />
+          )}
+        </>
+      )}
 
       {/* Snapshot societario */}
       <div>

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.84'
+export const APP_VERSION = '1.9.85'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.85',
+    date: '2026-09-22',
+    title: 'Dashboard admin/direttore: statistiche giocatori con selettore squadra',
+    fixes: [
+      'La dashboard "Statistiche giocatori" (con filtri e confronto introdotta in 1.9.83-84) era visibile solo al mister della singola squadra. Ora appare anche in AdminDashboard (admin senza direttore) e DirectorDashboard (admin con is_director=true), posizionata subito dopo la card "Panoramica staff", con un selettore squadra a chip scorrevoli in cima. L\'admin sceglie quale categoria vedere (Prima Squadra, Juniores, Under 16, Under 14, ecc.) e il pannello sotto ricarica automaticamente con tutti i giocatori di quella squadra, i loro filtri, il confronto e la tabella completa',
+      'Il selettore mostra il nome della squadra + numero tesserati (es. "Under 14 · 21"). Il colore del chip attivo eredita dal colore della squadra. Default: prima squadra della lista al primo caricamento, poi rimane la scelta dell\'utente per tutta la sessione',
+    ],
+  },
   {
     version: '1.9.84',
     date: '2026-09-22',

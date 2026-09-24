@@ -114,6 +114,10 @@ function AdminDashboard({ firstName }: { firstName: string }) {
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [complianceOpen, setComplianceOpen] = useState(false)
   const [presenceLogOpen, setPresenceLogOpen] = useState(false)
+  // Squadra selezionata nel pannello "Statistiche giocatori per squadra":
+  // l'admin non ha una propria squadra, quindi deve poter scegliere quale vedere.
+  // Default = prima squadra caricata (impostato via useEffect dopo load).
+  const [statsTeamId, setStatsTeamId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
 
@@ -215,6 +219,11 @@ function AdminDashboard({ firstName }: { firstName: string }) {
       leadsPending: leadsPending.count ?? 0,
     })
     setTeams(teamsWithCount)
+    // Se non è stata già scelta una squadra per il pannello stats, seleziono la prima
+    // (di solito Prima Squadra o l'unica). Se cambia poi, resta la scelta dell'utente.
+    if (teamsWithCount.length > 0) {
+      setStatsTeamId(prev => prev ?? teamsWithCount[0].id)
+    }
     setExpiringPlayers(expiringList.data ?? [])
   }
 
@@ -502,6 +511,63 @@ function AdminDashboard({ firstName }: { firstName: string }) {
 
       {/* Panoramica staff (presenze allenamenti/partite + servizi navetta) */}
       <AdminStaffOverviewCard />
+
+      {/* Selettore squadra per il pannello statistiche giocatori sotto.
+          L'admin non ha una propria squadra: sceglie quale vedere. La card sotto
+          (CoachPlayerStatsDashboard) è già una card bianca con la propria intestazione,
+          quindi qui uso una card compatta solo per il selettore, per non annidare card. */}
+      {teams.length > 0 && (
+        <>
+          <div style={{
+            background: '#fff', borderRadius: 14, padding: '12px 14px',
+            boxShadow: '0 6px 16px rgba(0,120,191,0.06)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <Icon name="groups" size={16} color="#005f98" />
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#005f98', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Statistiche giocatori — squadra
+              </div>
+            </div>
+            <div style={{
+              display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4,
+              margin: '0 -4px', padding: '0 4px 4px',
+            }}>
+              {teams.map(t => {
+                const active = t.id === statsTeamId
+                const color = t.color || '#005f98'
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setStatsTeamId(t.id)}
+                    style={{
+                      padding: '6px 12px', borderRadius: 999,
+                      border: `1.5px solid ${active ? color : '#dfe6ef'}`,
+                      background: active ? color : '#fff',
+                      color: active ? '#fff' : '#404751',
+                      fontSize: 11.5, fontWeight: 700,
+                      cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {t.name}
+                    <span style={{ marginLeft: 6, opacity: 0.75, fontSize: 10 }}>
+                      · {t.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {statsTeamId && (
+            <CoachPlayerStatsDashboard
+              teamId={statsTeamId}
+              teamColor={teams.find(t => t.id === statsTeamId)?.color || undefined}
+              categoryName={teams.find(t => t.id === statsTeamId)?.name}
+            />
+          )}
+        </>
+      )}
 
       {/* Prossimi impegni (14 giorni) */}
       <div>
