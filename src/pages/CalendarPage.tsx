@@ -10,6 +10,8 @@ import { AttendanceSheet } from '../components/AttendanceSheet'
 import { CalendarSubscribeSheet } from '../components/CalendarSubscribeSheet'
 import { EventEditSheet } from '../components/EventEditSheet'
 import { MeetingEditSheet } from '../components/MeetingEditSheet'
+import { WeekendPlannerSheet } from '../components/WeekendPlannerSheet'
+import type { WeekendPlannerData } from '../lib/weekendPlannerBuilder'
 import { PostMatchSheet, type PostMatchData } from '../components/PostMatchSheet'
 import { TeamPickerSheet } from '../components/TeamPickerSheet'
 import { TeamTrainingHistorySheet } from '../components/TeamTrainingHistorySheet'
@@ -88,6 +90,9 @@ export function CalendarPage() {
   // perché usano un componente dedicato (MeetingEditSheet)
   const [meetingSheetOpen, setMeetingSheetOpen] = useState(false)
   const [meetingExisting, setMeetingExisting] = useState<any>(null)
+  // Sheet planner weekend (PNG esportabile)
+  const [weekendPlannerOpen, setWeekendPlannerOpen] = useState(false)
+  const [weekendPlannerData, setWeekendPlannerData] = useState<WeekendPlannerData | null>(null)
   const [programOpen, setProgramOpen] = useState(false)
   const [programEvent, setProgramEvent] = useState<CalendarEvent | null>(null)
   const [parentRespOpen, setParentRespOpen] = useState(false)
@@ -548,23 +553,69 @@ export function CalendarPage() {
         />
       </div>
 
-      {/* Riga di dettaglio: solo se filtro weekend attivo, mostra le date esatte */}
+      {/* Riga di dettaglio: solo se filtro weekend attivo, mostra le date esatte
+          e il pulsante "Esporta PNG" per generare il planner grafico condivisibile */}
       {weekendOnly && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 10px', margin: '-4px 0 2px',
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 10px', margin: '-4px 0 2px',
           background: '#f8ecf6', border: '1px solid #e6c8e2', borderRadius: 8,
           fontSize: 11, fontWeight: 700, color: '#7a0071',
         }}>
           <Icon name="event" size={13} color="#7a0071" />
-          {(() => {
-            const [sat, sun] = weekendRange
-            const fmt = (iso: string) => {
-              const [y, m, d] = iso.split('-')
-              return `${d}/${m}`
-            }
-            return <>Sab {fmt(sat)} · Dom {fmt(sun)}{filter !== 'all' ? ` · solo ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}` : ''}{teamFilter && teams.find(t => t.id === teamFilter) ? ` · ${teams.find(t => t.id === teamFilter)!.name}` : ''}</>
-          })()}
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {(() => {
+              const [sat, sun] = weekendRange
+              const fmt = (iso: string) => { const [, m, d] = iso.split('-'); return `${d}/${m}` }
+              return <>Sab {fmt(sat)} · Dom {fmt(sun)}{filter !== 'all' ? ` · solo ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}` : ''}{teamFilter && teams.find(t => t.id === teamFilter) ? ` · ${teams.find(t => t.id === teamFilter)!.name}` : ''}</>
+            })()}
+          </div>
+          {/* Pulsante export: costruisce lo snapshot dei dati e apre lo sheet */}
+          <button
+            onClick={() => {
+              const [sat, sun] = weekendRange
+              const teamName = teamFilter ? (teams.find(t => t.id === teamFilter)?.name || null) : null
+              const typeLabel = filter === 'all' ? null : `Solo ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}`
+              setWeekendPlannerData({
+                saturdayISO: sat,
+                sundayISO: sun,
+                teamFilterName: teamName,
+                typeFilterLabel: typeLabel,
+                events: filtered.map(e => ({
+                  date: e.date,
+                  startTime: e.startTime,
+                  endTime: e.endTime,
+                  kind: e.kind,
+                  title: e.title || '',
+                  teamName: e.teamName,
+                  teamColor: e.teamColor,
+                  location: e.location,
+                  opponent: e.opponent,
+                  venue: (e.venue === 'home' || e.venue === 'away') ? e.venue : null,
+                  competition: e.competition,
+                })),
+              })
+              setWeekendPlannerOpen(true)
+            }}
+            style={{
+              flexShrink: 0,
+              padding: '5px 10px',
+              borderRadius: 6,
+              border: 'none',
+              background: 'linear-gradient(135deg, #7a0071, #a71a9a)',
+              color: '#fff',
+              fontSize: 10.5,
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <Icon name="image" size={12} color="#fff" />
+            Esporta PNG
+          </button>
         </div>
       )}
 
@@ -758,6 +809,13 @@ export function CalendarPage() {
         currentUserId={profile?.id ?? null}
         existing={meetingExisting}
         onSaved={() => { refresh?.() }}
+      />
+
+      {/* Sheet planner weekend PNG (formato 9:16 per WhatsApp/Instagram Stories) */}
+      <WeekendPlannerSheet
+        open={weekendPlannerOpen}
+        onClose={() => setWeekendPlannerOpen(false)}
+        data={weekendPlannerData}
       />
 
       {/* Report post-partita (staff, dal calendario) */}

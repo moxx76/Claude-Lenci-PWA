@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.94'
+export const APP_VERSION = '1.9.95'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.95',
+    date: '2026-09-25',
+    title: 'Calendario: esporta il Planner Weekend come immagine (formato Stories 9:16)',
+    fixes: [
+      'Quando è attivo il chip "Weekend" nel calendario compare, nella barra di dettaglio sotto i chip, un pulsante viola "Esporta PNG": genera un\'immagine grafica del planner del weekend in formato 1080×1920 (9:16), ottimizzata per WhatsApp Status, Instagram Stories e condivisione nel gruppo staff',
+      'L\'immagine include: header viola-blu con titolo "PLANNER WEEKEND" e nome club, chip dei filtri attivi (squadra + tipo se selezionati), sezione SABATO con card evento (orario grande, badge tipo colorato, squadra, avversario/titolo, luogo, competizione) e sezione DOMENICA identica. Se un giorno non ha impegni compare un placeholder "Nessun impegno in programma"',
+      'Il PNG rispetta esattamente i filtri già attivi nel calendario: filtro squadra → planner solo di quella squadra; filtro tipo (Allenamenti/Partite/Riunioni) → solo eventi di quel tipo. Un\'anteprima si apre in un bottom sheet con due azioni: "Condividi" (usa la Web Share API nativa su mobile per aprire WhatsApp/Instagram/altro) e "Scarica PNG" (fallback desktop)',
+      'Zero dipendenze aggiunte: tutto disegnato con Canvas 2D nativo, funziona anche offline (PWA installata). Nome file automatico "Planner_Weekend_YYYY-MM-DD[_NomeSquadra].png"',
+    ],
+  },
   {
     version: '1.9.94',
     date: '2026-09-25',
