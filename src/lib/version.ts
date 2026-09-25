@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.93'
+export const APP_VERSION = '1.9.94'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.94',
+    date: '2026-09-25',
+    title: 'Calendario: chip "Weekend" per vedere solo gli impegni del sabato/domenica',
+    fixes: [
+      'Nella barra filtri del calendario aggiunto il chip viola "Weekend" (a destra dopo un separatore, perché è un filtro temporale non di categoria): quando attivo, mostra SOLO gli eventi del prossimo weekend (o corrente se siamo già in sab/dom). La regola di calcolo: lun→gio = weekend prossimo, ven = sab+dom successivi, sab = oggi + domani, dom = ieri + oggi',
+      'Il chip Weekend è combinabile con TUTTI gli altri filtri: se hai selezionato una squadra dall\'alto e il chip "Allenamenti", attivando Weekend vedi solo gli allenamenti di quella squadra nel weekend. Sotto la barra chip appare una riga di dettaglio "Sab DD/MM · Dom DD/MM" con anche il filtro tipo e la squadra attiva, così sai esattamente cosa stai guardando',
+      'Empty state dedicato: se non ci sono impegni per il weekend selezionato compare il messaggio "Nessun impegno per il weekend Sab DD/MM · Dom DD/MM (rispetto ai filtri attivi)" con un pulsante veloce "Rimuovi filtro weekend" per tornare alla vista completa',
+    ],
+  },
   {
     version: '1.9.93',
     date: '2026-09-24',

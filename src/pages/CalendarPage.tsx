@@ -140,11 +140,52 @@ export function CalendarPage() {
     limit: 200,
   })
 
+  // Toggle "solo weekend": mostra solo gli eventi del weekend prossimo
+  // (o corrente se siamo già in sabato/domenica). Utile per un planner
+  // rapido dei soli sab/dom da appendere/stampare.
+  const [weekendOnly, setWeekendOnly] = useState(false)
+
+  // Calcola l'intervallo del weekend "utile":
+  //  - Se oggi è lun→gio → weekend prossimo (sab+dom successivi)
+  //  - Se oggi è ven/sab/dom → weekend corrente (sab+dom di questa settimana)
+  // Ritorna [saturdayISO, sundayISO] come YYYY-MM-DD per confronto con event.date.
+  const weekendRange = useMemo<[string, string]>(() => {
+    const today = new Date()
+    const dow = today.getDay() // 0=Sun ... 6=Sat
+    const sat = new Date(today)
+    if (dow === 0) {
+      // domenica → sabato di ieri, domenica oggi
+      sat.setDate(today.getDate() - 1)
+    } else if (dow === 6) {
+      // sabato → oggi + domani
+      // nulla, sat = oggi
+    } else if (dow === 5) {
+      // venerdì → domani + dopodomani
+      sat.setDate(today.getDate() + 1)
+    } else {
+      // lun-gio → sabato prossimo
+      sat.setDate(today.getDate() + (6 - dow))
+    }
+    const sun = new Date(sat)
+    sun.setDate(sat.getDate() + 1)
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return [iso(sat), iso(sun)]
+  }, [weekendOnly]) // ricalcola alla riapertura del toggle (in caso di sessione lunga)
+
   const filtered = useMemo(() => {
-    if (filter === 'all') return events
-    if (filter === 'match') return events.filter(e => e.kind === 'match' || e.kind === 'tournament')
-    return events.filter(e => e.kind === filter)
-  }, [events, filter])
+    let list = events
+    // Filtro per tipo evento (Tutti/Allenamenti/Partite/Riunioni)
+    if (filter !== 'all') {
+      if (filter === 'match') list = list.filter(e => e.kind === 'match' || e.kind === 'tournament')
+      else list = list.filter(e => e.kind === filter)
+    }
+    // Filtro weekend: solo eventi con event.date in [sabato, domenica]
+    if (weekendOnly) {
+      const [sat, sun] = weekendRange
+      list = list.filter(e => e.date === sat || e.date === sun)
+    }
+    return list
+  }, [events, filter, weekendOnly, weekendRange])
 
   // Carica breakdown presenze per tutti gli allenamenti visualizzati (solo staff)
   useEffect(() => {
@@ -493,7 +534,39 @@ export function CalendarPage() {
             icon={f.icon}
           />
         ))}
+        {/* Separatore visivo tra filtri categoria e filtro temporale */}
+        <div style={{ flexShrink: 0, width: 1, background: '#e6ebf2', margin: '4px 2px' }} />
+        {/* Chip Weekend: filtro temporale, combinabile con i filtri categoria sopra.
+            Quando attivo, mostra sotto la barra le date del weekend in questione,
+            così Davide sa esattamente quale sabato/domenica sta guardando. */}
+        <FilterChip
+          active={weekendOnly}
+          onClick={() => setWeekendOnly(v => !v)}
+          label="Weekend"
+          icon="weekend"
+          accent="#a71a9a"
+        />
       </div>
+
+      {/* Riga di dettaglio: solo se filtro weekend attivo, mostra le date esatte */}
+      {weekendOnly && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px', margin: '-4px 0 2px',
+          background: '#f8ecf6', border: '1px solid #e6c8e2', borderRadius: 8,
+          fontSize: 11, fontWeight: 700, color: '#7a0071',
+        }}>
+          <Icon name="event" size={13} color="#7a0071" />
+          {(() => {
+            const [sat, sun] = weekendRange
+            const fmt = (iso: string) => {
+              const [y, m, d] = iso.split('-')
+              return `${d}/${m}`
+            }
+            return <>Sab {fmt(sat)} · Dom {fmt(sun)}{filter !== 'all' ? ` · solo ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}` : ''}{teamFilter && teams.find(t => t.id === teamFilter) ? ` · ${teams.find(t => t.id === teamFilter)!.name}` : ''}</>
+          })()}
+        </div>
+      )}
 
       {/* Bottone Planner settimanale (sempre visibile per staff) */}
       {isStaff && (
@@ -562,11 +635,29 @@ export function CalendarPage() {
         </div>
       ) : grouped.length === 0 ? (
         <div style={{ background: '#fff', borderRadius: 18, padding: 40, boxShadow: '0 10px 24px rgba(0,120,191,0.06)', textAlign: 'center' }}>
-          <Icon name="event_busy" size={40} color="#c0c7d2" />
-          <p style={{ fontSize: 13, color: '#707882', marginTop: 8 }}>Nessun evento in programma</p>
-          <p style={{ fontSize: 11, color: '#707882', marginTop: 4 }}>
-            (caricati {events.length} eventi totali, {teams.length} squadre)
+          <Icon name={weekendOnly ? 'weekend' : 'event_busy'} size={40} color="#c0c7d2" />
+          <p style={{ fontSize: 13, color: '#707882', marginTop: 8 }}>
+            {weekendOnly
+              ? `Nessun impegno per il weekend Sab ${weekendRange[0].split('-').reverse().slice(0,2).join('/')} · Dom ${weekendRange[1].split('-').reverse().slice(0,2).join('/')}`
+              : 'Nessun evento in programma'}
           </p>
+          <p style={{ fontSize: 11, color: '#707882', marginTop: 4 }}>
+            {weekendOnly
+              ? `(rispetto ai filtri attivi — caricati ${events.length} eventi totali)`
+              : `(caricati ${events.length} eventi totali, ${teams.length} squadre)`}
+          </p>
+          {weekendOnly && (
+            <button
+              onClick={() => setWeekendOnly(false)}
+              style={{
+                marginTop: 12, padding: '6px 14px', borderRadius: 999,
+                border: '1px solid #a71a9a', background: '#fff', color: '#7a0071',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Rimuovi filtro weekend
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col" style={{ gap: 18 }}>
