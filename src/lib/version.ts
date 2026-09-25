@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.92'
+export const APP_VERSION = '1.9.93'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,14 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.93',
+    date: '2026-09-24',
+    title: 'Calendario: chip filtro "Riunioni" mancante nella barra Tutti/Allenamenti/Partite',
+    fixes: [
+      'Nella barra dei filtri del calendario mancava il chip "Riunioni" (accanto a Tutti / Allenamenti / Partite). Ora aggiunto con icona groups, consente di isolare solo le riunioni dagli altri eventi. Il parametro URL ?filter=meeting è supportato per link diretti',
+    ],
+  },
   {
     version: '1.9.92',
     date: '2026-09-24',

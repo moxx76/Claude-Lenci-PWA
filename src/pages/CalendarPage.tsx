@@ -45,12 +45,13 @@ function groupByDate(events: CalendarEvent[]): Array<{ date: string; events: Cal
   return Array.from(map.entries()).map(([date, events]) => ({ date, events }))
 }
 
-type FilterKey = 'all' | 'training' | 'match'
+type FilterKey = 'all' | 'training' | 'match' | 'meeting'
 
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Tutti', icon: 'apps' },
   { key: 'training', label: 'Allenamenti', icon: 'fitness_center' },
   { key: 'match', label: 'Partite', icon: 'sports_soccer' },
+  { key: 'meeting', label: 'Riunioni', icon: 'groups' },
 ]
 
 interface AttBreakdown { present: number; absent: number; late: number; excused: number; total: number }
@@ -67,7 +68,7 @@ export function CalendarPage() {
   const [searchParams] = useSearchParams()
   const initialFilter: FilterKey = (() => {
     const q = searchParams.get('filter')
-    return q === 'training' || q === 'match' ? q : 'all'
+    return q === 'training' || q === 'match' || q === 'meeting' ? q : 'all'
   })()
   const [filter, setFilter] = useState<FilterKey>(initialFilter)
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
