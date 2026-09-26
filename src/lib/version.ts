@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.95'
+export const APP_VERSION = '1.9.96'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.96',
+    date: '2026-09-26',
+    title: 'Distinta FIGC: matricola società, vice capitano e titolari evidenziati',
+    fixes: [
+      'Nell\'header della distinta ufficiale di gara è stata aggiunta una nuova riga MATRICOLA FIGC OSPITANTE / OSPITE che riporta il numero identificativo della società rilasciato dalla FIGC. Il valore per Lenci si edita in Profilo → Impostazioni club (visibile a tutti in sola lettura, editabile solo dall\'amministratore). Per la squadra avversaria resta uno spazio da compilare a mano in campo',
+      'Nuova colonna TIT. nella tabella giocatori: mostra un pallino nero (●) accanto ai giocatori che sono titolari, in base a quanto salvato nella distinta tattica (match_player_stats.was_starter). Se la distinta tattica non è stata compilata, la colonna resta vuota e i giocatori sono ordinati come prima (portieri, poi per numero maglia). Se invece è stata compilata, i titolari appaiono in cima, poi i panchinari',
+      'Vice capitano gestito nella distinta: accanto al nome del vice capitano appare l\'etichetta "(VC)" (in grassetto come il capitano). Il capitano prevale sul vice se per errore fosse impostato entrambi. La legenda in fondo alla tabella è stata aggiornata: "● = Titolare | P = Portiere | (C) = Capitano | (VC) = Vice Capitano"',
+      'Migration DB: nuovo campo clubs.federation_code (TEXT) per la matricola FIGC della società; nessun dato esistente toccato. La fetch al momento della generazione PDF prende sia was_starter da match_player_stats sia federation_code via join teams→clubs, entrambi tolleranti agli errori (se una manca, il PDF si genera comunque con la parte assente vuota)',
+    ],
+  },
   {
     version: '1.9.95',
     date: '2026-09-25',

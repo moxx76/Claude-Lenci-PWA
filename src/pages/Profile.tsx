@@ -8,6 +8,7 @@ import { SupervisorSwitchCard } from '../components/SupervisorSwitchCard'
 import { AvatarUploader } from '../components/AvatarUploader'
 import { ChangePasswordCard } from '../components/ChangePasswordCard'
 import { StaffAttendanceStatsCard } from '../components/StaffAttendanceStatsCard'
+import { ClubSettingsCard } from '../components/ClubSettingsCard'
 import { ChangelogSheet } from '../components/ChangelogSheet'
 import { APP_VERSION } from '../lib/version'
 import { supabase } from '../lib/supabase'
@@ -179,6 +180,13 @@ export function Profile() {
 
       {/* Cambio password (tutti gli utenti loggati) */}
       <ChangePasswordCard />
+
+      {/* Impostazioni club (mostrata sempre; l'editor è editabile solo dagli admin,
+          gli altri vedono la matricola FIGC in sola lettura). Serve al momento per la
+          matricola FIGC che compare nella distinta ufficiale di gara. */}
+      {profile?.club_id && (
+        <ClubSettingsCard clubId={profile.club_id} isAdmin={profile.role === 'admin'} />
+      )}
 
       {/* Settings list */}
       <div

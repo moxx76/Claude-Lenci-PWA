@@ -16,6 +16,8 @@ export interface DistintaTeam {
   name: string
   category: string | null
   club_name: string
+  /** Matricola FIGC della società, indicata nella distinta ufficiale come identificativo del club */
+  federation_code?: string | null
 }
 
 export interface DistintaPlayer {
@@ -27,7 +29,14 @@ export interface DistintaPlayer {
   fiscal_code: string | null
   position: string | null
   is_captain: boolean
+  /** Vice capitano: mostrato con "(VC)" accanto al nome */
+  is_vice_captain?: boolean
   is_goalkeeper: boolean
+  /** True se il giocatore parte titolare (from match_player_stats.was_starter). Viene
+   *  evidenziato in tabella con un pallino nella nuova colonna "TIT.". Se in questa
+   *  partita la distinta tattica non è ancora stata compilata, tutti sono false e
+   *  la colonna resta vuota (retro-compatibile). */
+  is_starter?: boolean
 }
 
 export interface DistintaStaff {
@@ -126,6 +135,19 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
   ], boxH)
   y += boxH
 
+  // Riga dedicata alla matricola FIGC della società Lenci — identificativo
+  // ufficiale del club che va indicato in tutti i documenti federali.
+  // Il valore lato ospitante è la nostra matricola, lato ospite lasciamo
+  // uno spazio da compilare a mano (raramente riempito su distinte cartacee).
+  const ourMatricola = data.team.federation_code || '—'
+  const homeMatricola = data.match.venue === 'home' ? ourMatricola : '—'
+  const awayMatricola = data.match.venue === 'home' ? '—' : ourMatricola
+  drawInfoRow(doc, marginX, y, contentW, [
+    { label: 'MATRICOLA FIGC OSPITANTE', value: homeMatricola, width: contentW / 2 },
+    { label: 'MATRICOLA FIGC OSPITE',    value: awayMatricola, width: contentW / 2 },
+  ], boxH)
+  y += boxH
+
   drawInfoRow(doc, marginX, y, contentW, [
     { label: 'COLORI MAGLIE GIOCATORI', value: data.match.shirt_color_home || '—', width: contentW / 2 },
     { label: 'COLORI MAGLIA PORTIERE',  value: data.match.shirt_color_gk   || '—', width: contentW / 2 },
@@ -143,14 +165,17 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
   y += 6
 
   // ==== TABELLA GIOCATORI ====
-  // Colonne: # progressivo, MAGLIA, COGNOME E NOME, DATA NASCITA, MATRICOLA FIGC, DOCUMENTO
+  // Colonne: TIT (pallino se titolare), # progressivo, MAGLIA, COGNOME E NOME, DATA NASCITA, MATRICOLA FIGC, DOCUMENTO
+  // La colonna TIT viene compilata quando la distinta tattica è stata salvata
+  // (usa match_player_stats.was_starter). Se nessuno è titolare, la colonna resta vuota.
   const cols = [
+    { key: 'starter', label: 'TIT.',           w: 10, align: 'center' as const },
     { key: 'idx',   label: 'N.',              w: 10, align: 'center' as const },
-    { key: 'shirt', label: 'MAGLIA',          w: 16, align: 'center' as const },
-    { key: 'name',  label: 'COGNOME E NOME',  w: 72, align: 'left'   as const },
-    { key: 'birth', label: 'DATA NASCITA',    w: 26, align: 'center' as const },
-    { key: 'card',  label: 'MATRICOLA FIGC',  w: 30, align: 'center' as const },
-    { key: 'doc',   label: 'DOCUMENTO',       w: contentW - (10 + 16 + 72 + 26 + 30), align: 'center' as const },
+    { key: 'shirt', label: 'MAGLIA',          w: 14, align: 'center' as const },
+    { key: 'name',  label: 'COGNOME E NOME',  w: 68, align: 'left'   as const },
+    { key: 'birth', label: 'DATA NASCITA',    w: 24, align: 'center' as const },
+    { key: 'card',  label: 'MATRICOLA FIGC',  w: 28, align: 'center' as const },
+    { key: 'doc',   label: 'DOCUMENTO',       w: contentW - (10 + 10 + 14 + 68 + 24 + 28), align: 'center' as const },
   ]
   const rowH = 6.8
   const headH = 5.5
@@ -189,12 +214,18 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
       doc.line(x, y, x, y + rowH)
       let val = ''
       switch (c.key) {
+        case 'starter':
+          // Pallino nero per il titolare, altrimenti vuoto
+          val = p.is_starter ? '●' : ''
+          break
         case 'idx':   val = String(i + 1); break
         case 'shirt': val = p.shirt_number != null ? String(p.shirt_number) : ''; break
         case 'name':
-          // Prefisso solo per capitano e portiere
+          // Cognome NOME + suffissi ruoli speciali. Capitano prevale su vicecapitano
+          // (un giocatore non può essere entrambi, ma per sicurezza mostro solo (C))
           val = `${p.last_name.toUpperCase()} ${p.first_name}`
           if (p.is_captain) val = val + '  (C)'
+          else if (p.is_vice_captain) val = val + '  (VC)'
           if (p.is_goalkeeper) val = 'P  ' + val
           break
         case 'birth': val = fmtDateShort(p.birth_date); break
@@ -203,7 +234,10 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
       }
       const textX = c.align === 'center' ? x + c.w / 2 : x + 2
       const align = c.align === 'center' ? 'center' : 'left'
-      if (c.key === 'name' && p.is_captain) doc.setFont('helvetica', 'bold')
+      // Grassetto per il capitano E il vicecapitano nella colonna nome
+      // (aiuta a distinguerli a colpo d'occhio quando arbitri e dirigenti
+      // fanno l'appello). Il pallino titolare resta in normale.
+      if (c.key === 'name' && (p.is_captain || p.is_vice_captain)) doc.setFont('helvetica', 'bold')
       else doc.setFont('helvetica', 'normal')
       doc.text(val, textX, y + rowH / 2 + 1.6, { align })
       x += c.w
@@ -230,7 +264,7 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
   doc.setFontSize(7)
   doc.setTextColor(GRAY_LT)
   doc.setFont('helvetica', 'italic')
-  doc.text('P = Portiere    |    (C) = Capitano', marginX, y)
+  doc.text('● = Titolare    |    P = Portiere    |    (C) = Capitano    |    (VC) = Vice Capitano', marginX, y)
   y += 6
 
   // ==== SEZIONE STAFF ====

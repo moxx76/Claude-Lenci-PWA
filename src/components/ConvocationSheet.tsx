@@ -359,6 +359,29 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
       // Prima salva tutto
       await handleSave()
 
+      // Fetch parallelo di:
+      //   1. was_starter da match_player_stats (se la distinta tattica è stata compilata)
+      //   2. federation_code del club (matricola FIGC della società) via team → club join,
+      //      dato che ConvocationMatch non porta il club_id direttamente ma solo team_id
+      const [statsRes, teamRes] = await Promise.allSettled([
+        supabase.from('match_player_stats')
+          .select('player_id, was_starter')
+          .eq('match_id', match.id),
+        supabase.from('teams')
+          .select('club:clubs(federation_code)')
+          .eq('id', match.team_id)
+          .maybeSingle(),
+      ])
+      const starterMap = new Map<string, boolean>()
+      if (statsRes.status === 'fulfilled' && statsRes.value.data) {
+        for (const s of statsRes.value.data as any[]) {
+          starterMap.set(s.player_id, !!s.was_starter)
+        }
+      }
+      const federationCode = teamRes.status === 'fulfilled'
+        ? ((teamRes.value.data as any)?.club?.federation_code ?? null)
+        : null
+
       const pdfPlayers: DistintaPlayer[] = convocatedList
         .map(p => {
           const row = rows[p.id]
@@ -371,11 +394,16 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
             fiscal_code: p.fiscal_code,
             position: p.position,
             is_captain: !!row?.is_captain,
+            is_vice_captain: !!row?.is_vice_captain,
+            is_starter: starterMap.get(p.id) ?? false,
             is_goalkeeper: p.position === 'Portiere',
           }
         })
-        // Portieri prima, poi per numero maglia
+        // Ordinamento: prima i titolari (per ruolo poi maglia), poi le riserve.
+        // Se nessuno è titolare (distinta tattica non compilata), fallback all'ordine
+        // storico: portieri prima, poi per numero maglia.
         .sort((a, b) => {
+          if (a.is_starter !== b.is_starter) return a.is_starter ? -1 : 1
           if (a.is_goalkeeper && !b.is_goalkeeper) return -1
           if (!a.is_goalkeeper && b.is_goalkeeper) return 1
           const na = a.shirt_number ?? 999
@@ -405,6 +433,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
           name: match.team_name,
           category: match.team_category,
           club_name: CLUB_NAME,
+          federation_code: federationCode,
         },
         players: pdfPlayers,
         staff: staffList,
