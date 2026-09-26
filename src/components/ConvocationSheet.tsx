@@ -46,6 +46,9 @@ interface ConvocationRow {
   status: 'accepted' | 'declined' | 'pending'
   is_captain: boolean
   is_vice_captain: boolean
+  /** True se il giocatore parte titolare — impostato direttamente dalla convocazione,
+   *  senza dover passare dalla distinta tattica. Salvato in convocations.is_starter. */
+  is_starter: boolean
   shirt_number_override: number | null
   note: string | null
 }
@@ -105,7 +108,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
         .order('jersey_number', { nullsFirst: false })
         .order('last_name'),
       supabase.from('convocations')
-        .select('player_id, status, note, is_captain, is_vice_captain, shirt_number_override')
+        .select('player_id, status, note, is_captain, is_vice_captain, is_starter, shirt_number_override')
         .eq('match_id', match.id),
       supabase.from('teams')
         .select(`
@@ -141,6 +144,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
         status: c.status as any,
         is_captain: !!c.is_captain,
         is_vice_captain: !!(c as any).is_vice_captain,
+        is_starter: !!(c as any).is_starter,
         shirt_number_override: c.shirt_number_override,
         note: c.note,
       }
@@ -229,6 +233,8 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
         status: newStatus,
         is_captain: newStatus === 'accepted' ? (cur?.is_captain ?? false) : false,
         is_vice_captain: newStatus === 'accepted' ? (cur?.is_vice_captain ?? false) : false,
+        // Se de-convoco un titolare, perde anche il flag titolare (non ha senso mantenerlo)
+        is_starter: newStatus === 'accepted' ? (cur?.is_starter ?? false) : false,
         shirt_number_override: cur?.shirt_number_override ?? null,
         note: cur?.note ?? null,
       } }
@@ -249,7 +255,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
       }
       // Se il capitano non è nella lista (non era convocato) → convocalo
       if (!next[pid]) {
-        next[pid] = { player_id: pid, status: 'accepted', is_captain: true, is_vice_captain: false, shirt_number_override: null, note: null }
+        next[pid] = { player_id: pid, status: 'accepted', is_captain: true, is_vice_captain: false, is_starter: false, shirt_number_override: null, note: null }
       } else if (next[pid].status !== 'accepted') {
         next[pid] = { ...next[pid], status: 'accepted', is_captain: true, is_vice_captain: false }
       }
@@ -267,7 +273,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
         next[k] = { ...v, is_vice_captain: willBeVice }
       }
       if (!next[pid]) {
-        next[pid] = { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: true, shirt_number_override: null, note: null }
+        next[pid] = { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: true, is_starter: false, shirt_number_override: null, note: null }
       } else if (next[pid].status !== 'accepted') {
         next[pid] = { ...next[pid], status: 'accepted', is_vice_captain: true }
       }
@@ -275,14 +281,56 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
     })
   }
 
+  // Titolare: toggle indipendente. A differenza di Capitano/Vice non c'è una regola
+  // "uno solo": ce ne devono essere idealmente 11 (o 9/7 nelle categorie giovanili),
+  // ma qui non impongo il limite — mostro solo un contatore nell'header per feedback.
+  // Se il giocatore non è convocato, taggarlo titolare lo convoca automaticamente.
+  const toggleStarter = (pid: string) => {
+    setRows(r => {
+      const cur = r[pid]
+      const willBeStarter = !(cur?.is_starter ?? false)
+      if (!cur) {
+        return { ...r, [pid]: {
+          player_id: pid, status: 'accepted',
+          is_captain: false, is_vice_captain: false,
+          is_starter: willBeStarter,
+          shirt_number_override: null, note: null,
+        } }
+      }
+      return { ...r, [pid]: {
+        ...cur,
+        status: willBeStarter && cur.status !== 'accepted' ? 'accepted' : cur.status,
+        is_starter: willBeStarter,
+      } }
+    })
+  }
+
   const setShirtOverride = (pid: string, val: string) => {
     setRows(r => ({
       ...r,
       [pid]: {
-        ...(r[pid] || { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: false, shirt_number_override: null, note: null }),
+        ...(r[pid] || { player_id: pid, status: 'accepted', is_captain: false, is_vice_captain: false, is_starter: false, shirt_number_override: null, note: null }),
         shirt_number_override: val ? parseInt(val, 10) : null,
       },
     }))
+  }
+
+  // Aggiorna la matricola FIGC di UN giocatore direttamente da qui.
+  // La matricola è un dato del giocatore (tabella `players`), non della convocazione,
+  // quindi la persistiamo subito con UPDATE e aggiorniamo la copia locale `players`.
+  // Se saveCardNumber viene richiamato con valore vuoto o solo spazi, salva NULL
+  // (per resettarla). Errori mostrati come alert perché non ho spazio per un banner inline.
+  const saveCardNumber = async (pid: string, val: string) => {
+    const cleaned = val.trim() || null
+    // Ottimistico: aggiorno subito la UI, poi persisto
+    setPlayers(prev => prev.map(pl => pl.id === pid ? { ...pl, card_number: cleaned } : pl))
+    try {
+      const { error } = await supabase.from('players').update({ card_number: cleaned }).eq('id', pid)
+      if (error) throw error
+    } catch (e: any) {
+      alert('Errore salvataggio matricola: ' + (e?.message || 'sconosciuto'))
+      // Non annullo la modifica locale — l'utente rivedrà lo stato corretto ricaricando
+    }
   }
 
   const selectAll = () => {
@@ -294,6 +342,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
           status: 'accepted',
           is_captain: next[p.id]?.is_captain ?? false,
           is_vice_captain: next[p.id]?.is_vice_captain ?? false,
+          is_starter: next[p.id]?.is_starter ?? false,
           shirt_number_override: next[p.id]?.shirt_number_override ?? null,
           note: next[p.id]?.note ?? null,
         }
@@ -331,6 +380,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
           status: r.status,
           is_captain: r.is_captain,
           is_vice_captain: r.is_vice_captain,
+          is_starter: r.is_starter,
           shirt_number_override: r.shirt_number_override,
           note: r.note,
         }))
@@ -359,28 +409,14 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
       // Prima salva tutto
       await handleSave()
 
-      // Fetch parallelo di:
-      //   1. was_starter da match_player_stats (se la distinta tattica è stata compilata)
-      //   2. federation_code del club (matricola FIGC della società) via team → club join,
-      //      dato che ConvocationMatch non porta il club_id direttamente ma solo team_id
-      const [statsRes, teamRes] = await Promise.allSettled([
-        supabase.from('match_player_stats')
-          .select('player_id, was_starter')
-          .eq('match_id', match.id),
-        supabase.from('teams')
-          .select('club:clubs(federation_code)')
-          .eq('id', match.team_id)
-          .maybeSingle(),
-      ])
-      const starterMap = new Map<string, boolean>()
-      if (statsRes.status === 'fulfilled' && statsRes.value.data) {
-        for (const s of statsRes.value.data as any[]) {
-          starterMap.set(s.player_id, !!s.was_starter)
-        }
-      }
-      const federationCode = teamRes.status === 'fulfilled'
-        ? ((teamRes.value.data as any)?.club?.federation_code ?? null)
-        : null
+      // Fetch della matricola FIGC del club per l'header PDF (tollerante: se il campo
+       // non è impostato, PDF mostra '—'). I titolari li leggiamo direttamente da
+       // convocations.is_starter (già in `rows` state), senza query extra.
+      const teamRes = await supabase.from('teams')
+        .select('club:clubs(federation_code)')
+        .eq('id', match.team_id)
+        .maybeSingle()
+      const federationCode = ((teamRes.data as any)?.club?.federation_code ?? null)
 
       const pdfPlayers: DistintaPlayer[] = convocatedList
         .map(p => {
@@ -395,7 +431,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
             position: p.position,
             is_captain: !!row?.is_captain,
             is_vice_captain: !!row?.is_vice_captain,
-            is_starter: starterMap.get(p.id) ?? false,
+            is_starter: !!row?.is_starter,
             is_goalkeeper: p.position === 'Portiere',
           }
         })
@@ -651,6 +687,23 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
                     <Icon name="star" size={12} color="#8e6300" /> Capitano assegnato
                   </span>
                 )}
+                {/* Contatore titolari: rende visibile a colpo d'occhio se ne mancano
+                    o se ne sono stati flaggati troppi. La UI non impone il limite
+                    (le categorie giovanili giocano 7/9/11) ma lo fa notare. */}
+                {(() => {
+                  const startersCount = Object.values(rows).filter(r => r.is_starter && r.status === 'accepted').length
+                  if (startersCount === 0) return null
+                  return (
+                    <span style={{
+                      background: 'rgba(0,110,37,0.18)', color: '#006e25',
+                      padding: '5px 10px', borderRadius: 999,
+                      fontSize: 11, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', gap: 3,
+                    }}>
+                      <Icon name="check_circle" size={12} color="#006e25" /> {startersCount} titolar{startersCount === 1 ? 'e' : 'i'}
+                    </span>
+                  )
+                })()}
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <button onClick={() => setBorrowPickerOpen(true)} style={miniBtn('#7b4bff', '#ece5ff')}>
@@ -769,9 +822,37 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
                             <Icon name="star_half" size={9} color="#005f98" /> VICE
                           </span>
                         )}
+                        {!!row?.is_starter && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 800, padding: '2px 5px', borderRadius: 4,
+                            background: 'rgba(0,110,37,0.18)', color: '#006e25',
+                            display: 'inline-flex', alignItems: 'center', gap: 2,
+                          }}>
+                            <Icon name="check_circle" size={9} color="#006e25" /> TIT
+                          </span>
+                        )}
                       </div>
-                      <div style={{ fontSize: 10.5, color: '#707882', display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span>Mat. {p.card_number || '—'}</span>
+                      <div style={{ fontSize: 10.5, color: '#707882', display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                        {/* Input inline per la matricola FIGC del giocatore:
+                            si salva onBlur direttamente in players.card_number
+                            così non serve andare al profilo giocatore per compilarla */}
+                        <span style={{ fontWeight: 700, color: '#404751' }}>Mat.</span>
+                        <input
+                          type="text"
+                          defaultValue={p.card_number || ''}
+                          onBlur={e => {
+                            const v = e.target.value.trim()
+                            if ((v || null) !== (p.card_number || null)) saveCardNumber(p.id, v)
+                          }}
+                          placeholder="FIGC…"
+                          maxLength={20}
+                          style={{
+                            width: 90, padding: '2px 5px', borderRadius: 4,
+                            border: '1px solid #dfe6ef', fontSize: 10.5,
+                            fontFamily: 'monospace, monospace',
+                            color: '#181c20', background: '#fff', outline: 'none',
+                          }}
+                        />
                         {medWarn && (
                           <span style={{ color: '#93000a', fontWeight: 700 }}>
                             ⚠ Cert. medico scaduto
@@ -781,6 +862,20 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
                     </div>
                     {isConvocated && (
                       <>
+                        {/* Toggle titolare — indipendente da capitano/vice */}
+                        <button
+                          onClick={() => toggleStarter(p.id)}
+                          title={row?.is_starter ? 'Titolare (togli)' : 'Segna titolare'}
+                          style={{
+                            width: 28, height: 28, borderRadius: 8, border: 'none',
+                            background: row?.is_starter ? 'rgba(0,110,37,0.18)' : 'transparent',
+                            cursor: 'pointer', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon name="check_circle" size={16} color={row?.is_starter ? '#006e25' : '#c0c7d2'} />
+                        </button>
                         <button
                           onClick={() => setCaptain(p.id)}
                           title={isCap ? 'Capitano' : 'Nomina capitano'}
@@ -982,6 +1077,7 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
                   status: 'accepted',
                   is_captain: false,
                   is_vice_captain: false,
+                  is_starter: false,
                   shirt_number_override: null,
                   note: null,
                 }

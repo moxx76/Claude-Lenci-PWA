@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.96'
+export const APP_VERSION = '1.9.97'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.97',
+    date: '2026-09-26',
+    title: 'Convocazione: matricola FIGC e titolare direttamente dalla card giocatore',
+    fixes: [
+      'Nella schermata Convocazione, sotto ogni giocatore, la matricola FIGC (players.card_number) è ora modificabile inline in un input compatto "Mat. [FIGC…]": la modifica si salva automaticamente in DB al blur del campo (nessun bottone Salva), così non serve più andare al profilo del giocatore per compilarla. Quando presente, la matricola finisce nella colonna MATRICOLA FIGC della distinta PDF',
+      'Nuovo toggle "Titolare" (icona ✓ verde) accanto ai toggle Capitano e Vice per ogni giocatore convocato: al tap segna il giocatore come titolare della prossima partita, salvato direttamente nella convocazione (convocations.is_starter), senza dover aspettare la Distinta Tattica. Se attivato su un giocatore non ancora convocato, lo convoca automaticamente. Un badge verde "TIT" appare accanto al nome; un contatore "N titolari" appare nell\'header della lista per feedback rapido',
+      'La distinta PDF ora legge i titolari direttamente da convocations.is_starter (rimosso il fetch da match_player_stats): il pallino ● in colonna TIT. e l\'ordinamento titolari-in-cima funzionano immediatamente appena spunti il toggle in convocazione, senza dover salvare la distinta tattica prima',
+      'Migration DB: nuovo campo convocations.is_starter BOOLEAN DEFAULT false, indice parziale idx_convocations_starter per lookup veloce. Nessun dato esistente toccato',
+    ],
+  },
   {
     version: '1.9.96',
     date: '2026-09-26',
