@@ -215,8 +215,16 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
       let val = ''
       switch (c.key) {
         case 'starter':
-          // Pallino nero per il titolare, altrimenti vuoto
-          val = p.is_starter ? '●' : ''
+          // Pallino disegnato come cerchio (il glifo Unicode ● non è supportato
+          // dai font standard di jsPDF Helvetica e verrebbe stampato male).
+          // Lo disegno subito e continuo con val vuoto per non stampare testo.
+          if (p.is_starter) {
+            const cxDot = x + c.w / 2
+            const cyDot = y + rowH / 2
+            doc.setFillColor(24, 28, 32)
+            doc.circle(cxDot, cyDot, 1.6, 'F')
+          }
+          val = ''
           break
         case 'idx':   val = String(i + 1); break
         case 'shirt': val = p.shirt_number != null ? String(p.shirt_number) : ''; break
@@ -239,7 +247,8 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
       // fanno l'appello). Il pallino titolare resta in normale.
       if (c.key === 'name' && (p.is_captain || p.is_vice_captain)) doc.setFont('helvetica', 'bold')
       else doc.setFont('helvetica', 'normal')
-      doc.text(val, textX, y + rowH / 2 + 1.6, { align })
+      // Salto la scrittura testuale se val è vuoto (evita di calpestare il cerchio)
+      if (val) doc.text(val, textX, y + rowH / 2 + 1.6, { align })
       x += c.w
     }
     y += rowH
@@ -259,12 +268,16 @@ export async function generateDistintaPdf(data: DistintaData): Promise<jsPDF> {
     y += rowH
   }
 
-  // Legenda
+  // Legenda: il pallino nero non è renderizzabile via testo Helvetica standard,
+  // quindi disegno un piccolo cerchio inline all'inizio della riga e allineo il
+  // testo alla sua destra.
   y += 3
   doc.setFontSize(7)
   doc.setTextColor(GRAY_LT)
   doc.setFont('helvetica', 'italic')
-  doc.text('● = Titolare    |    P = Portiere    |    (C) = Capitano    |    (VC) = Vice Capitano', marginX, y)
+  doc.setFillColor(GRAY_LT)
+  doc.circle(marginX + 1.2, y - 1.2, 1.1, 'F')
+  doc.text('  = Titolare    |    P = Portiere    |    (C) = Capitano    |    (VC) = Vice Capitano', marginX + 2.5, y)
   y += 6
 
   // ==== SEZIONE STAFF ====

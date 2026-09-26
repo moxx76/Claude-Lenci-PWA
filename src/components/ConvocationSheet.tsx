@@ -409,14 +409,29 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
       // Prima salva tutto
       await handleSave()
 
-      // Fetch della matricola FIGC del club per l'header PDF (tollerante: se il campo
-       // non è impostato, PDF mostra '—'). I titolari li leggiamo direttamente da
-       // convocations.is_starter (già in `rows` state), senza query extra.
-      const teamRes = await supabase.from('teams')
-        .select('club:clubs(federation_code)')
-        .eq('id', match.team_id)
-        .maybeSingle()
-      const federationCode = ((teamRes.data as any)?.club?.federation_code ?? null)
+      // Fetch parallelo:
+      //   1. was_starter dalla distinta tattica (match_player_stats) — se già compilata
+      //   2. federation_code del club per l'header PDF
+      // Un giocatore è titolare se lo è in convocations.is_starter OR in
+      // match_player_stats.was_starter. Basta averlo settato in una delle due UI.
+      const [statsRes, teamRes] = await Promise.allSettled([
+        supabase.from('match_player_stats')
+          .select('player_id, was_starter')
+          .eq('match_id', match.id),
+        supabase.from('teams')
+          .select('club:clubs(federation_code)')
+          .eq('id', match.team_id)
+          .maybeSingle(),
+      ])
+      const starterFromTactic = new Map<string, boolean>()
+      if (statsRes.status === 'fulfilled' && statsRes.value.data) {
+        for (const s of statsRes.value.data as any[]) {
+          starterFromTactic.set(s.player_id, !!s.was_starter)
+        }
+      }
+      const federationCode = teamRes.status === 'fulfilled'
+        ? ((teamRes.value.data as any)?.club?.federation_code ?? null)
+        : null
 
       const pdfPlayers: DistintaPlayer[] = convocatedList
         .map(p => {
@@ -431,7 +446,8 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
             position: p.position,
             is_captain: !!row?.is_captain,
             is_vice_captain: !!row?.is_vice_captain,
-            is_starter: !!row?.is_starter,
+            // Titolare se marcato in convocazione OR nella distinta tattica
+            is_starter: !!row?.is_starter || starterFromTactic.get(p.id) === true,
             is_goalkeeper: p.position === 'Portiere',
           }
         })

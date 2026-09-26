@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.97'
+export const APP_VERSION = '1.9.98'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.98',
+    date: '2026-09-26',
+    title: 'Distinta FIGC: fix pallino titolare non stampato + titolari letti anche dalla distinta tattica',
+    fixes: [
+      'BUG: nel PDF distinta il pallino ● nella colonna TIT. e nella legenda non veniva stampato (i font Helvetica standard di jsPDF non supportano il carattere Unicode ●, che veniva reso come "%Ï" o simboli sconosciuti). Ora il pallino è disegnato come un piccolo cerchio nero via doc.circle() sia nella cella sia nella legenda, così si vede sempre',
+      'REGRESSIONE risolta: in v1.9.97 avevo rimosso il fetch dei titolari dalla distinta tattica per evitare doppia sorgente, ma questo penalizzava chi aveva già impostato i titolari lì e non aveva ancora usato il nuovo toggle in convocazione. Ora il PDF prende i titolari da ENTRAMBE le fonti (convocations.is_starter OR match_player_stats.was_starter): basta averli marcati in una qualsiasi delle due schermate perché appaiano con pallino e ordinati per primi',
+    ],
+  },
   {
     version: '1.9.97',
     date: '2026-09-26',
