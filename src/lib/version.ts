@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.99'
+export const APP_VERSION = '1.9.100'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.100',
+    date: '2026-09-27',
+    title: 'Timeline partita: fix sostituzioni multiple allo stesso minuto',
+    fixes: [
+      'BUG: nella timeline eventi di una partita, quando al minuto N c\'erano più sostituzioni contemporanee (es. triple change al 55\' della U14 vs San Giacomo Chieri del 27/09: escono Pellengo/Amato/Tedesco, entrano Mantovani/Davtyan/Marocco), tutti gli entranti risultavano abbinati sempre allo STESSO uscito (in quel caso "← Pellengo S." per tutti e tre). La causa: stats.find(x => x.was_starter && x.minute_out === s.minute_in) restituiva sempre il PRIMO match trovato',
+      'Fix: pre-costruzione di una mappa "minuto → coda dei titolari usciti" e uso di .shift() nel loop per consumare un uscito diverso per ciascun entrante. Ora ogni sub allo stesso minuto viene abbinata a un titolare diverso. L\'ordine di accoppiamento riflette l\'ordine di iterazione di stats (che dipende dalla query a monte): può non coincidere al 100% con "chi ha realmente sostituito chi" durante la partita, ma è deterministico e non duplica più. Per una mappatura esatta servirebbe una colonna substituted_player_id dedicata',
+    ],
+  },
   {
     version: '1.9.99',
     date: '2026-09-27',

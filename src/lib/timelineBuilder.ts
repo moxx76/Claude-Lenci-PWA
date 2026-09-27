@@ -47,6 +47,19 @@ export function buildTimelineEvents({
   const events: TimelineEvent[] = []
   let yellowCardsCount = 0
 
+  // Costruisce una coda per minuto dei titolari usciti: quando ci sono più
+  // sostituzioni allo stesso minuto (triple change) ogni entrante viene abbinato
+  // a un uscito diverso via .shift() dentro il loop, invece che puntare tutti
+  // al primo trovato da .find(). L'ordine è quello di iterazione di `stats`,
+  // che rispecchia l'ordinamento della query a monte.
+  const outByMinute = new Map<number, StatsRow[]>()
+  for (const s of stats) {
+    if (s.was_starter && s.minute_out != null) {
+      if (!outByMinute.has(s.minute_out)) outByMinute.set(s.minute_out, [])
+      outByMinute.get(s.minute_out)!.push(s)
+    }
+  }
+
   for (const s of stats) {
     const p = players[s.player_id]
     if (!p) continue
@@ -71,8 +84,11 @@ export function buildTimelineEvents({
     }
     // Sostituzione: subentrato (minute_in > 0 e non titolare)
     if (!s.was_starter && s.minute_in != null && s.minute_in > 0) {
-      // Trova chi è uscito (titolare con minute_out == minute_in del sub)
-      const outStat = stats.find(x => x.was_starter && x.minute_out === s.minute_in)
+      // Prende il PRIMO titolare uscito ancora disponibile a questo minuto (shift = consuma).
+      // Prima usavamo stats.find(...) che ritornava sempre lo STESSO uscito quando c'erano più
+      // sub allo stesso minuto, così tutti risultavano "← Pellengo" ai triple change.
+      const pool = outByMinute.get(s.minute_in)
+      const outStat = pool && pool.length > 0 ? pool.shift()! : null
       const outName = outStat ? (() => {
         const op = players[outStat.player_id]
         return op ? `${op.last_name} ${op.first_name?.[0] ?? ''}.` : null
