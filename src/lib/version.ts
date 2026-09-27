@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.98'
+export const APP_VERSION = '1.9.99'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.99',
+    date: '2026-09-27',
+    title: 'Convocazione: nuovo bottone "Esporta CSV distinta" nel formato Numero;Cognome Nome;Anno;Ruolo',
+    fixes: [
+      'Nel bottom sheet Convocazione, sotto i bottoni "Salva e genera distinta FIGC" e "Genera locandina per WhatsApp", è ora presente un nuovo bottone verde scuro "Esporta CSV distinta" che scarica un file .csv con i giocatori convocati nel formato richiesto da sistemi esterni: header "Numero;Cognome Nome;Anno;Ruolo" e una riga per giocatore ordinata come nel PDF (titolari per primi, poi portieri, poi per numero maglia)',
+      'Il ruolo è convertito automaticamente in codice singola lettera P/D/C/A: Portiere→P; Difensore centrale/Terzino→D; Centrocampista/Esterno/Mezzala→C; Punta/Attaccante/Ala→A. L\'anno è estratto dalla data di nascita (4 cifre). Il separatore è ";" (compatibile Excel italiano) con BOM UTF-8 per accenti corretti. Nome file: distinta_[categoria]_vs_[avversario]_[data].csv',
+    ],
+  },
   {
     version: '1.9.98',
     date: '2026-09-26',

@@ -500,6 +500,75 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
     }
   }
 
+  // Export CSV nel formato richiesto da altri sistemi di gestione FIGC/società:
+  //   Numero;Cognome Nome;Anno;Ruolo (P/D/C/A)
+  // Un record per giocatore convocato, ordinato come nel PDF (titolari prima,
+  // poi portieri, poi per numero maglia). Il separatore è ';' perché
+  // Excel italiano lo apre correttamente con doppio click, contrariamente a ','.
+  const handleExportCsv = () => {
+    if (!match) return
+    if (convocatedList.length === 0) {
+      alert('Convoca almeno un giocatore prima di esportare il CSV.')
+      return
+    }
+    // Mapping ruolo → codice singola lettera: P/D/C/A.
+    // Le stringhe nel DB corrispondono al valore mostrato nella scheda giocatore
+    // (Portiere / Difensore centrale / Terzino / Centrocampista / Esterno / Punta / Ala).
+    const roleCode = (pos: string | null): string => {
+      if (!pos) return ''
+      const p = pos.toLowerCase()
+      if (p.startsWith('portier')) return 'P'
+      if (p.includes('difens') || p.startsWith('terzino')) return 'D'
+      if (p.includes('centrocamp') || p.startsWith('esterno') || p.startsWith('mezz')) return 'C'
+      if (p.startsWith('punt') || p.startsWith('att') || p.startsWith('ala')) return 'A'
+      return ''
+    }
+    // Escape CSV: se il campo contiene ";", '"' o newline, lo racchiudo tra doppi apici
+    // e raddoppio gli apici interni. Cognome/Nome di solito non ne hanno, ma è più sicuro.
+    const escapeCsv = (v: string | number | null | undefined): string => {
+      const s = v == null ? '' : String(v)
+      if (/[;"\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+      return s
+    }
+
+    // Ordino come il PDF: titolari prima, poi portieri, poi per numero maglia
+    const sorted = [...convocatedList].sort((a, b) => {
+      const ra = rows[a.id]; const rb = rows[b.id]
+      const sa = !!ra?.is_starter; const sb = !!rb?.is_starter
+      if (sa !== sb) return sa ? -1 : 1
+      const ga = a.position === 'Portiere' ? 0 : 1
+      const gb = b.position === 'Portiere' ? 0 : 1
+      if (ga !== gb) return ga - gb
+      const na = ra?.shirt_number_override ?? a.jersey_number ?? 999
+      const nb = rb?.shirt_number_override ?? b.jersey_number ?? 999
+      return na - nb
+    })
+
+    // Header + righe. Uso il formato indicato nel messaggio: separatore ";"
+    const lines: string[] = ['Numero;Cognome Nome;Anno;Ruolo']
+    for (const p of sorted) {
+      const row = rows[p.id]
+      const numero = row?.shirt_number_override ?? p.jersey_number ?? ''
+      const cognomeNome = `${p.last_name} ${p.first_name}`.trim()
+      // Anno di nascita (4 cifre) dalla birth_date "YYYY-MM-DD"
+      const anno = p.birth_date ? p.birth_date.slice(0, 4) : ''
+      const ruolo = roleCode(p.position)
+      lines.push([escapeCsv(numero), escapeCsv(cognomeNome), escapeCsv(anno), escapeCsv(ruolo)].join(';'))
+    }
+    // BOM UTF-8 così Excel apre correttamente le lettere accentate
+    const csv = '﻿' + lines.join('\r\n') + '\r\n'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const fname = `distinta_${match.team_category || 'squadra'}_vs_${match.opponent.replace(/\s+/g, '-')}_${match.match_date.slice(0, 10)}.csv`
+    a.download = fname
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   const handleGeneratePoster = () => {
     if (!match) return
     if (convocatedList.length === 0) {
@@ -1015,6 +1084,22 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
               >
                 <Icon name="image" size={16} color="#fff" />
                 Genera locandina per WhatsApp
+              </button>
+              <button
+                onClick={handleExportCsv}
+                disabled={acceptedCount === 0}
+                title="Esporta la distinta in formato CSV (Numero; Cognome Nome; Anno; Ruolo P/D/C/A)"
+                style={{
+                  padding: '12px 18px', borderRadius: 12, border: 'none',
+                  background: 'linear-gradient(135deg, #0a7d3a 0%, #045821 100%)',
+                  color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(10,125,58,0.28)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: acceptedCount === 0 ? 0.6 : 1,
+                }}
+              >
+                <Icon name="table_view" size={16} color="#fff" />
+                Esporta CSV distinta
               </button>
               <button
                 onClick={handleSave}
