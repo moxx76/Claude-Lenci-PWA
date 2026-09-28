@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.100'
+export const APP_VERSION = '1.9.101'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.101',
+    date: '2026-09-28',
+    title: 'Referto: fix toggle "Subentrato" che si disattivava cancellando i minuti + default minuto ingresso adattivo',
+    fixes: [
+      'BUG segnalato: nel referto post-partita, quando si cliccava "Subentrato" su un giocatore e poi si cancellavano manualmente entrambi i campi minuto ingresso/uscita, l\'interfaccia interpretava la cancellazione come richiesta di annullare il subentro: il giocatore tornava a "Non entrato", il pannello dettaglio si smontava e il focus saltava via. La causa era che la funzione roleOf() deduceva il ruolo esclusivamente dai valori (was_starter=false + minute_in=null → "Non entrato"), quindi lo state UI seguiva i dati numerici invece di essere un\'informazione separata',
+      'Fix: aggiunto un flag UI-only Stats._uiRole (starter/sub/out/null) che memorizza la scelta esplicita dell\'utente tramite i toggle button. roleOf() ora dà priorità a _uiRole quando presente, così il pannello resta stabile anche con campi numerici vuoti. Al salvataggio DB il flag viene rimosso via destructuring insieme a id/timestamp (non è una colonna reale). Su reload da DB, se la riga ha was_starter=false ma minute_in valorizzato, il fallback deduttivo restituisce comunque "sub"',
+      'Migliorato il default del minuto di ingresso automatico: prima era hardcoded 46 (inizio secondo tempo per 2×45). Ora usa match.team_match_periods_count e team_match_period_duration_min per calcolare "inizio secondo tempo" corretto per la categoria: 2×35=70\' → 36, 3×20=60\' → 21, 2×30=60\' → 31. Fallback 46 se durata non disponibile',
+      'Come conseguenza del fix: il focus non salta più via cancellando i minuti, i campi possono restare temporaneamente vuoti durante la modifica, e la disattivazione del subentro avviene solo cliccando esplicitamente su un altro toggle (Titolare o Non entrato)',
+    ],
+  },
   {
     version: '1.9.100',
     date: '2026-09-27',

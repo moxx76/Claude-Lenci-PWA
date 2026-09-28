@@ -57,6 +57,11 @@ interface Stats {
   role_slot?: string | null
   slot_index?: number | null
   role_slot_label?: string | null
+  /** UI-only, non persistito: quando l'utente sceglie esplicitamente "Subentrato"
+   *  ma poi cancella i valori numerici del minuto d'ingresso, teniamo comunque
+   *  lo stato "sub" attivo così il pannello dettaglio non si smonta e il focus
+   *  non salta via. Reset a null solo quando l'utente clicca Titolare/Non entrato. */
+  _uiRole?: 'starter' | 'sub' | 'out' | null
 }
 
 interface PostMatchSheetProps {
@@ -412,33 +417,55 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
 
   // Ruolo giocatore nella gara: 3 stati mutuamente esclusivi
   //   'starter' = titolare (was_starter=true, minute_in=0 implicito)
-  //   'sub'     = subentrato dalla panchina (was_starter=false, minute_in>0)
+  //   'sub'     = subentrato dalla panchina (was_starter=false, minute_in>0 tipico,
+  //                                         MA anche minute_in=null se l'utente ha
+  //                                         appena cancellato i campi durante l'edit)
   //   'out'     = non entrato / non convocato (was_starter=false, minute_in=null)
+  //
+  // Per poter distinguere "subentrato con campi vuoti in corso di modifica" da "non entrato"
+  // usiamo un flag UI-only `_uiRole` che memorizza la scelta esplicita dell'utente e
+  // sopravvive alla cancellazione dei valori numerici. Il flag NON viene persistito su DB:
+  // al salvataggio, quello che conta sono `was_starter` e `minute_in` (validati come '*').
   // NB: quando un giocatore lascia lo stato 'starter' i campi legati alla distinta
   // tattica (role_slot, slot_index, role_slot_label) vengono azzerati per coerenza.
+  //
+  // Default minuto ingresso per un nuovo sub: inizio del secondo tempo (metà partita).
+  // Prima era hardcoded a 46, che vale solo per partite 2x45=90. Ora leggo la durata
+  // effettiva della squadra dal match: es. 3x20=60 → default 21, 2x30=60 → 31, 2x35=70 → 36.
+  // Se la durata non è disponibile fallback su 46 storico.
+  const defaultSubMinuteIn = (): number => {
+    const periods = match?.team_match_periods_count ?? 2
+    const perDur = match?.team_match_period_duration_min ?? 45
+    if (!periods || periods < 1 || !perDur || perDur < 1) return 46
+    return perDur + 1
+  }
+
   const setPlayerRole = (pid: string, role: 'starter' | 'sub' | 'out') => {
     if (role === 'starter') {
-      updateStat(pid, { was_starter: true,  minute_in: 0,    minute_out: null })
+      updateStat(pid, { was_starter: true, minute_in: 0, minute_out: null, _uiRole: 'starter' })
     } else if (role === 'sub') {
-      // Serve un minute_in > 0 perché roleOf riconosca il ruolo 'sub': se il giocatore
-      // non ha ancora un ingresso valorizzato, uso 46 come default ragionevole
-      // (inizio secondo tempo per una partita da 90'); l'utente poi lo modifica.
       const current = stats[pid]
-      const keepIn = (current?.minute_in && current.minute_in > 0) ? current.minute_in : 46
+      // Se ha già un minute_in valido, lo tengo; altrimenti proposta ragionata
+      const keepIn = (current?.minute_in && current.minute_in > 0) ? current.minute_in : defaultSubMinuteIn()
       updateStat(pid, {
         was_starter: false, minute_in: keepIn, minute_out: current?.minute_out ?? null,
         role_slot: null, slot_index: null, role_slot_label: null,
+        _uiRole: 'sub',
       } as any)
     } else {
       updateStat(pid, {
-        was_starter: false, minute_in: null,  minute_out: null,
+        was_starter: false, minute_in: null, minute_out: null,
         role_slot: null, slot_index: null, role_slot_label: null,
+        _uiRole: 'out',
       } as any)
     }
   }
 
-  // Etichetta del ruolo corrente (per rendering condizionale)
+  // Etichetta del ruolo corrente (per rendering condizionale).
+  // Priorità al flag UI `_uiRole`, che l'utente ha impostato tramite ToggleBtn.
+  // Se il flag è assente (dati caricati da DB), fallback alla deduzione dai dati.
   const roleOf = (s: Stats): 'starter' | 'sub' | 'out' => {
+    if (s._uiRole) return s._uiRole
     if (s.was_starter) return 'starter'
     if (s.minute_in != null) return 'sub'
     return 'out'
@@ -549,7 +576,19 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           // Se lo stato contiene campi provenienti dal SELECT precedente (id vuoto/valorizzato,
           // created_at, updated_at) li scarto: dopo il DELETE la INSERT deve lasciare che il DB
           // generi id via gen_random_uuid() e i timestamp via default now().
-          const { id: _drop_id, created_at: _drop_ca, updated_at: _drop_ua, ...clean } = s as any
+          // Escludo anche `_uiRole` — flag UI-only che non esiste come colonna DB: senza questo
+          // filtro l'INSERT fallirebbe con "column _uiRole of relation match_player_stats does not exist".
+          const {
+            id: _drop_id, created_at: _drop_ca, updated_at: _drop_ua,
+            _uiRole: _drop_uirole,
+            ...clean
+          } = s as any
+          // Se l'utente ha lasciato _uiRole='sub' ma i minuti sono vuoti, in DB la riga finisce
+          // con was_starter=false e minute_in=null → questo record verrebbe letto come "non entrato"
+          // al reload (nessun uiRole in DB). Questo comportamento e' voluto: valori mancanti = record
+          // non completo. La regola funzionale chiede di NON forzare il reset dello stato durante
+          // l'editing (che facciamo), ma quando salvi con valori vuoti stai salvando esattamente
+          // cio' che vedi. Nessuna correzione al salvataggio quindi.
           return {
             ...clean,
             match_id: match.id,
