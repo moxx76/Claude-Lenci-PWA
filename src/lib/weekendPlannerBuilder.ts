@@ -15,7 +15,7 @@
  * Nessuna dipendenza esterna, funziona anche offline.
  */
 
-import { formatEventLocationLine } from './eventLocation'
+import { formatEventLocationParts } from './eventLocation'
 
 export interface WeekendPlannerEvent {
   date: string             // YYYY-MM-DD
@@ -89,12 +89,23 @@ export async function buildWeekendPlannerPng(data: WeekendPlannerData): Promise<
 
   const hasFilters = !!(data.teamFilterName || data.typeFilterLabel)
 
+  // Pre-pass di misurazione: per i tornei con nome competizione lungo la card
+  // può richiedere spazio extra per il wrap su più righe (v1.9.105).
+  const measureCanvas = document.createElement('canvas')
+  measureCanvas.width = W
+  measureCanvas.height = 100
+  const mctx = measureCanvas.getContext('2d')
+  if (!mctx) throw new Error('Canvas context non disponibile')
+  const satHeights = satEvents.map(e => computeEventCardH(mctx, e))
+  const sunHeights = sunEvents.map(e => computeEventCardH(mctx, e))
+  const sumH = (hs: number[]) => hs.reduce((a, b) => a + b, 0)
+
   // Calcolo altezza dinamica
   const satBlockH = SECTION_HEADER_H + (satEvents.length > 0
-    ? satEvents.length * EVENT_CARD_H + (satEvents.length - 1) * EVENT_GAP
+    ? sumH(satHeights) + (satEvents.length - 1) * EVENT_GAP
     : EMPTY_DAY_H)
   const sunBlockH = SECTION_HEADER_H + (sunEvents.length > 0
-    ? sunEvents.length * EVENT_CARD_H + (sunEvents.length - 1) * EVENT_GAP
+    ? sumH(sunHeights) + (sunEvents.length - 1) * EVENT_GAP
     : EMPTY_DAY_H)
 
   // Altezza minima 1920 per compatibilità story-format, se scarso contenuto
@@ -133,10 +144,10 @@ export async function buildWeekendPlannerPng(data: WeekendPlannerData): Promise<
     drawEmptyDay(ctx, y)
     y += EMPTY_DAY_H
   } else {
-    for (const evt of satEvents) {
-      drawEventCard(ctx, y, evt)
-      y += EVENT_CARD_H + EVENT_GAP
-    }
+    satEvents.forEach((evt, i) => {
+      drawEventCard(ctx, y, evt, satHeights[i])
+      y += satHeights[i] + EVENT_GAP
+    })
     y -= EVENT_GAP // remove trailing gap
   }
 
@@ -149,10 +160,10 @@ export async function buildWeekendPlannerPng(data: WeekendPlannerData): Promise<
     drawEmptyDay(ctx, y)
     y += EMPTY_DAY_H
   } else {
-    for (const evt of sunEvents) {
-      drawEventCard(ctx, y, evt)
-      y += EVENT_CARD_H + EVENT_GAP
-    }
+    sunEvents.forEach((evt, i) => {
+      drawEventCard(ctx, y, evt, sunHeights[i])
+      y += sunHeights[i] + EVENT_GAP
+    })
   }
 
   // Footer (sempre in fondo)
@@ -162,6 +173,24 @@ export async function buildWeekendPlannerPng(data: WeekendPlannerData): Promise<
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png', 0.95)
   })
+}
+
+/** Altezza card: base + righe extra per il nome torneo se wrappato. */
+function computeEventCardH(ctx: CanvasRenderingContext2D, evt: WeekendPlannerEvent): number {
+  const parts = formatEventLocationParts({
+    venue: evt.venue,
+    location: evt.location,
+    locationAddress: evt.locationAddress ?? null,
+    competition: evt.competition,
+    kind: evt.kind,
+  })
+  if (!parts || !parts.secondary) return EVENT_CARD_H
+  const rightW = W - PAD * 2 - 35 - 240 - 30  // = cardW - timeX_offset - timeW - padRight
+  const lines = wrapText(ctx, parts.secondary, rightW, '500 20px "Segoe UI", -apple-system, sans-serif')
+  // Base 200 contiene già una riga location + eventuale una riga competizione.
+  // Per tornei la secondary occupa più righe sotto la città: ogni riga oltre
+  // la prima aggiunge 28px, con un piccolo cuscinetto in fondo.
+  return EVENT_CARD_H + Math.max(0, lines.length - 1) * 28 + 10
 }
 
 // ============================================================
@@ -285,10 +314,9 @@ function drawSectionHeader(ctx: CanvasRenderingContext2D, y: number, dayLabel: s
 // ============================================================
 // EVENT CARD — card singolo evento con orario grande a sinistra
 // ============================================================
-function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPlannerEvent) {
+function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPlannerEvent, cardH: number = EVENT_CARD_H) {
   const cardX = PAD
   const cardW = W - PAD * 2
-  const cardH = EVENT_CARD_H
   const kindStyle = KIND_STYLE[evt.kind]
 
   // Sfondo card bianco con ombra
@@ -365,36 +393,82 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
   const truncMain = truncateToWidth(ctx, mainTitle, rightW)
   ctx.fillText(truncMain, rightX, y + 82)
 
-  // Riga info UNIFORME (v1.9.104): invece di "🏠 Casa" / "✈️ Trasferta",
-  // scrivo direttamente la città ("🏠 Poirino", "✈️ Rivoli") e, per i tornei,
-  // concateno il nome della competizione ("✈️ Rivoli – Torneo Quattro Stagioni").
-  const infoLine = formatEventLocationLine({
+  // Riga info UNIFORME (v1.9.104 + fix v1.9.105): città sulla prima riga,
+  // nome torneo (eventuale) su righe successive così non viene troncato
+  // quando è lungo.
+  const parts = formatEventLocationParts({
     venue: evt.venue,
     location: evt.location,
     locationAddress: evt.locationAddress ?? null,
     competition: evt.competition,
     kind: evt.kind,
   })
-
-  if (infoLine) {
-    ctx.fillStyle = COLOR_MUTED
-    ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-    const truncInfo = truncateToWidth(ctx, infoLine, rightW)
-    ctx.fillText(truncInfo, rightX, y + 132)
-  }
-
-  // Competizione in piccolo in fondo: la stampo solo se NON è già stata
-  // inglobata nella riga location sopra (succede per i tornei). Per campionati
-  // e amichevoli resta visibile come riga sotto il titolo.
   const isTournamentLike = evt.kind === 'tournament'
     || (evt.competition || '').toLowerCase().includes('torneo')
     || (evt.competition || '').toLowerCase().includes('cup')
+
+  if (parts) {
+    // Riga 1: icona + città
+    ctx.fillStyle = COLOR_MUTED
+    ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
+    ctx.fillText(
+      truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
+      rightX,
+      y + 132,
+    )
+    // Riga(2+): nome torneo wrappato (per i tornei)
+    if (parts.secondary) {
+      const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.font = tourneyFont
+      ctx.fillStyle = COLOR_MUTED
+      const tLines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
+      let ty = y + 165
+      for (const line of tLines) {
+        ctx.fillText(line, rightX, ty)
+        ty += 28
+      }
+    }
+  }
+
+  // Competizione in piccolo in fondo: la stampo solo se NON è già stata
+  // mostrata come secondary (succede per i tornei). Per campionati e
+  // amichevoli resta visibile come riga sotto il titolo.
   if (evt.competition && !isTournamentLike) {
     ctx.fillStyle = COLOR_MUTED
     ctx.font = '400 18px "Segoe UI", -apple-system, sans-serif'
     const truncComp = truncateToWidth(ctx, evt.competition, rightW)
     ctx.fillText(truncComp, rightX, y + 165)
   }
+}
+
+/**
+ * Spezza `text` su più righe che stanno dentro `maxW` col font dato.
+ * Cap a 3 righe (quelle oltre vengono condensate con "…").
+ */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, font: string): string[] {
+  ctx.font = font
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (ctx.measureText(next).width <= maxW) {
+      current = next
+    } else {
+      if (current) lines.push(current)
+      current = ctx.measureText(word).width > maxW
+        ? truncateToWidth(ctx, word, maxW)
+        : word
+    }
+  }
+  if (current) lines.push(current)
+  if (lines.length > 3) {
+    const first = lines.slice(0, 2)
+    const rest = lines.slice(2).join(' ')
+    first.push(truncateToWidth(ctx, rest, maxW))
+    return first
+  }
+  return lines
 }
 
 // ============================================================

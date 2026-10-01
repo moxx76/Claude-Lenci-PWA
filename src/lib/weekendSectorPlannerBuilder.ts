@@ -13,7 +13,7 @@
  * Zero dipendenze esterne. Canvas 2D nativo.
  */
 
-import { formatEventLocationLine } from './eventLocation'
+import { formatEventLocationParts } from './eventLocation'
 
 export type SectorKey = 'prima' | 'agonistica' | 'scuola'
 
@@ -50,7 +50,10 @@ const W = 1080
 const PAD = 60
 const HEADER_H = 340
 const SECTION_HEADER_H = 100
-const EVENT_CARD_H = 180
+// Altezza base card (no torneo). Per i tornei aggiungiamo spazio per il nome
+// della competizione su una o più righe sotto la città (vedi EVENT_TOURNAMENT_LINE_H).
+const EVENT_CARD_BASE_H = 180
+const EVENT_TOURNAMENT_LINE_H = 32   // altezza per ogni riga nome torneo
 const EVENT_GAP = 16
 const SECTION_GAP = 40
 const EMPTY_SECTION_H = 110
@@ -89,7 +92,16 @@ const KIND_META: Record<SectorEvent['kind'], { label: string; bg: string; fg: st
 export async function buildSectorWeekendPng(data: SectorPlannerData): Promise<Blob> {
   const clubName = data.clubName || 'ASD Lenci Poirino'
 
-  // Calcolo altezza: header + 3 sezioni + footer
+  // Pre-pass di misurazione: per i tornei il nome competizione può richiedere
+  // più righe → calcolo l'altezza esatta di ogni card prima di creare il
+  // canvas finale, così non trunco mai il testo del torneo.
+  const measureCanvas = document.createElement('canvas')
+  measureCanvas.width = W
+  measureCanvas.height = 100
+  const measureCtx = measureCanvas.getContext('2d')
+  if (!measureCtx) throw new Error('Canvas 2D non disponibile')
+
+  const cardHeights: Record<SectorKey, number[]> = { prima: [], agonistica: [], scuola: [] }
   let bodyH = 0
   for (const key of ['prima', 'agonistica', 'scuola'] as const) {
     const items = data.sections[key]
@@ -97,7 +109,17 @@ export async function buildSectorWeekendPng(data: SectorPlannerData): Promise<Bl
     if (items.length === 0) {
       bodyH += EMPTY_SECTION_H
     } else {
-      bodyH += items.length * EVENT_CARD_H + (items.length - 1) * EVENT_GAP
+      // Ordino qui con la stessa regola usata in drawSection, così gli indici
+      // combaciano.
+      const sorted = [...items].sort((a, b) =>
+        a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+      )
+      for (const ev of sorted) {
+        const h = computeCardHeight(measureCtx, ev)
+        cardHeights[key].push(h)
+        bodyH += h
+      }
+      bodyH += (sorted.length - 1) * EVENT_GAP
     }
     bodyH += SECTION_GAP
   }
@@ -121,7 +143,7 @@ export async function buildSectorWeekendPng(data: SectorPlannerData): Promise<Bl
   drawHeader(ctx, data, clubName)
   let y = HEADER_H + 20
   for (const key of ['prima', 'agonistica', 'scuola'] as const) {
-    y = drawSection(ctx, y, key, data.sections[key])
+    y = drawSection(ctx, y, key, data.sections[key], cardHeights[key])
     y += SECTION_GAP
   }
   drawFooter(ctx, totalH, clubName)
@@ -129,6 +151,25 @@ export async function buildSectorWeekendPng(data: SectorPlannerData): Promise<Bl
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png', 0.95)
   })
+}
+
+/**
+ * Calcola l'altezza di una card evento: base (180px) + eventuali righe extra
+ * per il nome del torneo quando non ci sta su una sola riga.
+ */
+function computeCardHeight(ctx: CanvasRenderingContext2D, ev: SectorEvent): number {
+  const parts = formatEventLocationParts({
+    venue: ev.venue,
+    location: ev.location,
+    locationAddress: ev.locationAddress ?? null,
+    competition: ev.competition ?? null,
+    kind: ev.kind,
+  })
+  if (!parts || !parts.secondary) return EVENT_CARD_BASE_H
+  // Larghezza disponibile nella zona destra della card
+  const rightW = W - PAD * 2 - 32 - 170 - 24  // = cardW - 32 - dateW - 24
+  const lines = wrapText(ctx, parts.secondary, rightW, '500 20px "Segoe UI", -apple-system, sans-serif')
+  return EVENT_CARD_BASE_H + lines.length * EVENT_TOURNAMENT_LINE_H
 }
 
 // === Header ====================================================================
@@ -195,6 +236,7 @@ function drawSection(
   y: number,
   key: SectorKey,
   items: SectorEvent[],
+  cardHeights: number[],
 ): number {
   const meta = SECTOR_META[key]
 
@@ -233,10 +275,11 @@ function drawSection(
   const sorted = [...items].sort((a, b) =>
     a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
   )
-  for (const ev of sorted) {
-    drawEventCard(ctx, y, ev, meta)
-    y += EVENT_CARD_H + EVENT_GAP
-  }
+  sorted.forEach((ev, i) => {
+    const h = cardHeights[i] ?? EVENT_CARD_BASE_H
+    drawEventCard(ctx, y, ev, meta, h)
+    y += h + EVENT_GAP
+  })
   y -= EVENT_GAP
   return y
 }
@@ -269,10 +312,10 @@ function drawEventCard(
   y: number,
   ev: SectorEvent,
   sectorMeta: typeof SECTOR_META[SectorKey],
+  cardH: number,
 ) {
   const cardX = PAD
   const cardW = W - PAD * 2
-  const cardH = EVENT_CARD_H
   const kindMeta = KIND_META[ev.kind]
 
   // Sfondo con ombra
@@ -347,20 +390,39 @@ function drawEventCard(
   ctx.textBaseline = 'top'
   ctx.fillText(truncateToWidth(ctx, mainTitle, rightW), rightX, y + 76)
 
-  // Riga location UNIFORME (v1.9.104): invece di "🏠 Casa" / "✈️ Trasferta",
-  // mostriamo la città in chiaro — es. "🏠 Poirino" oppure
-  // "✈️ Rivoli – Torneo Quattro Stagioni" per i tornei.
-  const infoLine = formatEventLocationLine({
+  // Riga location UNIFORME (v1.9.104 + fix v1.9.105): invece di "🏠 Casa" /
+  // "✈️ Trasferta", mostriamo la città in chiaro ("🏠 Poirino"). Per i tornei,
+  // il nome della competizione va su una (o più) righe sotto la città così
+  // non viene troncato quando è lungo (es. "Torneo Pre-Campionato U14
+  // Provinciale - Girone 1 - 1ª giornata").
+  const parts = formatEventLocationParts({
     venue: ev.venue,
     location: ev.location,
     locationAddress: ev.locationAddress ?? null,
     competition: ev.competition ?? null,
     kind: ev.kind,
   })
-  if (infoLine) {
+  if (parts) {
+    // Riga 1: icona + città
     ctx.fillStyle = COLOR_MUTED
     ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-    ctx.fillText(truncateToWidth(ctx, infoLine, rightW), rightX, y + 120)
+    ctx.fillText(
+      truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
+      rightX,
+      y + 120,
+    )
+    // Riga(2+): nome torneo wrappato su più righe se necessario
+    if (parts.secondary) {
+      const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.font = tourneyFont
+      ctx.fillStyle = COLOR_MUTED
+      const lines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
+      let ty = y + 120 + 30
+      for (const line of lines) {
+        ctx.fillText(line, rightX, ty)
+        ty += EVENT_TOURNAMENT_LINE_H
+      }
+    }
   }
 }
 
@@ -428,6 +490,45 @@ function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxW: numb
     else hi = mid - 1
   }
   return text.slice(0, lo) + '…'
+}
+
+/**
+ * Spezza `text` in righe che stanno dentro `maxW` quando renderizzate col
+ * `font` dato. Separatore primario = spazio. Se una singola parola supera
+ * maxW, la trunca con "…" (caso raro: nomi torneo ragionevoli non la
+ * attivano).
+ *
+ * Imposta `ctx.font = font` come side-effect; il chiamante deve risettarlo
+ * se usa un font diverso in seguito.
+ */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, font: string): string[] {
+  ctx.font = font
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (ctx.measureText(next).width <= maxW) {
+      current = next
+    } else {
+      if (current) lines.push(current)
+      // Se la parola singola supera maxW, trunca brutalmente
+      if (ctx.measureText(word).width > maxW) {
+        current = truncateToWidth(ctx, word, maxW)
+      } else {
+        current = word
+      }
+    }
+  }
+  if (current) lines.push(current)
+  // Cap massimo 3 righe per non rompere il layout su tornei esagerati
+  if (lines.length > 3) {
+    const first = lines.slice(0, 2)
+    const rest = lines.slice(2).join(' ')
+    first.push(truncateToWidth(ctx, rest, maxW))
+    return first
+  }
+  return lines
 }
 
 // Download / share riusabili (copiano il pattern di weekendPlannerBuilder)

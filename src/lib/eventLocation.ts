@@ -141,40 +141,62 @@ export function formatEventLocationLine(params: EventLocationParams): string | n
  * vogliono stilizzare icona e testo diversamente (colori, pesi, troncamento
  * separato). Restituisce `{ icon, label }` oppure null se non c'è nulla da
  * mostrare.
+ *
+ * NB: per i tornei il `label` è la stringa unica "<città> – <nome torneo>".
+ * Se il consumatore vuole mandare il nome torneo su una riga a parte (vedi
+ * builder PNG che altrimenti tronca), usare `formatEventLocationParts()`.
  */
 export function formatEventLocation(params: EventLocationParams): { icon: string; label: string } | null {
+  const parts = formatEventLocationParts(params)
+  if (!parts) return null
+  const label = parts.secondary
+    ? `${parts.primary} – ${parts.secondary}`
+    : parts.primary
+  return { icon: parts.icon, label }
+}
+
+/**
+ * Variante STRUTTURATA SU 2 PARTI: la città (primary) e il nome del torneo
+ * (secondary, null se non torneo). Serve ai builder PNG e alle card dashboard
+ * per andare a capo quando il nome torneo è lungo, evitando il troncamento
+ * su una singola riga (es. "Torneo Pre-Campionato U14 Provinciale - Girone 1
+ * - 1ª giornata" supera la larghezza card e veniva tagliato con "…").
+ *
+ * Formato di output:
+ *   Casa match:    { icon: '🏠', primary: 'Poirino', secondary: null }
+ *   Casa torneo:   { icon: '🏠', primary: 'Poirino', secondary: 'Torneo Pre-Campionato…' }
+ *   Away match:    { icon: '✈️', primary: 'Rivoli',  secondary: null }
+ *   Away torneo:   { icon: '✈️', primary: 'Rivoli',  secondary: 'Torneo Quattro Stagioni' }
+ *   Allenamento:   { icon: '📍', primary: '<location>', secondary: null }
+ */
+export function formatEventLocationParts(params: EventLocationParams): { icon: string; primary: string; secondary: string | null } | null {
   const { venue, location, locationAddress, competition, kind } = params
   const isTournament = kind === 'tournament' || isTournamentCompetition(competition)
   const isMatchLike = kind === 'match' || kind === 'tournament'
 
   if (isMatchLike) {
     if (venue === 'home') {
-      // Casa: la sede è sempre Poirino. Il campo location contiene il nome
-      // del campo ("Campo Sportivo Poirino") che è ridondante — vince la città.
-      const city = HOME_CITY
-      const label = isTournament && competition
-        ? `${city} – ${competition.trim()}`
-        : city
-      return { icon: '🏠', label }
+      return {
+        icon: '🏠',
+        primary: HOME_CITY,
+        secondary: isTournament && competition ? competition.trim() : null,
+      }
     }
     if (venue === 'away') {
-      // Trasferta: estraggo la città dall'indirizzo, fallback al nome location
       const city = extractCity(locationAddress, location)
-      // Se città mancante uso il nome location (es. "Orbassano") come fallback
-      // visivo invece di mostrare un generico "Trasferta" sterile.
       const fallback = (location || '').trim()
-      const base = city || fallback || 'Trasferta'
-      const label = isTournament && competition
-        ? `${base} – ${competition.trim()}`
-        : base
-      return { icon: '✈️', label }
+      const primary = city || fallback || 'Trasferta'
+      return {
+        icon: '✈️',
+        primary,
+        secondary: isTournament && competition ? competition.trim() : null,
+      }
     }
-    // venue sconosciuto per una partita (dovrebbe essere raro): fallback puro
-    if (location) return { icon: '📍', label: location }
+    if (location) return { icon: '📍', primary: location, secondary: null }
     return null
   }
 
-  // Allenamenti / marketing / riunioni: mostro il nome location grezzo, se c'è.
-  if (location) return { icon: '📍', label: location }
+  // Allenamenti / marketing / riunioni
+  if (location) return { icon: '📍', primary: location, secondary: null }
   return null
 }

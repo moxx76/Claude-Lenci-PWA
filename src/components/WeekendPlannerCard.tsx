@@ -8,7 +8,7 @@ import {
   shareOrDownload,
   type SectorPlannerData,
 } from '../lib/weekendSectorPlannerBuilder'
-import { formatEventLocation } from '../lib/eventLocation'
+import { formatEventLocationParts } from '../lib/eventLocation'
 
 /**
  * WeekendPlannerCard — Pannello dashboard che mostra gli impegni del weekend
@@ -439,10 +439,11 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
   const kindColor = ev.kind === 'match' ? '#93000a' : '#004a78'
   const kindLabel = ev.kind === 'match' ? 'Partita' : 'Allenamento'
 
-  // v1.9.104: riga location UNIFORME — mostra la città in chiaro invece di
-  // "🏠 Casa" / "✈️ Trasferta" generici. Per i tornei include anche il nome
-  // della competizione (es. "✈️ Rivoli – Torneo Quattro Stagioni").
-  const locationInfo = formatEventLocation({
+  // v1.9.104 + fix v1.9.105: riga location UNIFORME. Città sulla prima riga,
+  // nome torneo (eventuale) su una SECONDA riga sotto, con wrap libero così
+  // non viene troncato quando è lungo (es. "Torneo Pre-Campionato U14
+  // Provinciale - Girone 1 - 1ª giornata").
+  const locationParts = formatEventLocationParts({
     venue: ev.venue,
     location: ev.location,
     locationAddress: ev.location_address,
@@ -482,13 +483,23 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
         }}>
           {ev.title}
         </div>
-        {locationInfo && (
-          <div style={{
-            fontSize: 10.5, color: '#707882',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {locationInfo.icon} {locationInfo.label}
-          </div>
+        {locationParts && (
+          <>
+            <div style={{
+              fontSize: 10.5, color: '#707882',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {locationParts.icon} {locationParts.primary}
+            </div>
+            {locationParts.secondary && (
+              <div style={{
+                fontSize: 10.5, color: '#707882',
+                lineHeight: 1.3,
+              }}>
+                {locationParts.secondary}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

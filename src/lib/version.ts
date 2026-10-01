@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.104'
+export const APP_VERSION = '1.9.105'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.105',
+    date: '2026-10-01',
+    title: 'Fix v1.9.104: nome torneo troncato nel PNG "Weekend del club" (ora wrappa su più righe)',
+    fixes: [
+      'BUG segnalato subito dopo il rilascio di v1.9.104: nel PNG "Weekend del club" la riga location per i tornei veniva troncata con "…" quando il nome della competizione era lungo (es. "🏠 Poirino – Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giorn…"). Causa: il builder PNG costruiva "<città> – <nome torneo>" come stringa unica e la troncava con binary search per stare nella larghezza card',
+      'Fix: nuova funzione formatEventLocationParts() in src/lib/eventLocation.ts che restituisce {icon, primary (città), secondary (nome torneo, null se non torneo)} invece di una stringa unica. Entrambi i builder PNG (weekendSectorPlannerBuilder per settore e weekendPlannerBuilder per giorno) ora disegnano la città sulla prima riga ("🏠 Poirino") e il nome torneo wrappato su righe successive sotto (max 3 righe, poi condensa con "…")',
+      'Altezza card calcolata dinamicamente con pre-pass di misurazione su canvas offscreen: ogni card misura esattamente quante righe serve per il nome torneo e cresce di 28-32px per riga extra. Il PNG totale si adatta di conseguenza, mantenendo il minimo 1920px per compatibilità Stories 9:16',
+      'WeekendPlannerCard (dashboard React) specularmente: la seconda riga per il nome torneo ha whiteSpace normal invece di ellipsis, così wrappa senza troncare. Le card di CalendarPage, ManagerDashboard "Prossima partita" e Dashboard famiglia già usavano <p> con wrap nativo quindi non erano affette',
+    ],
+  },
   {
     version: '1.9.104',
     date: '2026-10-01',
