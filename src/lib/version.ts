@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.106'
+export const APP_VERSION = '1.9.107'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.107',
+    date: '2026-10-01',
+    title: 'Planner settimanale PNG: layout partita a 3 righe + torneo abbreviato',
+    fixes: [
+      'La riga partita del poster "Planner settimanale" era illeggibile quando c\'era un nome torneo lungo ("🏠 Poirino · vs ANDEZENO · Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giornata ritorno" veniva troncato con "…"). Ora il layout è a 3 righe ben distinte: riga 1 = squadra (grande, bianco pieno); riga 2 = "🏠 Poirino → vs ANDEZENO" (medio, bianco pieno — il separatore "→" fa capire a colpo d\'occhio "da/verso"); riga 3 = nome torneo abbreviato (piccolo, opaco)',
+      'Il nome torneo viene normalizzato tramite nuovo helper compactCompetitionLabel(): rimuove "Torneo" iniziale (ridondante col badge rosso P), accorcia "Girone 1" → "G1", "Girone E" → "G.E", "1ª giornata" → "1ª g", "andata"/"ritorno" → "A"/"Rit". Esempio: "Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giornata ritorno" diventa "Pre-Campionato U14 Provinciale · G1 · 1ª g Rit", quasi dimezzata e perfettamente leggibile',
+      'Il layout a 3 righe scatta solo per partite con competition quando il giorno ha ≤2 eventi (c\'è spazio verticale). Giorni densi (3-4 eventi) restano a 2 righe compatte. Allenamenti e partite senza competition non cambiano',
+    ],
+  },
   {
     version: '1.9.106',
     date: '2026-10-01',

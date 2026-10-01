@@ -366,23 +366,21 @@ function drawEvent(
   const textX = oraX + oraBlockW + 14
   const textMaxW = x + w - textX - 4
 
-  // Line 1: squadra grande + eventuale badge casa/trasferta per match
+  // v1.9.107: layout partita riorganizzato per essere leggibile a colpo d'occhio.
+  // Prima era tutto accatastato su una riga sola che veniva troncata:
+  //   "🏠 vs ANDEZENO · Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giorn…"
+  // Ora distinguiamo visivamente le 3 informazioni:
+  //   Line 1 (grande, bianco):     UNDER 14 ANNATA 2013
+  //   Line 2 (media, bianco pieno): 🏠 Poirino → vs ANDEZENO
+  //   Line 3 (piccola, opaca):     Pre-Campionato U14 Prov. · G1 · 1ª g Rit (torneo abbreviato)
+  // Line 3 appare solo per partite con competition e quando c'è spazio verticale
+  // (totalEvs ≤ 2). Allenamenti e partite senza competition restano a 2 righe.
   const nameSize = totalEvs <= 2 ? 17 : 14
-  const line1Y = totalEvs === 1 ? cy - 10 : cy - (nameSize * 0.6)
-  ctx.font = `700 ${nameSize}px system-ui, Arial, sans-serif`
-  ctx.fillStyle = COL.white
-  const label1 = ev.teamName.toUpperCase()
-  drawTruncatedText(ctx, label1, textX, line1Y, textMaxW)
-
-  // Line 2: descrizione match (vs opponent + città) o info allenamento (location)
-  // v1.9.106: aggiunta la città ("🏠 Poirino · vs Andezeno") per uniformare col
-  // resto dei planner/report invece di solo "🏠 vs Andezeno". Per i tornei la
-  // competition è già inclusa (compressa dopo " · ") quando c'è spazio.
   const descSize = totalEvs <= 2 ? 14 : 11
-  const line2Y = totalEvs === 1 ? cy + 12 : cy + (descSize * 0.7)
-  ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  let line2 = ''
+
+  // Preparo le info match (serve il check "hasCompetition" per decidere il layout)
+  let line2Text = ''
+  let line3Text: string | null = null
   if (isMatch) {
     const parts = formatEventLocationParts({
       venue: ev.venue ?? null,
@@ -393,16 +391,83 @@ function drawEvent(
     })
     const icon = parts?.icon || (ev.venue === 'home' ? '🏠' : '✈')
     const city = parts?.primary || ''
-    // Prefix compatto: "🏠 Poirino · vs Andezeno"
-    line2 = city
-      ? `${icon} ${city} · vs ${ev.opponent || '—'}`
-      : `${icon} vs ${ev.opponent || '—'}`
-    // Nome torneo o campionato in coda solo se c'è spazio (<= 2 eventi/giorno)
-    if (ev.competition && totalEvs <= 2) line2 += ` · ${ev.competition}`
+    const opponent = ev.opponent || '—'
+    // Separatore " → " invece di " · ": enfatizza il "da-posto / verso avversario"
+    line2Text = city
+      ? `${icon} ${city} → vs ${opponent}`
+      : `${icon} vs ${opponent}`
+    if (ev.competition && totalEvs <= 2) {
+      line3Text = compactCompetitionLabel(ev.competition)
+    }
   } else {
-    line2 = ev.location || 'Allenamento'
+    line2Text = ev.location || 'Allenamento'
   }
-  drawTruncatedText(ctx, line2, textX, line2Y, textMaxW)
+
+  const useThreeLines = line3Text !== null
+
+  // Coordinate Y: 3 righe spaziate quando c'è anche la competition
+  const line1Y = useThreeLines
+    ? (totalEvs === 1 ? cy - 22 : cy - 15)
+    : (totalEvs === 1 ? cy - 10 : cy - (nameSize * 0.6))
+  const line2Y = useThreeLines
+    ? (totalEvs === 1 ? cy       : cy)
+    : (totalEvs === 1 ? cy + 12  : cy + (descSize * 0.7))
+  const line3Y = useThreeLines
+    ? (totalEvs === 1 ? cy + 22  : cy + 13)
+    : 0
+
+  // Line 1: squadra (grande, bianco pieno)
+  ctx.font = `700 ${nameSize}px system-ui, Arial, sans-serif`
+  ctx.fillStyle = COL.white
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  drawTruncatedText(ctx, ev.teamName.toUpperCase(), textX, line1Y, textMaxW)
+
+  // Line 2: città + avversario (medio, bianco pieno per leggibilità)
+  // Per allenamenti/match-senza-competition torna al grigio chiaro leggibile.
+  ctx.font = `${useThreeLines ? 700 : 600} ${descSize}px system-ui, Arial, sans-serif`
+  ctx.fillStyle = useThreeLines ? COL.white : 'rgba(255,255,255,0.85)'
+  drawTruncatedText(ctx, line2Text, textX, line2Y, textMaxW)
+
+  // Line 3: torneo abbreviato (piccolo, opaco)
+  if (useThreeLines && line3Text) {
+    const comp3Size = totalEvs === 1 ? 12 : 10
+    ctx.font = `500 ${comp3Size}px system-ui, Arial, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.62)'
+    drawTruncatedText(ctx, line3Text, textX, line3Y, textMaxW)
+  }
+}
+
+/**
+ * Abbrevia il nome competizione per entrarci nella line 3 del poster
+ * settimanale senza perdere informazione utile.
+ *
+ * Esempi di normalizzazione:
+ *   "Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giornata ritorno"
+ *     → "Pre-Campionato U14 Provinciale · G1 · 1ª Rit"
+ *   "Prima categoria — Girone E · G.1 (andata)"
+ *     → "Prima categoria · G.E · G.1 (A)"
+ *   "Coppa Piemonte Prima categoria — Girone 14 · G.1 (andata)"
+ *     → "Coppa Piemonte · G.14 · G.1 (A)"
+ *   "Amichevole" → "Amichevole"  (invariato)
+ */
+function compactCompetitionLabel(competition: string): string {
+  let s = competition.trim()
+  // Rimuovo "Torneo " iniziale (ridondante col badge P rosso)
+  s = s.replace(/^torneo\s+/i, '')
+  // Normalizza separatori: " — " e " - " → " · "
+  s = s.replace(/\s+[-—]\s+/g, ' · ')
+  // "Girone 1" → "G1", "Girone 14" → "G14", "Girone E" → "G.E"
+  s = s.replace(/\bgirone\s+(\d+)\b/gi, 'G$1')
+  s = s.replace(/\bgirone\s+([A-Z])\b/gi, 'G.$1')
+  // "1ª giornata" / "2ª giornata" → "1ª g" (solo in coda)
+  s = s.replace(/\b(\d+ª)\s+giornata\b/gi, '$1 g')
+  // "andata" → "A", "ritorno" → "Rit"
+  s = s.replace(/\bandata\b/gi, 'A')
+  s = s.replace(/\britorno\b/gi, 'Rit')
+  // Compatto spazi doppi
+  s = s.replace(/\s{2,}/g, ' ').trim()
+  return s
 }
 
 // ============================================================
