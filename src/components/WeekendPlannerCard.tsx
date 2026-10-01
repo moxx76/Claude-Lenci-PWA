@@ -485,7 +485,15 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
         </div>
         {locationParts && (
           <>
-            {/* v1.9.109: etichetta esplicita "LOCALITÀ:" per i match */}
+            {/* v1.9.110: nome torneo PRIMA, LOCALITÀ: come ultima riga */}
+            {locationParts.secondary && (
+              <div style={{
+                fontSize: 10.5, color: '#707882',
+                lineHeight: 1.3,
+              }}>
+                {locationParts.secondary}
+              </div>
+            )}
             {ev.kind === 'match' ? (
               <div style={{
                 fontSize: 10.5, lineHeight: 1.3,
@@ -501,14 +509,6 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {locationParts.icon} {locationParts.primary}
-              </div>
-            )}
-            {locationParts.secondary && (
-              <div style={{
-                fontSize: 10.5, color: '#707882',
-                lineHeight: 1.3,
-              }}>
-                {locationParts.secondary}
               </div>
             )}
           </>

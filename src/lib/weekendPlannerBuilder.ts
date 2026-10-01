@@ -408,26 +408,39 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
     || (evt.competition || '').toLowerCase().includes('cup')
 
   if (parts) {
-    // v1.9.109: etichetta esplicita "LOCALITÀ:" (richiesta Davide)
+    // v1.9.109 + fix v1.9.110: nome torneo PRIMA, LOCALITÀ: come ultima riga
     const isMatchLike = evt.kind === 'match' || evt.kind === 'tournament'
-    const locRowY = y + 132
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
+
+    // Nome torneo (per primo, in alto): può occupare più righe
+    let locRowY = y + 132
+    if (parts.secondary) {
+      const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.font = tourneyFont
+      ctx.fillStyle = COLOR_MUTED
+      const tLines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
+      let ty = y + 132
+      for (const line of tLines) {
+        ctx.fillText(line, rightX, ty)
+        ty += 28
+      }
+      locRowY = ty + 2
+    }
+
+    // Ultima riga: LOCALITÀ (match) o 📍 location (allenamento)
     if (isMatchLike) {
       let xCursor = rightX
-      // Icona
       ctx.font = '500 22px "Segoe UI Emoji", "Apple Color Emoji", "Segoe UI", sans-serif'
       ctx.fillStyle = COLOR_MUTED
       const iconStr = `${parts.icon} `
       ctx.fillText(iconStr, xCursor, locRowY)
       xCursor += ctx.measureText(iconStr).width
-      // Label "LOCALITÀ:" in viola (brand)
       ctx.font = '800 20px "Segoe UI", -apple-system, sans-serif'
       ctx.fillStyle = COLOR_VIOLA
       const labelText = 'LOCALITÀ: '
       ctx.fillText(labelText, xCursor, locRowY)
       xCursor += ctx.measureText(labelText).width
-      // Città in nero pieno
       ctx.font = '800 22px "Segoe UI", -apple-system, sans-serif'
       ctx.fillStyle = COLOR_TEXT
       const remainingW = Math.max(0, rightX + rightW - xCursor)
@@ -440,18 +453,6 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
         rightX,
         locRowY,
       )
-    }
-    // Nome torneo wrappato sotto (per i tornei)
-    if (parts.secondary) {
-      const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
-      ctx.font = tourneyFont
-      ctx.fillStyle = COLOR_MUTED
-      const tLines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
-      let ty = y + 165
-      for (const line of tLines) {
-        ctx.fillText(line, rightX, ty)
-        ty += 28
-      }
     }
   }
 

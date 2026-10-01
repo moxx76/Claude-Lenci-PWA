@@ -442,25 +442,28 @@ function drawEvent(
     ctx.fillStyle = COL.white
     drawTruncatedText(ctx, opponentLine, textX, line2Y, textMaxW)
 
-    // Line 3: "LOCALITÀ: Poirino" con la label dichiarata.
-    // La label è in giallo soft (crema) e la città in bianco pieno per farla risaltare.
+    // v1.9.110 (richiesta Davide): LOCALITÀ: va in fondo, ULTIMA riga.
+    // Quando c'è anche il nome torneo, va PRIMA della localita.
+    //   4 righe: team → vs → torneo (line3) → LOCALITÀ: (line4, ultima)
+    //   3 righe: team → vs → LOCALITÀ: (line3, ultima)
+    if (useFourLines && compactComp) {
+      // Line 3: nome torneo abbreviato (piccolo, opaco)
+      ctx.font = `500 12px system-ui, Arial, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.62)'
+      drawTruncatedText(ctx, compactComp, textX, line3Y, textMaxW)
+    }
+
+    // Ultima riga: "LOCALITÀ: Poirino" (label crema + città bianco pieno)
+    const locY = useFourLines ? line4Y : line3Y
     const locSize = descSize
     const labelText = 'LOCALITÀ: '
     ctx.font = `800 ${locSize}px system-ui, Arial, sans-serif`
     const labelW = ctx.measureText(labelText).width
     ctx.fillStyle = COL.cream
-    ctx.fillText(labelText, textX, line3Y)
-    // Città subito dopo la label, con troncamento sul resto della larghezza
+    ctx.fillText(labelText, textX, locY)
     ctx.font = `700 ${locSize}px system-ui, Arial, sans-serif`
     ctx.fillStyle = COL.white
-    drawTruncatedText(ctx, city, textX + labelW, line3Y, Math.max(0, textMaxW - labelW))
-
-    // Line 4 (opzionale, solo se un unico evento nel giorno): nome torneo abbreviato
-    if (useFourLines && compactComp) {
-      ctx.font = `500 12px system-ui, Arial, sans-serif`
-      ctx.fillStyle = 'rgba(255,255,255,0.62)'
-      drawTruncatedText(ctx, compactComp, textX, line4Y, textMaxW)
-    }
+    drawTruncatedText(ctx, city, textX + labelW, locY, Math.max(0, textMaxW - labelW))
   } else if (matchCompact) {
     // 2 righe compatte (giorni densi): tutto su line 2 con separatore medio
     ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`

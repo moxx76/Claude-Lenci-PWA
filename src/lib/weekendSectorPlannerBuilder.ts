@@ -403,57 +403,52 @@ function drawEventCard(
     kind: ev.kind,
   })
   if (parts) {
-    // SectorEvent.kind è ristretto a 'training' | 'match' — i tornei qui
-    // sono 'match' con competition che contiene "torneo"
+    // v1.9.110 (richiesta Davide): LOCALITÀ va in ULTIMA riga. Prima stampo
+    // il nome torneo (wrappato) se presente, poi "LOCALITÀ: <città>" sotto.
     const isMatchLike = ev.kind === 'match'
-    const locRowY = y + 120
-    if (isMatchLike) {
-      // Icona a sinistra, label "LOCALITÀ:" + città a seguire sulla stessa riga.
-      // Label in accent del settore così risalta subito.
-      let xCursor = rightX
-      // Icona
-      ctx.font = '500 22px "Segoe UI Emoji", "Apple Color Emoji", "Segoe UI", sans-serif'
-      ctx.fillStyle = COLOR_MUTED
-      ctx.textAlign = 'left'
-      ctx.textBaseline = 'top'
-      const iconStr = `${parts.icon} `
-      ctx.fillText(iconStr, xCursor, locRowY)
-      xCursor += ctx.measureText(iconStr).width
-      // Label "LOCALITÀ:"
-      const labelFont = '800 20px "Segoe UI", -apple-system, sans-serif'
-      ctx.font = labelFont
-      ctx.fillStyle = sectorMeta.accent
-      const labelText = 'LOCALITÀ: '
-      ctx.fillText(labelText, xCursor, locRowY)
-      xCursor += ctx.measureText(labelText).width
-      // Città
-      ctx.font = '800 22px "Segoe UI", -apple-system, sans-serif'
-      ctx.fillStyle = COLOR_TEXT
-      const remainingW = Math.max(0, rightX + rightW - xCursor)
-      ctx.fillText(truncateToWidth(ctx, parts.primary, remainingW), xCursor, locRowY)
-    } else {
-      // Allenamento o altro: riga semplice "📍 location"
-      ctx.fillStyle = COLOR_MUTED
-      ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-      ctx.textAlign = 'left'
-      ctx.textBaseline = 'top'
-      ctx.fillText(
-        truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
-        rightX,
-        locRowY,
-      )
-    }
-    // Nome torneo wrappato sotto, opaco
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+
+    // Nome torneo (per primo, in alto): può occupare più righe
+    let locRowY = y + 120
     if (parts.secondary) {
       const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
       ctx.font = tourneyFont
       ctx.fillStyle = COLOR_MUTED
       const lines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
-      let ty = locRowY + 30
+      let ty = y + 120
       for (const line of lines) {
         ctx.fillText(line, rightX, ty)
         ty += EVENT_TOURNAMENT_LINE_H
       }
+      locRowY = ty + 2
+    }
+
+    // Ultima riga: LOCALITÀ (match) o 📍 location (allenamento)
+    if (isMatchLike) {
+      let xCursor = rightX
+      ctx.font = '500 22px "Segoe UI Emoji", "Apple Color Emoji", "Segoe UI", sans-serif'
+      ctx.fillStyle = COLOR_MUTED
+      const iconStr = `${parts.icon} `
+      ctx.fillText(iconStr, xCursor, locRowY)
+      xCursor += ctx.measureText(iconStr).width
+      ctx.font = '800 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillStyle = sectorMeta.accent
+      const labelText = 'LOCALITÀ: '
+      ctx.fillText(labelText, xCursor, locRowY)
+      xCursor += ctx.measureText(labelText).width
+      ctx.font = '800 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillStyle = COLOR_TEXT
+      const remainingW = Math.max(0, rightX + rightW - xCursor)
+      ctx.fillText(truncateToWidth(ctx, parts.primary, remainingW), xCursor, locRowY)
+    } else {
+      ctx.fillStyle = COLOR_MUTED
+      ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillText(
+        truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
+        rightX,
+        locRowY,
+      )
     }
   }
 }

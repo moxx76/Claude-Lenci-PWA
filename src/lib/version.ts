@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.109'
+export const APP_VERSION = '1.9.110'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.110',
+    date: '2026-10-01',
+    title: 'Planner (tutti): LOCALITÀ ora chiude la card come ULTIMA riga',
+    fixes: [
+      'Richiesta Davide: in tutti i planner la riga "LOCALITÀ: <città>" deve essere l\'ULTIMA — prima il nome torneo (quando c\'è), poi la LOCALITÀ in fondo. L\'informazione chiave del "dove si gioca" chiude visivamente la card così lo sguardo ci atterra naturalmente',
+      'Modificato ordine in 4 superfici: (1) Planner settimanale PNG — ora le 4 righe sono team → vs → nome torneo → LOCALITÀ:; (2) PNG "Weekend del club" per settore — nome torneo wrappato in alto, LOCALITÀ: subito sotto; (3) PNG "Planner Weekend" per giorno — stesso ordine; (4) card React dashboard — stesso ordine',
+      'Il calcolo altezza card nei PNG tiene conto correttamente delle righe aggiuntive del torneo (invariato rispetto a v1.9.105): le card crescono per contenere tutte le righe, LOCALITÀ: incluso',
+    ],
+  },
   {
     version: '1.9.109',
     date: '2026-10-01',
