@@ -366,21 +366,27 @@ function drawEvent(
   const textX = oraX + oraBlockW + 14
   const textMaxW = x + w - textX - 4
 
-  // v1.9.107: layout partita riorganizzato per essere leggibile a colpo d'occhio.
-  // Prima era tutto accatastato su una riga sola che veniva troncata:
-  //   "🏠 vs ANDEZENO · Torneo Pre-Campionato U14 Provinciale - Girone 1 - 1ª giorn…"
-  // Ora distinguiamo visivamente le 3 informazioni:
-  //   Line 1 (grande, bianco):     UNDER 14 ANNATA 2013
-  //   Line 2 (media, bianco pieno): 🏠 Poirino → vs ANDEZENO
-  //   Line 3 (piccola, opaca):     Pre-Campionato U14 Prov. · G1 · 1ª g Rit (torneo abbreviato)
-  // Line 3 appare solo per partite con competition e quando c'è spazio verticale
-  // (totalEvs ≤ 2). Allenamenti e partite senza competition restano a 2 righe.
+  // v1.9.108: layout partita con etichetta esplicita "LOCALITÀ:".
+  // Richiesta Davide: avere la città in una riga dedicata, dichiarata — non
+  // mescolata con l'avversario — così si capisce al volo DOVE si gioca.
+  //
+  // Layout per le partite (totalEvs ≤ 2, c'è spazio verticale):
+  //   Line 1 (grande, bianco):      UNDER 14 ANNATA 2013
+  //   Line 2 (media, bianco):       🏠 vs ANDEZENO
+  //   Line 3 (media, giallo soft):  LOCALITÀ: Poirino
+  //   Line 4 (piccola, opaca):      Pre-Campionato U14 Prov. · G1 · 1ª g Rit (solo se c'è competition)
+  //
+  // Giorni densi (totalEvs ≥ 3): si torna al layout compatto a 2 righe
+  // (team + "🏠 Poirino · vs Andezeno") per non rompere la densità.
+  // Allenamenti: 2 righe (team + location) come prima.
   const nameSize = totalEvs <= 2 ? 17 : 14
   const descSize = totalEvs <= 2 ? 14 : 11
 
-  // Preparo le info match (serve il check "hasCompetition" per decidere il layout)
-  let line2Text = ''
-  let line3Text: string | null = null
+  // Preparo le info match
+  let city = ''
+  let icon = ''
+  let opponentLine = ''
+  let compactComp: string | null = null
   if (isMatch) {
     const parts = formatEventLocationParts({
       venue: ev.venue ?? null,
@@ -389,32 +395,39 @@ function drawEvent(
       competition: ev.competition ?? null,
       kind: ev.kind === 'tournament' ? 'tournament' : 'match',
     })
-    const icon = parts?.icon || (ev.venue === 'home' ? '🏠' : '✈')
-    const city = parts?.primary || ''
+    icon = parts?.icon || (ev.venue === 'home' ? '🏠' : '✈')
+    city = parts?.primary || ''
     const opponent = ev.opponent || '—'
-    // Separatore " → " invece di " · ": enfatizza il "da-posto / verso avversario"
-    line2Text = city
-      ? `${icon} ${city} → vs ${opponent}`
-      : `${icon} vs ${opponent}`
-    if (ev.competition && totalEvs <= 2) {
-      line3Text = compactCompetitionLabel(ev.competition)
+    opponentLine = `${icon} vs ${opponent}`
+    if (ev.competition) {
+      compactComp = compactCompetitionLabel(ev.competition)
     }
-  } else {
-    line2Text = ev.location || 'Allenamento'
   }
 
-  const useThreeLines = line3Text !== null
+  // Decide quante righe: match con spazio e città → layout "espanso" (3 o 4 righe)
+  // Match senza spazio o allenamenti → layout "compatto" (2 righe)
+  const matchExpanded = isMatch && totalEvs <= 2 && !!city
+  const matchCompact = isMatch && !matchExpanded
+  const useFourLines = matchExpanded && !!compactComp && totalEvs === 1
 
-  // Coordinate Y: 3 righe spaziate quando c'è anche la competition
-  const line1Y = useThreeLines
-    ? (totalEvs === 1 ? cy - 22 : cy - 15)
-    : (totalEvs === 1 ? cy - 10 : cy - (nameSize * 0.6))
-  const line2Y = useThreeLines
-    ? (totalEvs === 1 ? cy       : cy)
-    : (totalEvs === 1 ? cy + 12  : cy + (descSize * 0.7))
-  const line3Y = useThreeLines
-    ? (totalEvs === 1 ? cy + 22  : cy + 13)
-    : 0
+  // Coordinate Y per il layout espanso (3 o 4 righe)
+  let line1Y = 0, line2Y = 0, line3Y = 0, line4Y = 0
+  if (useFourLines) {
+    // 4 righe, 22-24px di passo verticale
+    line1Y = cy - 32
+    line2Y = cy - 10
+    line3Y = cy + 10
+    line4Y = cy + 30
+  } else if (matchExpanded) {
+    // 3 righe (team + vs + LOCALITÀ:)
+    line1Y = totalEvs === 1 ? cy - 22 : cy - 15
+    line2Y = cy
+    line3Y = totalEvs === 1 ? cy + 22 : cy + 15
+  } else {
+    // 2 righe standard
+    line1Y = totalEvs === 1 ? cy - 10 : cy - (nameSize * 0.6)
+    line2Y = totalEvs === 1 ? cy + 12 : cy + (descSize * 0.7)
+  }
 
   // Line 1: squadra (grande, bianco pieno)
   ctx.font = `700 ${nameSize}px system-ui, Arial, sans-serif`
@@ -423,18 +436,44 @@ function drawEvent(
   ctx.textBaseline = 'middle'
   drawTruncatedText(ctx, ev.teamName.toUpperCase(), textX, line1Y, textMaxW)
 
-  // Line 2: città + avversario (medio, bianco pieno per leggibilità)
-  // Per allenamenti/match-senza-competition torna al grigio chiaro leggibile.
-  ctx.font = `${useThreeLines ? 700 : 600} ${descSize}px system-ui, Arial, sans-serif`
-  ctx.fillStyle = useThreeLines ? COL.white : 'rgba(255,255,255,0.85)'
-  drawTruncatedText(ctx, line2Text, textX, line2Y, textMaxW)
+  if (matchExpanded) {
+    // Line 2: "🏠 vs AVVERSARIO" (medio, bianco pieno)
+    ctx.font = `700 ${descSize}px system-ui, Arial, sans-serif`
+    ctx.fillStyle = COL.white
+    drawTruncatedText(ctx, opponentLine, textX, line2Y, textMaxW)
 
-  // Line 3: torneo abbreviato (piccolo, opaco)
-  if (useThreeLines && line3Text) {
-    const comp3Size = totalEvs === 1 ? 12 : 10
-    ctx.font = `500 ${comp3Size}px system-ui, Arial, sans-serif`
-    ctx.fillStyle = 'rgba(255,255,255,0.62)'
-    drawTruncatedText(ctx, line3Text, textX, line3Y, textMaxW)
+    // Line 3: "LOCALITÀ: Poirino" con la label dichiarata.
+    // La label è in giallo soft (crema) e la città in bianco pieno per farla risaltare.
+    const locSize = descSize
+    const labelText = 'LOCALITÀ: '
+    ctx.font = `800 ${locSize}px system-ui, Arial, sans-serif`
+    const labelW = ctx.measureText(labelText).width
+    ctx.fillStyle = COL.cream
+    ctx.fillText(labelText, textX, line3Y)
+    // Città subito dopo la label, con troncamento sul resto della larghezza
+    ctx.font = `700 ${locSize}px system-ui, Arial, sans-serif`
+    ctx.fillStyle = COL.white
+    drawTruncatedText(ctx, city, textX + labelW, line3Y, Math.max(0, textMaxW - labelW))
+
+    // Line 4 (opzionale, solo se un unico evento nel giorno): nome torneo abbreviato
+    if (useFourLines && compactComp) {
+      ctx.font = `500 12px system-ui, Arial, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.62)'
+      drawTruncatedText(ctx, compactComp, textX, line4Y, textMaxW)
+    }
+  } else if (matchCompact) {
+    // 2 righe compatte (giorni densi): tutto su line 2 con separatore medio
+    ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    const compactLine = city
+      ? `${icon} ${city} · vs ${ev.opponent || '—'}`
+      : `${icon} vs ${ev.opponent || '—'}`
+    drawTruncatedText(ctx, compactLine, textX, line2Y, textMaxW)
+  } else {
+    // Allenamento o fallback
+    ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    drawTruncatedText(ctx, ev.location || 'Allenamento', textX, line2Y, textMaxW)
   }
 }
 

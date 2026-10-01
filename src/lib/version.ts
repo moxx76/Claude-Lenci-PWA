@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.107'
+export const APP_VERSION = '1.9.108'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.108',
+    date: '2026-10-01',
+    title: 'Planner settimanale PNG: etichetta esplicita "LOCALITÀ:" per la città',
+    fixes: [
+      'Richiesta Davide: la riga partita del poster "Planner settimanale" deve avere un\'etichetta esplicita "LOCALITÀ:" davanti alla città, invece di avere la città nascosta nella stessa riga dell\'avversario con solo l\'icona 🏠/✈️. Ora chi legge il poster su WhatsApp capisce subito dove si gioca',
+      'Nuovo layout per le partite con spazio verticale (1 evento al giorno, con competition): 4 righe — riga 1 nome squadra, riga 2 "🏠 vs ANDEZENO", riga 3 "LOCALITÀ: Poirino" con la label in color crema e la città in bianco pieno, riga 4 nome torneo abbreviato in piccolo opaco (es. "Pre-Campionato U14 Prov. · G1 · 1ª g Rit")',
+      'Per 2 partite al giorno il layout si riduce a 3 righe (team + vs + LOCALITÀ, senza il nome torneo in coda). Giorni con 3-4 eventi tornano al layout compatto a 2 righe ("🏠 Poirino · vs Avv") per non rompere la densità. Allenamenti invariati',
+    ],
+  },
   {
     version: '1.9.107',
     date: '2026-10-01',
