@@ -485,12 +485,24 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
         </div>
         {locationParts && (
           <>
-            <div style={{
-              fontSize: 10.5, color: '#707882',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {locationParts.icon} {locationParts.primary}
-            </div>
+            {/* v1.9.109: etichetta esplicita "LOCALITÀ:" per i match */}
+            {ev.kind === 'match' ? (
+              <div style={{
+                fontSize: 10.5, lineHeight: 1.3,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                <span style={{ color: '#707882' }}>{locationParts.icon}&nbsp;</span>
+                <span style={{ color: '#7a0071', fontWeight: 800 }}>LOCALITÀ:&nbsp;</span>
+                <span style={{ color: '#181c20', fontWeight: 700 }}>{locationParts.primary}</span>
+              </div>
+            ) : (
+              <div style={{
+                fontSize: 10.5, color: '#707882',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {locationParts.icon} {locationParts.primary}
+              </div>
+            )}
             {locationParts.secondary && (
               <div style={{
                 fontSize: 10.5, color: '#707882',

@@ -408,15 +408,40 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
     || (evt.competition || '').toLowerCase().includes('cup')
 
   if (parts) {
-    // Riga 1: icona + città
-    ctx.fillStyle = COLOR_MUTED
-    ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-    ctx.fillText(
-      truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
-      rightX,
-      y + 132,
-    )
-    // Riga(2+): nome torneo wrappato (per i tornei)
+    // v1.9.109: etichetta esplicita "LOCALITÀ:" (richiesta Davide)
+    const isMatchLike = evt.kind === 'match' || evt.kind === 'tournament'
+    const locRowY = y + 132
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    if (isMatchLike) {
+      let xCursor = rightX
+      // Icona
+      ctx.font = '500 22px "Segoe UI Emoji", "Apple Color Emoji", "Segoe UI", sans-serif'
+      ctx.fillStyle = COLOR_MUTED
+      const iconStr = `${parts.icon} `
+      ctx.fillText(iconStr, xCursor, locRowY)
+      xCursor += ctx.measureText(iconStr).width
+      // Label "LOCALITÀ:" in viola (brand)
+      ctx.font = '800 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillStyle = COLOR_VIOLA
+      const labelText = 'LOCALITÀ: '
+      ctx.fillText(labelText, xCursor, locRowY)
+      xCursor += ctx.measureText(labelText).width
+      // Città in nero pieno
+      ctx.font = '800 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillStyle = COLOR_TEXT
+      const remainingW = Math.max(0, rightX + rightW - xCursor)
+      ctx.fillText(truncateToWidth(ctx, parts.primary, remainingW), xCursor, locRowY)
+    } else {
+      ctx.fillStyle = COLOR_MUTED
+      ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillText(
+        truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
+        rightX,
+        locRowY,
+      )
+    }
+    // Nome torneo wrappato sotto (per i tornei)
     if (parts.secondary) {
       const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
       ctx.font = tourneyFont

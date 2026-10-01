@@ -390,11 +390,11 @@ function drawEventCard(
   ctx.textBaseline = 'top'
   ctx.fillText(truncateToWidth(ctx, mainTitle, rightW), rightX, y + 76)
 
-  // Riga location UNIFORME (v1.9.104 + fix v1.9.105): invece di "🏠 Casa" /
-  // "✈️ Trasferta", mostriamo la città in chiaro ("🏠 Poirino"). Per i tornei,
-  // il nome della competizione va su una (o più) righe sotto la città così
-  // non viene troncato quando è lungo (es. "Torneo Pre-Campionato U14
-  // Provinciale - Girone 1 - 1ª giornata").
+  // v1.9.109: etichetta esplicita "LOCALITÀ:" davanti alla città
+  // (richiesta Davide per uniformare con il planner settimanale v1.9.108).
+  // Layout:
+  //   Riga 1: icona + "LOCALITÀ:" (grassetto, colore settore) + città (nero pieno)
+  //   Riga(2+): nome torneo wrappato su più righe se presente (opaco)
   const parts = formatEventLocationParts({
     venue: ev.venue,
     location: ev.location,
@@ -403,21 +403,53 @@ function drawEventCard(
     kind: ev.kind,
   })
   if (parts) {
-    // Riga 1: icona + città
-    ctx.fillStyle = COLOR_MUTED
-    ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-    ctx.fillText(
-      truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
-      rightX,
-      y + 120,
-    )
-    // Riga(2+): nome torneo wrappato su più righe se necessario
+    // SectorEvent.kind è ristretto a 'training' | 'match' — i tornei qui
+    // sono 'match' con competition che contiene "torneo"
+    const isMatchLike = ev.kind === 'match'
+    const locRowY = y + 120
+    if (isMatchLike) {
+      // Icona a sinistra, label "LOCALITÀ:" + città a seguire sulla stessa riga.
+      // Label in accent del settore così risalta subito.
+      let xCursor = rightX
+      // Icona
+      ctx.font = '500 22px "Segoe UI Emoji", "Apple Color Emoji", "Segoe UI", sans-serif'
+      ctx.fillStyle = COLOR_MUTED
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      const iconStr = `${parts.icon} `
+      ctx.fillText(iconStr, xCursor, locRowY)
+      xCursor += ctx.measureText(iconStr).width
+      // Label "LOCALITÀ:"
+      const labelFont = '800 20px "Segoe UI", -apple-system, sans-serif'
+      ctx.font = labelFont
+      ctx.fillStyle = sectorMeta.accent
+      const labelText = 'LOCALITÀ: '
+      ctx.fillText(labelText, xCursor, locRowY)
+      xCursor += ctx.measureText(labelText).width
+      // Città
+      ctx.font = '800 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.fillStyle = COLOR_TEXT
+      const remainingW = Math.max(0, rightX + rightW - xCursor)
+      ctx.fillText(truncateToWidth(ctx, parts.primary, remainingW), xCursor, locRowY)
+    } else {
+      // Allenamento o altro: riga semplice "📍 location"
+      ctx.fillStyle = COLOR_MUTED
+      ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillText(
+        truncateToWidth(ctx, `${parts.icon} ${parts.primary}`, rightW),
+        rightX,
+        locRowY,
+      )
+    }
+    // Nome torneo wrappato sotto, opaco
     if (parts.secondary) {
       const tourneyFont = '500 20px "Segoe UI", -apple-system, sans-serif'
       ctx.font = tourneyFont
       ctx.fillStyle = COLOR_MUTED
       const lines = wrapText(ctx, parts.secondary, rightW, tourneyFont)
-      let ty = y + 120 + 30
+      let ty = locRowY + 30
       for (const line of lines) {
         ctx.fillText(line, rightX, ty)
         ty += EVENT_TOURNAMENT_LINE_H

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.108'
+export const APP_VERSION = '1.9.109'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.109',
+    date: '2026-10-01',
+    title: 'Weekend del club + Planner Weekend: etichetta esplicita "LOCALITÀ:" come nel settimanale',
+    fixes: [
+      'Richiesta Davide: estendere la label esplicita "LOCALITÀ:" (introdotta in v1.9.108 nel planner settimanale) anche ai planner del weekend — PNG "Weekend del club" raggruppato per settore, PNG "Planner Weekend" per giorno, e card dashboard React. Ora in tutti e 3 i contesti chi legge vede immediatamente dove si gioca con una label dichiarata',
+      'Builder PNG "Weekend del club" (weekendSectorPlannerBuilder): la riga location delle partite è ora "🏠 LOCALITÀ: Poirino" con "LOCALITÀ:" in grassetto nel colore accent del settore (rosso per Prima Squadra, azzurro per Settore Giovanile, ambra per Scuola Calcio) e città in nero pieno. Allenamenti restano con "📍 location" senza label (non c\'è "trasferta" negli allenamenti)',
+      'Builder PNG "Planner Weekend" per giorno (weekendPlannerBuilder): stesso trattamento, con "LOCALITÀ:" in viola brand e città in nero pieno. Il nome torneo wrappato sotto resta invariato (riga aggiuntiva opaca)',
+      'Card React "Weekend del club" nel dashboard: aggiunta la label "LOCALITÀ:" in viola per partite/tornei, città in nero. Allenamenti continuano a mostrare solo "📍 location"',
+    ],
+  },
   {
     version: '1.9.108',
     date: '2026-10-01',
