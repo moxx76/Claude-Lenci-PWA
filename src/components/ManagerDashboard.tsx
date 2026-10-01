@@ -15,6 +15,7 @@ import { AttendanceSheet } from './AttendanceSheet'
 import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
 import { WeekendPlannerCard } from './WeekendPlannerCard'
 import { useAuth } from '../store/auth'
+import { extractCity, isTournamentCompetition, HOME_CITY } from '../lib/eventLocation'
 
 // Elenco user_id dei dirigenti autorizzati a vedere la card "Weekend del club"
 // nella Dashboard manager. Normalmente la card è riservata ad admin/director,
@@ -694,12 +695,31 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
             </p>
           </div>
           <div style={{ padding: 16 }}>
-            {nextMatch.location && (
-              <p style={{ fontSize: 12, color: '#404751', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Icon name="location_on" size={13} />
-                {nextMatch.location}
-              </p>
-            )}
+            {(() => {
+              // v1.9.104: riga location esplicita con città.
+              // Casa → "Poirino · <nome campo>"
+              // Trasferta → "<città> · <nome campo>" (torneo: "<città> – <nome torneo> · <nome campo>")
+              const isTournamentLike = isTournamentCompetition(nextMatch.competition)
+              let cityPrefix: string | null = null
+              if (nextMatch.venue === 'home') {
+                cityPrefix = HOME_CITY
+              } else if (nextMatch.venue === 'away') {
+                cityPrefix = extractCity(nextMatch.location_address, nextMatch.location)
+              }
+              if (cityPrefix && isTournamentLike && nextMatch.competition) {
+                cityPrefix = `${cityPrefix} – ${nextMatch.competition.trim()}`
+              }
+              if (!nextMatch.location && !cityPrefix) return null
+              const label = cityPrefix && nextMatch.location
+                ? `${cityPrefix} · ${nextMatch.location}`
+                : (cityPrefix || nextMatch.location)
+              return (
+                <p style={{ fontSize: 12, color: '#404751', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="location_on" size={13} />
+                  {label}
+                </p>
+              )
+            })()}
             <div style={{
               display: 'flex', gap: 8, marginBottom: 12,
               padding: '10px 12px', background: '#f7f9ff', borderRadius: 10,

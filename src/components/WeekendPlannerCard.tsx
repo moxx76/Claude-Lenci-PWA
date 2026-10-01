@@ -8,6 +8,7 @@ import {
   shareOrDownload,
   type SectorPlannerData,
 } from '../lib/weekendSectorPlannerBuilder'
+import { formatEventLocation } from '../lib/eventLocation'
 
 /**
  * WeekendPlannerCard — Pannello dashboard che mostra gli impegni del weekend
@@ -49,6 +50,10 @@ interface EventRow {
   venue: 'home' | 'away' | null
   opponent: string | null
   location: string | null
+  // v1.9.104: estesi con indirizzo + competition per poter mostrare la
+  // città (location_address) e il nome torneo nel riga location.
+  location_address: string | null
+  competition: string | null
 }
 
 const SECTOR_META: Record<Sector, { label: string; icon: string; accent: string; bg: string }> = {
@@ -84,6 +89,8 @@ function mapForExport(e: EventRow) {
     opponent: e.opponent,
     venue: e.venue,
     location: e.location,
+    locationAddress: e.location_address,
+    competition: e.competition,
   }
 }
 
@@ -126,7 +133,7 @@ export function WeekendPlannerCard() {
             .select('id, training_date, start_time, end_time, team_id, focus, location')
             .gte('training_date', satISO).lte('training_date', sunISO),
           supabase.from('matches')
-            .select('id, match_date, team_id, opponent, venue, location, kickoff_field, competition')
+            .select('id, match_date, team_id, opponent, venue, location, location_address, kickoff_field, competition')
             .gte('match_date', satISO + 'T00:00:00')
             .lte('match_date', sunISO + 'T23:59:59'),
         ])
@@ -150,6 +157,8 @@ export function WeekendPlannerCard() {
             team_name: team?.name ?? null, team_color: team?.color ?? null,
             venue: null, opponent: null,
             location: t.location,
+            location_address: null,
+            competition: null,
           })
         }
         for (const m of (matchRes.data ?? []) as any[]) {
@@ -168,6 +177,8 @@ export function WeekendPlannerCard() {
             venue: (m.venue === 'home' || m.venue === 'away') ? m.venue : null,
             opponent: m.opponent,
             location: m.kickoff_field || m.location || null,
+            location_address: m.location_address || null,
+            competition: m.competition || null,
           })
         }
         list.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
@@ -428,6 +439,17 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
   const kindColor = ev.kind === 'match' ? '#93000a' : '#004a78'
   const kindLabel = ev.kind === 'match' ? 'Partita' : 'Allenamento'
 
+  // v1.9.104: riga location UNIFORME — mostra la città in chiaro invece di
+  // "🏠 Casa" / "✈️ Trasferta" generici. Per i tornei include anche il nome
+  // della competizione (es. "✈️ Rivoli – Torneo Quattro Stagioni").
+  const locationInfo = formatEventLocation({
+    venue: ev.venue,
+    location: ev.location,
+    locationAddress: ev.location_address,
+    competition: ev.competition,
+    kind: ev.kind,
+  })
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -453,12 +475,6 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
               color: ev.team_color || '#404751',
             }}>{ev.team_name}</span>
           )}
-          {ev.kind === 'match' && ev.venue === 'home' && (
-            <span style={{ fontSize: 10, color: '#8e6300' }}>🏠 Casa</span>
-          )}
-          {ev.kind === 'match' && ev.venue === 'away' && (
-            <span style={{ fontSize: 10, color: '#8e6300' }}>✈️ Trasferta</span>
-          )}
         </div>
         <div style={{
           fontSize: 12, fontWeight: 700, color: '#181c20',
@@ -466,12 +482,12 @@ function SectorEventRow({ ev }: { ev: EventRow }) {
         }}>
           {ev.title}
         </div>
-        {ev.location && (
+        {locationInfo && (
           <div style={{
             fontSize: 10.5, color: '#707882',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            📍 {ev.location}
+            {locationInfo.icon} {locationInfo.label}
           </div>
         )}
       </div>

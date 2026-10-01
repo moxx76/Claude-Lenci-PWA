@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.103'
-export const APP_VERSION_DATE = '2026-09-22'
+export const APP_VERSION = '1.9.104'
+export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
   version: string
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.104',
+    date: '2026-10-01',
+    title: 'Planner/Report: località esplicita (città) accanto a 🏠/✈️ in modo uniforme',
+    fixes: [
+      'Richiesta Luca Palermo: su "Weekend del club", "Planner Weekend" (PNG), card prossima partita (mister e dashboard famiglia) e card calendario la riga location mostrava solo l\'icona casa/aeroplano senza indicare la città — scomodo per le trasferte (es. "Trasferta" senza dire dove) e ambiguo per i tornei (nessun modo di sapere a colpo d\'occhio dove si gioca). Ora la città è sempre esplicita e per i tornei è concatenato anche il nome della competizione',
+      'Nuovo modulo src/lib/eventLocation.ts con due funzioni condivise: extractCity(location_address, location) estrae il nome della città parsando l\'indirizzo esteso (gestisce "Via X, 10046 Poirino (TO)", "Via Y, 40 - Nichelino (To)", "Via Z CN", scartando CAP residui e prefissi via/corso/piazza); formatEventLocation({venue, location, locationAddress, competition, kind}) restituisce {icon, label} nel formato richiesto. Casa→"🏠 Poirino" (fisso, sede Lenci), Trasferta→"✈️ Rivoli" (città estratta), Torneo→"🏠/✈️ Rivoli – Torneo Quattro Stagioni"',
+      'Applicato uniformemente su 6 superfici: (1) WeekendPlannerCard (dashboard admin/director/Genna, raggruppata per settore), (2) weekendSectorPlannerBuilder (PNG 1080×1920 esportabile da quella card), (3) weekendPlannerBuilder (PNG dal calendario filtrato Weekend), (4) EventCard di CalendarPage (riga sotto le pill Casa/Trasferta), (5) card "Prossima partita" di ManagerDashboard, (6) card next-event del Dashboard famiglia/athlete',
+      'Le pill colorate Casa/Trasferta (verde/arancione) e le icone 🏠/✈️ restano come supporto visivo rapido, ma la città diventa IL dato leggibile. In nessun caso si perde l\'informazione precedente — nome campo e competizione continuano a comparire, concatenati con separatore " · "',
+      'Zero migration DB. useCalendarEvents.ts ora popola CalendarEvent.address con matches.location_address (prima era sempre null per i match). WeekendPlannerCard aggiunge location_address e competition al select di matches. Chiamanti dei builder PNG estesi con locationAddress opzionale per retrocompatibilità',
+    ],
+  },
   {
     version: '1.9.103',
     date: '2026-10-01',

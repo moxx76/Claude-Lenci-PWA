@@ -13,6 +13,8 @@
  * Zero dipendenze esterne. Canvas 2D nativo.
  */
 
+import { formatEventLocationLine } from './eventLocation'
+
 export type SectorKey = 'prima' | 'agonistica' | 'scuola'
 
 export interface SectorEvent {
@@ -26,6 +28,10 @@ export interface SectorEvent {
   opponent: string | null
   venue: 'home' | 'away' | null
   location: string | null
+  // v1.9.104: indirizzo esteso + competition per mostrare città in chiaro
+  // e nome torneo nella riga location (es. "Rivoli – Torneo Quattro Stagioni").
+  locationAddress?: string | null
+  competition?: string | null
 }
 
 export interface SectorPlannerData {
@@ -341,15 +347,20 @@ function drawEventCard(
   ctx.textBaseline = 'top'
   ctx.fillText(truncateToWidth(ctx, mainTitle, rightW), rightX, y + 76)
 
-  // Riga location (casa/trasferta + luogo)
-  const infoParts: string[] = []
-  if (ev.venue === 'home') infoParts.push('🏠 Casa')
-  else if (ev.venue === 'away') infoParts.push('✈️ Trasferta')
-  if (ev.location) infoParts.push(ev.location)
-  if (infoParts.length > 0) {
+  // Riga location UNIFORME (v1.9.104): invece di "🏠 Casa" / "✈️ Trasferta",
+  // mostriamo la città in chiaro — es. "🏠 Poirino" oppure
+  // "✈️ Rivoli – Torneo Quattro Stagioni" per i tornei.
+  const infoLine = formatEventLocationLine({
+    venue: ev.venue,
+    location: ev.location,
+    locationAddress: ev.locationAddress ?? null,
+    competition: ev.competition ?? null,
+    kind: ev.kind,
+  })
+  if (infoLine) {
     ctx.fillStyle = COLOR_MUTED
     ctx.font = '500 22px "Segoe UI", -apple-system, sans-serif'
-    ctx.fillText(truncateToWidth(ctx, infoParts.join(' · '), rightW), rightX, y + 120)
+    ctx.fillText(truncateToWidth(ctx, infoLine, rightW), rightX, y + 120)
   }
 }
 

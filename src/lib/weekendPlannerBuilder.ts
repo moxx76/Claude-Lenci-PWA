@@ -15,6 +15,8 @@
  * Nessuna dipendenza esterna, funziona anche offline.
  */
 
+import { formatEventLocationLine } from './eventLocation'
+
 export interface WeekendPlannerEvent {
   date: string             // YYYY-MM-DD
   startTime: string | null // HH:MM
@@ -27,6 +29,9 @@ export interface WeekendPlannerEvent {
   opponent: string | null
   venue: 'home' | 'away' | null
   competition: string | null
+  // v1.9.104: indirizzo esteso per estrarre la città in chiaro.
+  // Opzionale per retrocompatibilità con chiamanti più vecchi.
+  locationAddress?: string | null
 }
 
 export interface WeekendPlannerData {
@@ -360,12 +365,16 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
   const truncMain = truncateToWidth(ctx, mainTitle, rightW)
   ctx.fillText(truncMain, rightX, y + 82)
 
-  // Riga info (casa/trasferta + location)
-  const infoParts: string[] = []
-  if (evt.venue === 'home') infoParts.push('🏠 Casa')
-  else if (evt.venue === 'away') infoParts.push('✈️ Trasferta')
-  if (evt.location) infoParts.push(evt.location)
-  const infoLine = infoParts.join(' · ')
+  // Riga info UNIFORME (v1.9.104): invece di "🏠 Casa" / "✈️ Trasferta",
+  // scrivo direttamente la città ("🏠 Poirino", "✈️ Rivoli") e, per i tornei,
+  // concateno il nome della competizione ("✈️ Rivoli – Torneo Quattro Stagioni").
+  const infoLine = formatEventLocationLine({
+    venue: evt.venue,
+    location: evt.location,
+    locationAddress: evt.locationAddress ?? null,
+    competition: evt.competition,
+    kind: evt.kind,
+  })
 
   if (infoLine) {
     ctx.fillStyle = COLOR_MUTED
@@ -374,8 +383,13 @@ function drawEventCard(ctx: CanvasRenderingContext2D, y: number, evt: WeekendPla
     ctx.fillText(truncInfo, rightX, y + 132)
   }
 
-  // Competizione (in fondo, piccola)
-  if (evt.competition) {
+  // Competizione in piccolo in fondo: la stampo solo se NON è già stata
+  // inglobata nella riga location sopra (succede per i tornei). Per campionati
+  // e amichevoli resta visibile come riga sotto il titolo.
+  const isTournamentLike = evt.kind === 'tournament'
+    || (evt.competition || '').toLowerCase().includes('torneo')
+    || (evt.competition || '').toLowerCase().includes('cup')
+  if (evt.competition && !isTournamentLike) {
     ctx.fillStyle = COLOR_MUTED
     ctx.font = '400 18px "Segoe UI", -apple-system, sans-serif'
     const truncComp = truncateToWidth(ctx, evt.competition, rightW)

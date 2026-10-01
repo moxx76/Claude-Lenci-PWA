@@ -23,6 +23,7 @@ import { ShuttleServiceCard } from '../components/ShuttleServiceCard'
 import { AdminStaffOverviewCard } from '../components/AdminStaffOverviewCard'
 import { WeekendPlannerCard } from '../components/WeekendPlannerCard'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
+import { extractCity, isTournamentCompetition, HOME_CITY } from '../lib/eventLocation'
 import { useMyTeam } from '../hooks/useMyTeam'
 import { useViewMode } from '../store/viewMode'
 import { useImpersonation } from '../store/impersonation'
@@ -1069,12 +1070,30 @@ function CoachDashboard({ firstName }: { firstName: string }) {
           <h3 style={{ fontFamily: 'Anybody', fontWeight: 700, fontSize: 18, color: '#181c20', margin: '0 0 8px' }}>
             {nextEvent.title}
           </h3>
-          {nextEvent.location && (
-            <p style={{ fontSize: 12.5, color: '#404751', margin: '0 0 14px', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="location_on" size={14} />
-              {nextEvent.location}
-            </p>
-          )}
+          {(() => {
+            // v1.9.104: riga location esplicita con città.
+            const isMatchLike = nextEvent.kind === 'match' || nextEvent.kind === 'tournament'
+            const isTournamentLike = nextEvent.kind === 'tournament'
+              || isTournamentCompetition(nextEvent.competition)
+            let cityPrefix: string | null = null
+            if (isMatchLike) {
+              if (nextEvent.venue === 'home') cityPrefix = HOME_CITY
+              else if (nextEvent.venue === 'away') cityPrefix = extractCity(nextEvent.address, nextEvent.location)
+              if (cityPrefix && isTournamentLike && nextEvent.competition) {
+                cityPrefix = `${cityPrefix} – ${nextEvent.competition.trim()}`
+              }
+            }
+            if (!nextEvent.location && !cityPrefix) return null
+            const label = cityPrefix && nextEvent.location
+              ? `${cityPrefix} · ${nextEvent.location}`
+              : (cityPrefix || nextEvent.location)
+            return (
+              <p style={{ fontSize: 12.5, color: '#404751', margin: '0 0 14px', lineHeight: 1.5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="location_on" size={14} />
+                {label}
+              </p>
+            )
+          })()}
           <div
             style={{
               width: '100%', height: 110, borderRadius: 12,

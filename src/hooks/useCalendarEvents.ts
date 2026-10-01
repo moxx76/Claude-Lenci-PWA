@@ -177,7 +177,9 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
             ? `Torneo — ${m.opponent}`
             : `${m.venue === 'home' ? 'vs' : '@'} ${m.opponent}`,
           location: m.location,
-          address: null,
+          // v1.9.104: popolo l'indirizzo esteso quando presente, serve ai
+          // builder planner (city extractor) per mostrare la città in chiaro.
+          address: m.location_address ?? null,
           teamId: m.team_id,
           teamName: team?.name || null,
           teamCategory: team?.category || null,

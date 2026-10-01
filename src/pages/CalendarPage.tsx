@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { isAdmin, isCoach, isParent, isAthlete } from '../lib/types'
 import { useCalendarEvents, eventBadgeStyle, type CalendarEvent } from '../hooks/useCalendarEvents'
+import { extractCity, isTournamentCompetition, HOME_CITY } from '../lib/eventLocation'
 import { useMyTeam } from '../hooks/useMyTeam'
 import { Icon } from '../components/Icon'
 import { AttendanceSheet } from '../components/AttendanceSheet'
@@ -590,6 +591,10 @@ export function CalendarPage() {
                   teamName: e.teamName,
                   teamColor: e.teamColor,
                   location: e.location,
+                  // v1.9.104: passo location_address per far risolvere al
+                  // builder la città (es. "Rivoli") invece del generico
+                  // "Trasferta". Fallback a null se mancante.
+                  locationAddress: e.address ?? e.raw?.location_address ?? null,
                   opponent: e.opponent,
                   venue: (e.venue === 'home' || e.venue === 'away') ? e.venue : null,
                   competition: e.competition,
@@ -1480,17 +1485,42 @@ function EventCard({ event, showTeamTag, isPast, isStaff, attBreakdown, matchBre
         </div>
       )}
 
-      {event.location && (
-        <p
-          style={{
-            fontSize: 11.5, color: '#707882', margin: 0,
-            display: 'flex', alignItems: 'center', gap: 4,
-          }}
-        >
-          <Icon name="location_on" size={13} />
-          {event.location}
-        </p>
-      )}
+      {(() => {
+        // v1.9.104: riga location esplicita con città. Per partite/tornei
+        // anteponiamo "<Città>" (o "<Città> – Nome torneo") al nome campo,
+        // così la località è leggibile a colpo d'occhio senza dover dedurre
+        // dalla pill Casa/Trasferta. Per gli altri eventi mostriamo location raw.
+        const isMatchLike = event.kind === 'match' || event.kind === 'tournament'
+        const isTournamentLike = event.kind === 'tournament'
+          || isTournamentCompetition(event.competition)
+        let cityPrefix: string | null = null
+        if (isMatchLike) {
+          if (event.venue === 'home') {
+            cityPrefix = HOME_CITY
+          } else if (event.venue === 'away') {
+            cityPrefix = extractCity(event.address, event.location)
+          }
+          if (cityPrefix && isTournamentLike && event.competition) {
+            cityPrefix = `${cityPrefix} – ${event.competition.trim()}`
+          }
+        }
+        // Mostro la riga se c'è location O un cityPrefix da esporre
+        if (!event.location && !cityPrefix) return null
+        const label = cityPrefix && event.location
+          ? `${cityPrefix} · ${event.location}`
+          : (cityPrefix || event.location)
+        return (
+          <p
+            style={{
+              fontSize: 11.5, color: '#707882', margin: 0,
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            <Icon name="location_on" size={13} />
+            {label}
+          </p>
+        )
+      })()}
 
       {event.notes && (
         <p style={{ fontSize: 11.5, color: '#404751', margin: '6px 0 0', fontStyle: 'italic' }}>
