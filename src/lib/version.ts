@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.101'
+export const APP_VERSION = '1.9.102'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.102',
+    date: '2026-10-01',
+    title: 'Dashboard admin/director: card "Weekend del club" raggruppata per settore',
+    fixes: [
+      'Nella dashboard di admin e director compare una nuova card viola "Weekend del club" che mostra tutti gli impegni di sabato e domenica raggruppati nei 3 settori secondo convenzione FIGC: Prima Squadra (adulti), Settore Giovanile Agonistico (Juniores U19 + Under 14/16/17), Scuola Calcio / Attività di Base (Esordienti, Pulcini, Primi Calci, Piccoli Amici). Richiesta di Luca Palermo per avere una vista d\'insieme senza aprire il calendario intero',
+      'Il weekend viene calcolato automaticamente: lun→gio mostra il weekend prossimo; ven, sab e dom mostrano il weekend in corso. Ogni card settore è colorata (rosso Prima Squadra, azzurro Giovanile, giallo Scuola Calcio) e include per ogni evento: data (SAB/DOM), ora, badge tipo (Partita rosso / Allenamento azzurro), nome squadra, avversario o focus, indicazione Casa/Trasferta per le partite e location. Card espandibile/richiudibile dal titolo',
+      'Visibile a tutti gli admin e director del club. RLS esistente filtra già per club: nessuna migration DB necessaria, i dati arrivano dalle tabelle trainings + matches senza nuove query dedicate',
+    ],
+  },
   {
     version: '1.9.101',
     date: '2026-09-28',

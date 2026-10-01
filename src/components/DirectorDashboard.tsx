@@ -10,6 +10,7 @@ import { MedicalComplianceSheet } from './MedicalComplianceSheet'
 import { PresenceLogSheet } from './PresenceLogSheet'
 import { AdminStaffOverviewCard } from './AdminStaffOverviewCard'
 import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
+import { WeekendPlannerCard } from './WeekendPlannerCard'
 import { TeamPickerSheet } from './TeamPickerSheet'
 import { sortTeamsByAge } from '../lib/teamOrder'
 
@@ -294,6 +295,8 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
       </div>
 
       {/* Panoramica staff (presenze allenamenti/partite + servizi navetta) */}
+      <WeekendPlannerCard />
+
       <AdminStaffOverviewCard />
 
       {/* Selettore squadra per il pannello statistiche giocatori.

@@ -21,6 +21,7 @@ import { CoachPlayerStatsDashboard } from '../components/CoachPlayerStatsDashboa
 import { TeamPickerSheet } from '../components/TeamPickerSheet'
 import { ShuttleServiceCard } from '../components/ShuttleServiceCard'
 import { AdminStaffOverviewCard } from '../components/AdminStaffOverviewCard'
+import { WeekendPlannerCard } from '../components/WeekendPlannerCard'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { useMyTeam } from '../hooks/useMyTeam'
 import { useViewMode } from '../store/viewMode'
@@ -510,6 +511,11 @@ function AdminDashboard({ firstName }: { firstName: string }) {
           </div>
         </div>
       )}
+
+      {/* Weekend del club raggruppato per settore (Prima Squadra / Settore Giovanile / Scuola Calcio).
+          Richiesto da Luca Palermo per avere a colpo d'occhio i tre settori. Visibile per
+          tutti gli admin (sia director sia non-director), montato anche in DirectorDashboard. */}
+      <WeekendPlannerCard />
 
       {/* Panoramica staff (presenze allenamenti/partite + servizi navetta) */}
       <AdminStaffOverviewCard />
