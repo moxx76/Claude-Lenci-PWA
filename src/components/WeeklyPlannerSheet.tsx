@@ -111,7 +111,7 @@ export function WeeklyPlannerSheet({ open, onClose, teamFilter, teams }: Props) 
     if (teamFilter) tq = tq.eq('team_id', teamFilter)
 
     let mq = supabase.from('matches')
-      .select('id, match_date, opponent, venue, competition, location, team_id, team:teams(name, color, category, age_range)')
+      .select('id, match_date, opponent, venue, competition, location, location_address, team_id, team:teams(name, color, category, age_range)')
       .gte('match_date', `${weekStart}T00:00:00`)
       .lte('match_date', `${weekEnd}T23:59:59`)
       .order('match_date')
@@ -163,6 +163,8 @@ export function WeeklyPlannerSheet({ open, onClose, teamFilter, teams }: Props) 
         opponent: m.opponent,
         venue: m.venue,
         location: m.location ?? null,
+        // v1.9.106: location_address serve a estrarre la città in chiaro nel poster
+        locationAddress: m.location_address ?? null,
         competition: m.competition ?? null,
       })
     }

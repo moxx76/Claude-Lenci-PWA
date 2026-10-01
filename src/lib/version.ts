@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.105'
+export const APP_VERSION = '1.9.106'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.106',
+    date: '2026-10-01',
+    title: 'Planner settimanale PNG: aggiunta la città anche sulla riga partita',
+    fixes: [
+      'BUG segnalato: il poster "Planner settimanale" (1080×1350 condiviso su WhatsApp) mostrava per le partite solo "🏠 vs ANDEZENO · Torneo Pre-Campionato..." senza nome città — non era allineato al resto dei planner/report dopo v1.9.104. Ora la riga partita mostra "🏠 Poirino · vs ANDEZENO · Torneo..." (casa) o "✈ Rivoli · vs X" (trasferta)',
+      'La città viene estratta via formatEventLocationParts() da matches.location_address con fallback alla logica standard (HOME_CITY=Poirino per i match in casa). Aggiunto location_address al select di matches in WeeklyPlannerSheet e nuovo campo locationAddress nel PlannerEvent di weeklyPlannerPoster.ts. Il nome torneo in coda viene mantenuto quando ci sono ≤2 eventi/giorno (per non sovrappopolare le righe), con troncamento automatico se eccede la larghezza della card',
+    ],
+  },
   {
     version: '1.9.105',
     date: '2026-10-01',

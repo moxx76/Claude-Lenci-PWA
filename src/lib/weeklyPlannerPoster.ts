@@ -3,6 +3,8 @@
  * Canvas 1080x1350 stile Lenci con 7 giorni della settimana.
  */
 
+import { formatEventLocationParts } from './eventLocation'
+
 export interface PlannerEvent {
   kind: 'training' | 'match' | 'tournament'
   time: string | null   // HH:MM
@@ -12,6 +14,8 @@ export interface PlannerEvent {
   opponent?: string | null   // per match
   venue?: 'home' | 'away' | null
   location?: string | null
+  /** Indirizzo esteso (matches.location_address) — serve per estrarre la città in chiaro (v1.9.106). */
+  locationAddress?: string | null
   competition?: string | null
 }
 
@@ -370,15 +374,30 @@ function drawEvent(
   const label1 = ev.teamName.toUpperCase()
   drawTruncatedText(ctx, label1, textX, line1Y, textMaxW)
 
-  // Line 2: descrizione match (vs opponent) o info allenamento (location)
+  // Line 2: descrizione match (vs opponent + città) o info allenamento (location)
+  // v1.9.106: aggiunta la città ("🏠 Poirino · vs Andezeno") per uniformare col
+  // resto dei planner/report invece di solo "🏠 vs Andezeno". Per i tornei la
+  // competition è già inclusa (compressa dopo " · ") quando c'è spazio.
   const descSize = totalEvs <= 2 ? 14 : 11
   const line2Y = totalEvs === 1 ? cy + 12 : cy + (descSize * 0.7)
   ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
   ctx.fillStyle = 'rgba(255,255,255,0.78)'
   let line2 = ''
   if (isMatch) {
-    const casa = ev.venue === 'home' ? '🏠' : '✈'
-    line2 = `${casa} vs ${ev.opponent || '—'}`
+    const parts = formatEventLocationParts({
+      venue: ev.venue ?? null,
+      location: ev.location ?? null,
+      locationAddress: ev.locationAddress ?? null,
+      competition: ev.competition ?? null,
+      kind: ev.kind === 'tournament' ? 'tournament' : 'match',
+    })
+    const icon = parts?.icon || (ev.venue === 'home' ? '🏠' : '✈')
+    const city = parts?.primary || ''
+    // Prefix compatto: "🏠 Poirino · vs Andezeno"
+    line2 = city
+      ? `${icon} ${city} · vs ${ev.opponent || '—'}`
+      : `${icon} vs ${ev.opponent || '—'}`
+    // Nome torneo o campionato in coda solo se c'è spazio (<= 2 eventi/giorno)
     if (ev.competition && totalEvs <= 2) line2 += ` · ${ev.competition}`
   } else {
     line2 = ev.location || 'Allenamento'
