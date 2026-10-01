@@ -13,6 +13,8 @@ export interface ConvocationPosterData {
   location?: string | null
   locationAddress?: string | null   // Indirizzo specifico del campo
   competition?: string | null
+  /** Categoria FIGC della squadra (es. 'U-14', 'Esordienti', 'Pulcini', ...). */
+  category?: string | null
   players: Array<{
     number?: number | null
     firstName: string
@@ -21,6 +23,20 @@ export interface ConvocationPosterData {
   }>
   coachName?: string | null
   dressNote?: string | null         // Frase fissa "Presentarsi con divisa di rappresentanza"
+}
+
+/**
+ * Scuola calcio FIGC = Esordienti, Pulcini, Primi Calci, Piccoli Amici.
+ * Per queste categorie i giocatori non hanno numero di maglia fisso: la
+ * locandina non deve mostrare il "#N" (richiesta Davide v1.9.111).
+ */
+function isSchoolOfSoccerCategory(category: string | null | undefined): boolean {
+  const c = (category || '').trim().toLowerCase()
+  if (!c) return false
+  return c.includes('esordienti')
+    || c.includes('pulcini')
+    || c.includes('primi calci')
+    || c.includes('piccoli amici')
 }
 
 const W = 1080
@@ -49,6 +65,11 @@ export async function generateConvocationPoster(
   canvas.height = H
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D non disponibile')
+
+  // v1.9.111: per la scuola calcio (Esordienti, Pulcini, Primi Calci, Piccoli
+  // Amici) la locandina non riporta "#N" accanto al nome: non hanno numero
+  // di maglia fisso.
+  const hideShirtNumbers = isSchoolOfSoccerCategory(data.category)
 
   const logo = await loadImage(logoUrl)
 
@@ -281,8 +302,10 @@ export async function generateConvocationPoster(
       { alignLeft: true }
     )
 
-    // Numero maglia (piccolo, a destra)
-    if (p.number != null) {
+    // Numero maglia (piccolo, a destra). v1.9.111: nascosto per scuola calcio
+    // (Esordienti, Pulcini, Primi Calci, Piccoli Amici) dove non c'è numero
+    // fisso — richiesta Davide.
+    if (p.number != null && !hideShirtNumbers) {
       ctx.fillStyle = COL.red
       ctx.font = cols === 3 ? '900 15px "Anybody", Arial, sans-serif' : '900 18px "Anybody", Arial, sans-serif'
       ctx.textAlign = 'right'

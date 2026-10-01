@@ -635,6 +635,9 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
       location: loc,
       locationAddress: match.location_address || null,
       competition: match.competition,
+      // v1.9.111: la categoria serve al builder per decidere se nascondere i
+      // numeri di maglia (scuola calcio: Esordienti e inferiori).
+      category: match.team_category,
       players: posterPlayers,
       coachName,
       dressNote: 'Presentarsi con divisa di rappresentanza',

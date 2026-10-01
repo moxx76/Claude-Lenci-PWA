@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.110'
+export const APP_VERSION = '1.9.111'
 export const APP_VERSION_DATE = '2026-10-01'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.111',
+    date: '2026-10-01',
+    title: 'Locandina convocazioni: niente numeri di maglia per la scuola calcio',
+    fixes: [
+      'Richiesta Davide: nella locandina PNG "Convocazioni" per WhatsApp, dalle categorie Esordienti in giù (Esordienti, Pulcini, Primi Calci, Piccoli Amici) non devono comparire i numeri di maglia "#N" accanto al nome del giocatore — nel settore attività di base i numeri non sono fissi e cambiano partita per partita, mostrarli è fuorviante',
+      'ConvocationPosterData estesa con campo opzionale "category" che il builder usa per discriminare: isSchoolOfSoccerCategory() (case-insensitive, match su substring) restituisce true per "Esordienti", "Pulcini", "Primi Calci", "Piccoli Amici" e in quel caso la colonna del "#N" rosso non viene disegnata. Prima e Seconda squadra, Juniores, Allievi, Giovanissimi e tutte le altre categorie non cambiano: numero di maglia visibile come prima',
+      'ConvocationSheet aggiornato per passare match.team_category al poster builder. Nessuna migration DB',
+    ],
+  },
   {
     version: '1.9.110',
     date: '2026-10-01',
