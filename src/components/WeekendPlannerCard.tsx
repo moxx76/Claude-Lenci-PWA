@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Icon } from './Icon'
+import { BottomSheet } from './BottomSheet'
+import {
+  buildSectorWeekendPng,
+  downloadBlob,
+  shareOrDownload,
+  type SectorPlannerData,
+} from '../lib/weekendSectorPlannerBuilder'
 
 /**
  * WeekendPlannerCard — Pannello dashboard che mostra gli impegni del weekend
@@ -63,6 +70,23 @@ function teamSector(t: { category: string | null; name: string }): Sector {
   return 'scuola'
 }
 
+// Converte un EventRow interno al formato richiesto dal builder PNG.
+// Lascio il builder definire etichette/colori: qui passo solo dati grezzi.
+function mapForExport(e: EventRow) {
+  return {
+    date: e.date,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    kind: e.kind,
+    teamName: e.team_name,
+    teamColor: e.team_color,
+    title: e.title,
+    opponent: e.opponent,
+    venue: e.venue,
+    location: e.location,
+  }
+}
+
 // Weekend prossimo (lun→gio) o corrente (ven/sab/dom)
 function computeWeekend(): [string, string] {
   const d = new Date()
@@ -84,6 +108,12 @@ export function WeekendPlannerCard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(true)
+  // Export PNG: anteprima + condividi/scarica
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportBlob, setExportBlob] = useState<Blob | null>(null)
+  const [exportUrl, setExportUrl] = useState<string | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -164,6 +194,46 @@ export function WeekendPlannerCard() {
   }, [events, teams])
 
   const totalCount = events.length
+
+  // Costruisco il payload per il builder PNG partendo da `grouped`.
+  // Chiamato al tap del bottone Esporta: evita di generare l'immagine fino
+  // a quando l'utente non la vuole davvero.
+  async function handleOpenExport() {
+    setExportOpen(true)
+    if (exportBlob) return // già generato
+    setExportLoading(true)
+    setExportError(null)
+    try {
+      const data: SectorPlannerData = {
+        saturdayISO: satISO,
+        sundayISO: sunISO,
+        sections: {
+          prima: grouped.prima.map(mapForExport),
+          agonistica: grouped.agonistica.map(mapForExport),
+          scuola: grouped.scuola.map(mapForExport),
+        },
+      }
+      const blob = await buildSectorWeekendPng(data)
+      setExportBlob(blob)
+      setExportUrl(URL.createObjectURL(blob))
+    } catch (e: any) {
+      setExportError(e?.message || 'Errore generazione PNG')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  // Cleanup URL quando si chiude
+  useEffect(() => {
+    if (!exportOpen && exportUrl) {
+      URL.revokeObjectURL(exportUrl)
+      setExportUrl(null)
+      setExportBlob(null)
+    }
+  }, [exportOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exportFilename = `Weekend_Club_${satISO}.png`
+
   const fmtDay = (iso: string) => {
     const [y, m, d] = iso.split('-').map(Number)
     const dt = new Date(y, m - 1, d)
@@ -201,8 +271,105 @@ export function WeekendPlannerCard() {
         <Icon name={expanded ? 'expand_less' : 'expand_more'} size={20} color="#707882" />
       </button>
 
+      {/* Sheet anteprima + condivisione PNG */}
+      <BottomSheet open={exportOpen} onClose={() => setExportOpen(false)} title="Weekend del club · PNG">
+        <div style={{ padding: '8px 14px 24px' }}>
+          {exportLoading && (
+            <div style={{ padding: 40, textAlign: 'center', color: '#707882', fontSize: 13 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🎨</div>
+              Genero l'immagine…
+            </div>
+          )}
+          {exportError && (
+            <div style={{
+              padding: 12, background: '#ffe4e4', color: '#7a0000',
+              borderRadius: 8, fontSize: 12, fontWeight: 600,
+            }}>
+              ⚠ {exportError}
+            </div>
+          )}
+          {!exportLoading && !exportError && exportUrl && (
+            <>
+              <div style={{ fontSize: 11.5, color: '#707882', marginBottom: 8, textAlign: 'center' }}>
+                Formato 9:16 · perfetto per WhatsApp e gruppo dirigenti
+              </div>
+              <div style={{
+                borderRadius: 12, overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                marginBottom: 12, background: '#000',
+                maxHeight: '55vh',
+                display: 'flex', justifyContent: 'center',
+              }}>
+                <img src={exportUrl} alt="Anteprima weekend del club"
+                  style={{ maxWidth: '100%', maxHeight: '55vh', display: 'block', objectFit: 'contain' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button
+                  onClick={() => exportBlob && shareOrDownload(exportBlob, exportFilename, 'Weekend del club')}
+                  style={{
+                    padding: '12px', borderRadius: 10, border: 'none',
+                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                    color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <Icon name="share" size={16} color="#fff" />
+                  Condividi
+                </button>
+                <button
+                  onClick={() => exportBlob && downloadBlob(exportBlob, exportFilename)}
+                  style={{
+                    padding: '12px', borderRadius: 10, border: 'none',
+                    background: 'linear-gradient(135deg, #7a0071 0%, #a71a9a 100%)',
+                    color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <Icon name="download" size={16} color="#fff" />
+                  Scarica PNG
+                </button>
+              </div>
+              <div style={{
+                marginTop: 10, padding: '8px 10px',
+                background: '#f0f7ff', borderRadius: 8,
+                fontSize: 10.5, color: '#004a78', lineHeight: 1.45,
+              }}>
+                💡 Su mobile <strong>Condividi</strong> apre il selettore nativo (WhatsApp, Instagram…). Su desktop scarica il file.
+              </div>
+            </>
+          )}
+        </div>
+      </BottomSheet>
+
       {expanded && (
         <div style={{ marginTop: 12 }}>
+          {/* Bottone Esporta PNG: visibile sempre, abilitato solo se ci sono eventi.
+              Permette di condividere il weekend del club su WhatsApp / Instagram Stories. */}
+          {!loading && !error && (
+            <button
+              onClick={handleOpenExport}
+              disabled={totalCount === 0}
+              style={{
+                width: '100%', marginBottom: 12,
+                padding: '10px 14px', borderRadius: 10,
+                border: 'none',
+                background: totalCount === 0
+                  ? '#e6e8ee'
+                  : 'linear-gradient(135deg, #7a0071, #a71a9a)',
+                color: totalCount === 0 ? '#8993a3' : '#fff',
+                fontSize: 12.5, fontWeight: 800,
+                cursor: totalCount === 0 ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: totalCount === 0 ? 'none' : '0 4px 10px rgba(122,0,113,0.25)',
+              }}
+            >
+              <Icon name="image" size={14} color={totalCount === 0 ? '#8993a3' : '#fff'} />
+              Esporta come immagine
+            </button>
+          )}
           {loading && <div style={{ fontSize: 12, color: '#707882', textAlign: 'center', padding: 12 }}>Caricamento…</div>}
           {error && (
             <div style={{ padding: 10, background: '#ffdad6', color: '#93000a', borderRadius: 8, fontSize: 11.5, fontWeight: 600 }}>

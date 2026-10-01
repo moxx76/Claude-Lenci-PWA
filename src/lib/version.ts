@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.102'
+export const APP_VERSION = '1.9.103'
 export const APP_VERSION_DATE = '2026-09-22'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.103',
+    date: '2026-10-01',
+    title: 'Weekend del club: visibile anche a Marcello Genna + nuovo bottone "Esporta come immagine"',
+    fixes: [
+      'La card "Weekend del club" (introdotta in v1.9.102 per admin e director) è ora visibile anche nella Dashboard di Marcello Genna (dirigente DT). Accesso gestito via whitelist di profile_id all\'interno di ManagerDashboard: in futuro, se cresce, si potrà aggiungere un flag dedicato su profiles',
+      'Nuovo bottone viola "Esporta come immagine" in testa alla card (disabilitato quando non ci sono impegni nel weekend): al tap genera un PNG verticale 1080×1920 ottimizzato per WhatsApp Status e Instagram Stories, con header gradient blu→viola, titolo "WEEKEND DEL CLUB", range date, e le 3 sezioni colorate (Prima Squadra rossa 🏆, Settore Giovanile azzurro ⚽, Scuola Calcio ambra 🧒). Ogni card evento riporta data, ora grande, badge tipo, nome squadra, avversario/focus, Casa/Trasferta e location',
+      'Anteprima in bottom sheet con due bottoni: "Condividi" (verde WhatsApp, usa Web Share API su mobile per aprire il selettore nativo) e "Scarica PNG" (viola, fallback desktop). Il nome file include automaticamente la data del sabato: Weekend_Club_YYYY-MM-DD.png. Zero dipendenze aggiunte: tutto disegnato con Canvas 2D nativo in src/lib/weekendSectorPlannerBuilder.ts',
+    ],
+  },
   {
     version: '1.9.102',
     date: '2026-10-01',

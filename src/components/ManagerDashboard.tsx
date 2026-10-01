@@ -13,6 +13,17 @@ import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
 import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
+import { WeekendPlannerCard } from './WeekendPlannerCard'
+import { useAuth } from '../store/auth'
+
+// Elenco user_id dei dirigenti autorizzati a vedere la card "Weekend del club"
+// nella Dashboard manager. Normalmente la card è riservata ad admin/director,
+// ma Davide ha chiesto che la veda anche Marcello Genna (DT, is_manager=true,
+// coach), che non è admin. Lista hardcoded perché l'autorizzazione è ad hoc:
+// in futuro, se cresce, si può aggiungere un flag dedicato su profiles.
+const WEEKEND_CARD_ALLOWED_MANAGER_IDS = new Set([
+  '68f0f330-6732-4c1c-a05c-73a84c9a323e', // Marcello Genna
+])
 
 interface MatchWithConv {
   id: string
@@ -57,7 +68,9 @@ interface MatchWithConv {
 }
 
 export function ManagerDashboard({ firstName }: { firstName: string }) {
+  const { profile } = useAuth()
   const { myTeam, myTeams } = useMyTeam()
+  const canSeeWeekendCard = !!profile?.id && WEEKEND_CARD_ALLOWED_MANAGER_IDS.has(profile.id)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null)
   const [upcoming, setUpcoming] = useState<MatchWithConv[]>([])
   const [past, setPast] = useState<MatchWithConv[]>([])
@@ -604,6 +617,10 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
           })}
         </div>
       )}
+
+      {/* Weekend del club (settori Prima/Giovanile/Scuola Calcio) — mostrata
+          solo ai dirigenti autorizzati (es. Marcello Genna, DT). */}
+      {canSeeWeekendCard && <WeekendPlannerCard />}
 
       {/* Header brandizzato dirigente */}
       <div style={{
