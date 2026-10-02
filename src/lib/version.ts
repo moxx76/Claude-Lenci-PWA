@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.112'
+export const APP_VERSION = '1.9.113'
 export const APP_VERSION_DATE = '2026-10-02'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.113',
+    date: '2026-10-02',
+    title: 'Foglio partita A4: fix taglio ultima riga panchina con 20 giocatori',
+    fixes: [
+      'BUG segnalato: con il foglio al completo (11 titolari + 9 panchinari = 20 giocatori), l\'ultima riga della panchina veniva clippata — il nome del 9° panchinario risultava visibile solo per metà altezza e il bordo inferiore del box PANCHINA scompariva. Causa doppia: overflow:hidden sul container middle che tagliava invece di espandere, e righe panchina a 4mm che sommate (36mm) superavano lo spazio flex residuo in alcune condizioni di layout del browser',
+      'Fix: righe panchina ora 3.6mm (-10%) con font nome 7pt + lineHeight 1 e padding verticale 0.2mm (prima 0.5mm), così 9 giocatori + header + padding box stanno in ~37mm invece di ~42mm. Righe titolari ridotte da 5mm a 4.5mm con font nome 7.5pt per uniformità (prima stavano larghe). Rimosso overflow:hidden dal container middle e dal box panchina — se mai in futuro ci fosse pressione, il contenuto espanderebbe senza clippare silenziosamente',
+      'Testato con 20 giocatori totali (massimo FIGC): tutte le 9 righe panchina sono completamente visibili con bordo inferiore, nessun giocatore tagliato, i nomi lunghi continuano a troncarsi con … orizzontale senza mangiare la riga successiva',
+    ],
+  },
   {
     version: '1.9.112',
     date: '2026-10-02',

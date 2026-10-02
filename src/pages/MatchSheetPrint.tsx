@@ -469,12 +469,14 @@ function MiniPitch({ starters, teamColor }: { starters: StarterRow[]; teamColor:
 
 function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: BenchRow[] }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1mm', minHeight: 0, overflow: 'hidden' }}>
-      {/* Titolari — 11 righe fisse (righe extra vuote pronte da scrivere a mano) */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1mm', minHeight: 0 }}>
+      {/* Titolari — 11 righe fisse (righe extra vuote pronte da scrivere a mano).
+          v1.9.113: rimosso overflow:hidden dal container middle così la panchina
+          con 9 giocatori (foglio completo da 20) non viene clippata in basso. */}
       <div className="box" style={{ padding: '1mm 1.5mm' }}>
         <div style={{
-          fontSize: '8.5pt', fontWeight: 800, textAlign: 'center',
-          borderBottom: '0.5pt solid #000', paddingBottom: '0.5mm', marginBottom: '1mm',
+          fontSize: '8pt', fontWeight: 800, textAlign: 'center',
+          borderBottom: '0.4pt solid #000', paddingBottom: '0.3mm', marginBottom: '0.5mm',
           color: '#005f98', letterSpacing: '0.3pt',
         }}>TITOLARI ({starters.length}/11)</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt', tableLayout: 'fixed' }}>
@@ -495,13 +497,14 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
             </tr>
           </thead>
           <tbody>
-            {/* Rendo sempre 11 righe: prima i titolari compilati, poi righe vuote */}
+            {/* Rendo sempre 11 righe titolari (v1.9.113: righe compattate a
+                4.5mm e padding ridotto per lasciare spazio alla panchina). */}
             {Array.from({ length: 11 }).map((_, i) => {
               const s = starters[i]
               const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
               if (!s) {
                 return (
-                  <tr key={i} style={{ background: rowBg, height: '5mm' }}>
+                  <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
@@ -511,13 +514,13 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
                 )
               }
               return (
-                <tr key={i} style={{ background: rowBg, height: '5mm' }}>
-                  {/* Numero maglia: se presente lo scrivo, altrimenti casella vuota da compilare a mano */}
-                  <td style={{ textAlign: 'center', padding: '0.5mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '9.5pt' }}>
+                <tr key={i} style={{ background: rowBg, height: '4.5mm' }}>
+                  {/* Numero maglia: se presente lo scrivo, altrimenti casella vuota */}
+                  <td style={{ textAlign: 'center', padding: '0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '8.5pt', lineHeight: 1 }}>
                     {s.jersey ?? ''}
                   </td>
-                  <td style={{ padding: '0.5mm 1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7.5pt' }}>{s.slot_label}</td>
-                  <td style={{ padding: '0.5mm 1mm', border: '0.3pt solid #d9dde4', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <td style={{ padding: '0.3mm 1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7pt' }}>{s.slot_label}</td>
+                  <td style={{ padding: '0.3mm 1mm', border: '0.3pt solid #d9dde4', fontWeight: 600, fontSize: '7.5pt', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {s.last_name.toUpperCase()} {s.first_name}
                     {s.is_captain && <span style={{ color: '#8e6300', marginLeft: 2, fontWeight: 900 }}> (C)</span>}
                     {s.is_vice_captain && <span style={{ color: '#005f98', marginLeft: 2, fontWeight: 900 }}> (VC)</span>}
@@ -530,11 +533,12 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
           </tbody>
         </table>
       </div>
-      {/* Panchina — 9 righe fisse, altezza ridotta perché sotto ci va il footer */}
-      <div className="box" style={{ padding: '1mm 1.5mm', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      {/* Panchina — 9 righe fisse. v1.9.113: rimosso overflow:hidden che
+          clippava la 9ª riga quando c'erano 20 giocatori totali. */}
+      <div className="box" style={{ padding: '0.8mm 1.5mm', flex: 1, minHeight: 0 }}>
         <div style={{
-          fontSize: '8.5pt', fontWeight: 800, textAlign: 'center',
-          borderBottom: '0.5pt solid #000', paddingBottom: '0.5mm', marginBottom: '1mm',
+          fontSize: '8pt', fontWeight: 800, textAlign: 'center',
+          borderBottom: '0.4pt solid #000', paddingBottom: '0.3mm', marginBottom: '0.5mm',
           color: '#005f98', letterSpacing: '0.3pt',
         }}>PANCHINA ({bench.length})</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt', tableLayout: 'fixed' }}>
@@ -560,7 +564,7 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
               const rowBg = i % 2 === 0 ? '#fff' : '#f9fafc'
               if (!b) {
                 return (
-                  <tr key={i} style={{ background: rowBg, height: '4mm' }}>
+                  <tr key={i} style={{ background: rowBg, height: '3.6mm' }}>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
                     <td style={{ border: '0.3pt solid #d9dde4' }}>&nbsp;</td>
@@ -570,12 +574,12 @@ function MiddlePanel({ starters, bench }: { starters: StarterRow[]; bench: Bench
                 )
               }
               return (
-                <tr key={i} style={{ background: rowBg, height: '4mm' }}>
-                  <td style={{ textAlign: 'center', padding: '0.3mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '8.5pt', lineHeight: 1 }}>
+                <tr key={i} style={{ background: rowBg, height: '3.6mm' }}>
+                  <td style={{ textAlign: 'center', padding: '0.2mm', border: '0.3pt solid #d9dde4', fontWeight: 800, fontSize: '7.5pt', lineHeight: 1 }}>
                     {b.jersey ?? ''}
                   </td>
-                  <td style={{ padding: '0.5mm 1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '7.5pt' }}>{b.role_group}</td>
-                  <td style={{ padding: '0.5mm 1mm', border: '0.3pt solid #d9dde4', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <td style={{ padding: '0.2mm 1mm', border: '0.3pt solid #d9dde4', color: '#005f98', fontWeight: 700, fontSize: '6.5pt', lineHeight: 1 }}>{b.role_group}</td>
+                  <td style={{ padding: '0.2mm 1mm', border: '0.3pt solid #d9dde4', fontWeight: 600, fontSize: '7pt', lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {b.last_name.toUpperCase()} {b.first_name}
                   </td>
                   <td style={{ border: '0.3pt solid #999' }}>&nbsp;</td>
