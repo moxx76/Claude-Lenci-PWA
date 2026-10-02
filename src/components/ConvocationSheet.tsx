@@ -1147,13 +1147,17 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
         data={posterData}
       />
 
-      {/* Picker per convocare giocatori da altre categorie (distinte miste) */}
+      {/* Picker per convocare giocatori da altre categorie (sotto-età +
+          distinte miste). v1.9.112: passo team_category così il picker ordina
+          per vicinanza (cat. inferiori per prime) e abilita il filtro
+          "solo sotto-età" di default. */}
       {match && (
         <BorrowPlayerPickerSheet
           open={borrowPickerOpen}
           onClose={() => setBorrowPickerOpen(false)}
           excludeTeamId={match.team_id}
           excludePlayerIds={players.map(p => p.id)}
+          currentTeamCategory={match.team_category}
           onSelect={(chosen) => {
             // Aggiungo i selezionati al roster con badge di provenienza,
             // e li imposto automaticamente come convocati (accepted)

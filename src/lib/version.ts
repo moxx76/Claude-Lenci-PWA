@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.111'
-export const APP_VERSION_DATE = '2026-10-01'
+export const APP_VERSION = '1.9.112'
+export const APP_VERSION_DATE = '2026-10-02'
 
 export interface Release {
   version: string
@@ -20,6 +20,17 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.112',
+    date: '2026-10-02',
+    title: 'Convocazioni: picker "altra categoria" intelligente per settore giovanile (sotto-età)',
+    fixes: [
+      'Richiesta Davide: il settore giovanile deve poter convocare agevolmente giocatori dall\'annata inferiore (esempio: U14 "2013" convoca dai 2014, Juniores convoca dai 2011 U16). Backend/RLS lo permettevano già da v1.9.80, ma il picker "Da altra categoria" mostrava tutte le squadre alla rinfusa, senza suggerire la cat. inferiore giusta. Ora il picker è contestuale',
+      'BorrowPlayerPickerSheet aggiornato: riceve la categoria della squadra corrente (team_category) e la trasforma in un "tier" numerico (Juniores=19, U-19=19, U-17=17, U-16=16, U-15=15, U-14=14, Esordienti=13, Pulcini=11, Primi Calci=9, Piccoli Amici=7, Prima Squadra=99). Le squadre vengono poi ordinate per vicinanza — categoria immediatamente inferiore in cima, poi via via le altre',
+      'Nuovo chip filtro "Solo cat. inferiori (sotto-età)" attivo per default quando la squadra corrente ha una categoria FIGC riconosciuta: nasconde subito le squadre di categoria uguale o superiore così il coach vede solo i candidati sotto-età. Un tap lo disattiva per includere anche distinte miste trasversali',
+      'Nuovo badge verde "SOTTO-ETÀ" accanto al nome delle squadre con tier inferiore al corrente, per rendere immediatamente evidente quale giocatore è "giovane in prestito". Header del picker aggiornato: "Convoca da altra categoria" + sottotitolo che si adatta ("Giocatori dall\'annata inferiore (sotto-età) o distinte miste" per il giovanile, "distinte miste scuola calcio" per il resto)',
+    ],
+  },
   {
     version: '1.9.111',
     date: '2026-10-01',
