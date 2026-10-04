@@ -258,11 +258,28 @@ export function PlayerAssessmentSheet({ open, onClose, player, canEdit, onSaved 
     setTechnical({}); setPhysical({}); setTactical({}); setNote('')
   }
 
-  // Prepara una nuova valutazione: reset campi skill, mantieni anagrafica dal player
+  // Prepara una nuova valutazione: reset campi skill, pre-compila i dati
+  // fisici dall'ULTIMA valutazione (richiesta Davide v1.9.114) — altezza,
+  // peso, numero di scarpa sono quasi sempre uguali o leggermente modificati
+  // rispetto all'ultima volta, pre-compilarli risparmia al coach di
+  // ridigitarli ogni volta. Fallback ai dati anagrafici del player se non
+  // c'è ancora alcuna valutazione precedente. Il piede dominante non è
+  // storicizzato sulle valutazioni, quindi resta sempre quello anagrafico.
   const startNew = () => {
     setEditingId(null)
     setAssessmentDate(new Date().toISOString().slice(0, 10))
     setTechnical({}); setPhysical({}); setTactical({}); setNote('')
+    // history è ordinato per assessment_date DESC in loadHistory() →
+    // history[0] è la più recente.
+    const last: Assessment | undefined = history[0]
+    const pickHeight = last?.height_cm ?? player?.height_cm ?? null
+    const pickWeight = last?.weight_kg ?? player?.weight_kg ?? null
+    const pickShoe   = last?.shoe_size ?? player?.shoe_size ?? null
+    setHeightCm(pickHeight != null ? String(pickHeight) : '')
+    setWeightKg(pickWeight != null ? String(pickWeight) : '')
+    setShoeSize(pickShoe != null ? String(pickShoe) : '')
+    // Piede dominante: solo anagrafica (non è su player_assessments).
+    setDominantFoot(player?.dominant_foot || '')
     setError(null)
     setMode('new')
   }

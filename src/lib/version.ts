@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.113'
-export const APP_VERSION_DATE = '2026-10-02'
+export const APP_VERSION = '1.9.114'
+export const APP_VERSION_DATE = '2026-10-04'
 
 export interface Release {
   version: string
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.114',
+    date: '2026-10-04',
+    title: 'Scheda tecnica giocatore: nuova valutazione pre-compila altezza/peso/scarpa dall\'ultima',
+    fixes: [
+      'Richiesta Davide: quando si crea una nuova valutazione di un giocatore, i campi altezza, peso e numero di scarpa vengono ora pre-compilati automaticamente con i valori dell\'ULTIMA valutazione (il più recente in ordine di assessment_date). Il coach non deve più ridigitarli ogni volta — tipicamente cambiano di poco o restano uguali tra due valutazioni ravvicinate, quindi parte dai valori precedenti e li ritocca solo se serve',
+      'Fallback automatico ai dati anagrafici del player (players.height_cm, weight_kg, shoe_size) quando non c\'è ancora alcuna valutazione precedente. Il piede dominante continua a venire dai dati anagrafici — non è storicizzato sulle valutazioni perché non cambia nel tempo',
+      'Modalità "Modifica" di una valutazione esistente invariata: continua a mostrare i valori di quella specifica valutazione (prevalgono sui valori anagrafici del player, come già v1.8.x)',
+    ],
+  },
   {
     version: '1.9.113',
     date: '2026-10-02',
