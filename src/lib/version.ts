@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.114'
-export const APP_VERSION_DATE = '2026-10-04'
+export const APP_VERSION = '1.9.115'
+export const APP_VERSION_DATE = '2026-10-05'
 
 export interface Release {
   version: string
@@ -20,6 +20,26 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.115',
+    date: '2026-10-05',
+    title: 'Calendario campionati Scuola Calcio Fase 1 autunno 2026 popolato da CU 19 Torino',
+    features: [
+      'Importato il calendario completo della Fase 1 autunno 2026 per tutte le 7 squadre della Scuola Calcio dal Comunicato Ufficiale n°19 Torino SGS: 41 partite totali con data, ora, avversario, campo di gioco e indirizzo completo per ogni gara (casa e trasferta), e numero di giornata (A/R) con girone nel campo competition',
+      'Esordienti 2014 (Girone H 2° anno): 9 partite dal 10/10/26 al 05/12/26 — avversari Chisola, CBS, CSF Carmagnola, Chieri, PSG, Garino, Moncalieri, Absolute La Loggia, Juventus',
+      'Esordienti 2015 (Girone D misti): 8 partite dal 11/10/26 al 06/12/26 — avversari Cambiano, San Giuseppe Riva, Pavarolo, Giovanile Carmagnola, Andezeno, Pecetto, Villastellone, Onnisport',
+      'Pulcini 2016 (Girone H 2° anno): 8 partite dal 10/10/26 al 06/12/26 — avversari Chisola, Pecetto, CSF, Torino FC, CBS, Top Player Academy, PSG, Chieri',
+      'Pulcini 2017 (Girone D misti): 7 partite dal 10/10/26 al 21/11/26 — avversari Andezeno, Chisola, Villastellone, Onnisport, Moncalieri, San Luigi Santena, San Giuseppe Riva',
+      'Primi Calci 2018 (Girone 1R 8 anni 5v5): 3 partite della Fase 1 — avversari Andezeno sq.B, Moncalieri, PSG',
+      'Primi Calci 2019 (Girone 1R 7 anni 4v4): 3 partite della Fase 1 — avversari CSF Carmagnola, Trofarello, Absolute La Loggia',
+      'Piccoli Amici 2020-21 (Girone 1N): 3 partite della Fase 1 — avversari Chisola sq.B, Santena 2014, Polisportiva Garino',
+    ],
+    notes: [
+      'Orari localizzati automaticamente in CEST/CET (cambio ora del 25/10). Orario di ritrovo (meeting_time) impostato a 60 minuti prima del fischio d\'inizio per tutte le partite',
+      'Per Primi Calci e Piccoli Amici gli orari delle trasferte sono stimati (Domenica mattina 10:30) perché il CU Fase 1 non include ancora l\'ELENCO CAMPI di quelle categorie — da verificare con le società prima della convocazione',
+      'Le 4 partite di 1ª giornata già presenti in DB (inserite manualmente) sono state aggiornate in place con i dati completi del comunicato, mantenendo l\'ID — nessuna convocazione o rilievo era associato',
+    ],
+  },
   {
     version: '1.9.114',
     date: '2026-10-04',
