@@ -11,7 +11,22 @@ declare const self: ServiceWorkerGlobalScope
 // Precache generato da Workbox
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
-self.skipWaiting()
+
+// IMPORTANTE: NON chiamare self.skipWaiting() al top-level.
+// Se lo si fa, il nuovo SW passa da `installed` direttamente ad `active`
+// bypassando lo stato `waiting`. Workbox-window chiama onNeedRefresh SOLO
+// quando il nuovo SW è in waiting, quindi il top-level skipWaiting è esattamente
+// ciò che rompe l'auto-update: SilentAutoUpdater del bundle vecchio non viene mai
+// notificato e il reload automatico non parte mai.
+//
+// Soluzione corretta: aspettare il messaggio SKIP_WAITING che workbox-window
+// invia dentro updateServiceWorker(true) chiamato da onNeedRefresh.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
 self.addEventListener('activate', (evt) => evt.waitUntil(self.clients.claim()))
 
 // IMPORTANTE: /version.json SEMPRE dalla rete, mai cache.

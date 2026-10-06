@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.117'
+export const APP_VERSION = '1.9.118'
 export const APP_VERSION_DATE = '2026-10-06'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.118',
+    date: '2026-10-06',
+    title: 'FIX CRITICO auto-update PWA: rimosso self.skipWaiting() globale dal service worker',
+    fixes: [
+      'ROOT CAUSE del bug "non si aggiorna" che impatta TUTTI gli utenti da v1.9.26 in poi: il sw.ts aveva self.skipWaiting() al top-level. Questo è esattamente ciò che rompe il meccanismo onNeedRefresh di workbox-window: il nuovo SW passa da `installed` direttamente ad `active` saltando lo stato `waiting`, e workbox-window chiama onNeedRefresh SOLO quando il nuovo SW è in waiting. Risultato: SilentAutoUpdater non veniva mai notificato dell\'aggiornamento, il reload automatico non partiva mai, e l\'app si aggiornava solo quando l\'utente chiudeva completamente la tab/PWA (cold start). Sugli iPhone con PWA installata — che iOS tiene in memoria per settimane — nessuno si aggiornava più dalla versione di prima installazione',
+      'Fix: rimosso self.skipWaiting() al top-level, sostituito con listener del messaggio {type: "SKIP_WAITING"} che workbox-window invia dentro updateServiceWorker(true) chiamato da onNeedRefresh. Da ora il flow è: (1) workbox-window polla registration.update() ogni 3 min + al focus/visibilitychange, (2) scarica nuovo sw.js che resta in waiting, (3) onNeedRefresh scatta → SilentAutoUpdater → scheduleUpdate → updateServiceWorker(true), (4) il nuovo SW riceve SKIP_WAITING, chiama skipWaiting(), passa ad active, clients.claim(), (5) SilentAutoUpdater fa window.location.reload() → nuovo bundle caricato',
+      'IMPATTO ZERO sugli utenti: appena questo deploy (1.9.118) è live, tutti gli utenti bloccati sulla v1.9.114 vedranno l\'aggiornamento scattare in automatico entro ~3 minuti dalla prossima apertura dell\'app, senza dover svuotare cache, reinstallare la PWA o fare qualsiasi altra azione',
+    ],
+  },
   {
     version: '1.9.117',
     date: '2026-10-06',
