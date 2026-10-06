@@ -81,6 +81,21 @@ export const FORMATIONS: Record<string, FormationSlot[]> = {
     { key: 'PC1',  label: 'Punta',              position_hint: 'Punta centrale',     x: 62, y: 87 },
     { key: 'PC2',  label: 'Seconda punta',      position_hint: 'Seconda punta',      x: 38, y: 87 },
   ],
+  '4-3-2-1': [
+    // "Albero di Natale": 4 difensori, 3 centrocampisti a triangolo (mediano basso + 2 interni),
+    // 2 trequartisti alle spalle di una punta centrale.
+    { key: 'GK',   label: 'Portiere',           position_hint: 'Portiere',           x: 50, y: 8  },
+    { key: 'TD',   label: 'Terzino destro',     position_hint: 'Terzino destro',     x: 85, y: 28 },
+    { key: 'DC1',  label: 'Difensore centrale', position_hint: 'Difensore centrale', x: 62, y: 28 },
+    { key: 'DC2',  label: 'Difensore centrale', position_hint: 'Difensore centrale', x: 38, y: 28 },
+    { key: 'TS',   label: 'Terzino sinistro',   position_hint: 'Terzino sinistro',   x: 15, y: 28 },
+    { key: 'MED',  label: 'Mediano',            position_hint: 'Mediano',            x: 50, y: 46 },
+    { key: 'INTD', label: 'Interno destro',     position_hint: 'Interno destro',     x: 72, y: 56 },
+    { key: 'INTS', label: 'Interno sinistro',   position_hint: 'Interno sinistro',   x: 28, y: 56 },
+    { key: 'TRQ1', label: 'Trequartista destro',   position_hint: 'Trequartista',    x: 62, y: 72 },
+    { key: 'TRQ2', label: 'Trequartista sinistro', position_hint: 'Trequartista',    x: 38, y: 72 },
+    { key: 'PC',   label: 'Punta centrale',     position_hint: 'Punta centrale',     x: 50, y: 88 },
+  ],
   '4-1-4-1': [
     { key: 'GK',   label: 'Portiere',           position_hint: 'Portiere',           x: 50, y: 8  },
     { key: 'TD',   label: 'Terzino destro',     position_hint: 'Terzino destro',     x: 85, y: 28 },

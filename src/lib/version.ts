@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.115'
-export const APP_VERSION_DATE = '2026-10-05'
+export const APP_VERSION = '1.9.116'
+export const APP_VERSION_DATE = '2026-10-06'
 
 export interface Release {
   version: string
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.116',
+    date: '2026-10-06',
+    title: 'Distinta tattica: aggiunto modulo 4-3-2-1 ("albero di Natale")',
+    features: [
+      'Nuovo modulo 4-3-2-1 disponibile sia nella distinta tattica (picker modulo e campo grafico SVG) sia nel referto post-partita (dropdown MODULES). Posizionamento: 4 difensori classici (TD, DC1, DC2, TS), 3 centrocampisti a triangolo con mediano arretrato (MED a y:46) e due interni leggermente più alti (INTD/INTS a y:56), 2 trequartisti alle spalle della punta (TRQ1 destro, TRQ2 sinistro a y:72), punta centrale (PC a y:88)',
+      'Keys stabili per DB: GK, TD, DC1, DC2, TS, MED, INTD, INTS, TRQ1, TRQ2, PC — così role_slot resta coerente anche se il coach rinomina le label dei singoli slot',
+    ],
+  },
   {
     version: '1.9.115',
     date: '2026-10-05',
