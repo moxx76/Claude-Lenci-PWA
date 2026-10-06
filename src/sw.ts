@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 /* eslint-disable no-restricted-globals */
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
+import { NetworkFirst, NetworkOnly } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
@@ -13,6 +13,31 @@ precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 self.skipWaiting()
 self.addEventListener('activate', (evt) => evt.waitUntil(self.clients.claim()))
+
+// IMPORTANTE: /version.json SEMPRE dalla rete, mai cache.
+// Serve al VersionGuard client per rilevare un deploy nuovo e forzare il reload
+// anche quando il resto del SW ha bundle vecchi precached. Deve stare PRIMA degli
+// altri registerRoute per avere priorità sul precache.
+registerRoute(
+  ({ url }) => url.origin === self.location.origin && url.pathname === '/version.json',
+  new NetworkOnly()
+)
+
+// Navigation requests (richieste a /, /qualsiasi-path senza estensione) → NetworkFirst
+// con timeout breve. Risolve il bug per cui index.html precached serviva per sempre
+// l'HTML del vecchio deploy, impedendo ai client installati di scoprire deploy nuovi.
+// Offline: fallback automatico al precache (PWA continua a funzionare senza rete).
+registerRoute(
+  new NavigationRoute(
+    new NetworkFirst({
+      cacheName: 'navigations',
+      networkTimeoutSeconds: 3,
+      plugins: [
+        new CacheableResponsePlugin({ statuses: [0, 200] }),
+      ],
+    })
+  )
+)
 
 // Cache API Supabase Network-First
 registerRoute(

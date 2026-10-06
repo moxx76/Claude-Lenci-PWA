@@ -16,6 +16,7 @@ import { Referti } from './pages/Referti'
 import { EserciziPage } from './pages/EserciziPage'
 import { MatchSheetPrint } from './pages/MatchSheetPrint'
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
+import { VersionGuard } from './components/VersionGuard'
 import { ToastProvider } from './components/Toast'
 import { useMyTeam } from './hooks/useMyTeam'
 import { isAdmin, isCoach } from './lib/types'
@@ -81,6 +82,7 @@ export default function App() {
   return (
     <ToastProvider>
       <SilentAutoUpdater />
+      <VersionGuard />
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}

@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.116'
+export const APP_VERSION = '1.9.117'
 export const APP_VERSION_DATE = '2026-10-06'
 
 export interface Release {
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.117',
+    date: '2026-10-06',
+    title: 'Auto-aggiornamento PWA affidabile: VersionGuard + sw.ts NetworkFirst su index.html',
+    fixes: [
+      'BUG CRITICO segnalato da Davide: dopo un deploy, le PWA installate su iPhone/Android continuavano a vedere la vecchia versione per ore o giorni. Il SilentAutoUpdater (useRegisterSW di workbox-window) non riusciva a bypassare il WKWebView di iOS, che tiene una cache HTTP separata dalle Cache API e serve index.html precached indefinitamente',
+      'Risolto con 3 modifiche coordinate: (1) nuovo file /version.json generato a build time (vite.config.ts plugin "write-version-json") che espone la versione corrente del deploy; (2) sw.ts aggiornato con registerRoute NetworkOnly dedicata a /version.json (bypass totale cache) + NavigationRoute NetworkFirst con timeout 3s per tutte le navigazioni (index.html non è più servito dal precache mentre la rete è disponibile, fallback a cache solo se offline); (3) nuovo componente VersionGuard montato in App.tsx che all\'avvio, al rientro foreground, al focus e ogni 5 minuti fa fetch no-store a /version.json e, se la versione server è diversa da APP_VERSION locale, unregister dei SW + cancellazione cache + navigate con query _v=<nuova_versione> (il cambio di query bypassa anche la cache HTTP di WKWebView)',
+      'Al prossimo deploy, l\'auto-update sarà silenzioso ma reale: gli utenti vedranno la nuova versione al primo cold start dopo la pubblicazione, senza dover svuotare cache manualmente, reinstallare la PWA o aspettare che il SW si decida',
+    ],
+  },
   {
     version: '1.9.116',
     date: '2026-10-06',
