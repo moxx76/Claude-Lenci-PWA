@@ -69,7 +69,10 @@ export function Profile() {
     .toUpperCase() || 'LP'
   const roleLabel = ROLE_LABEL[profile?.role ?? 'public'] ?? 'Utente'
 
+  const canSeeModuli = (profile?.role === 'admin') || profile?.is_director === true
+
   const settingsItems = [
+    ...(canSeeModuli ? [{ icon: 'folder', label: 'Moduli e documenti', onClick: () => { window.location.href = '/moduli' } }] : []),
     { icon: 'person', label: 'Modifica profilo', onClick: () => alert('Funzionalità in arrivo nel prossimo sprint') },
     { icon: 'lock', label: 'Cambia password', onClick: () => alert('Funzionalità in arrivo nel prossimo sprint') },
     { icon: 'help', label: 'Supporto', onClick: () => window.open('mailto:info@lencipoirino.it') },

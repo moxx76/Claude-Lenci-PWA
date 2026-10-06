@@ -40,6 +40,10 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'apple-touch-icon.svg'],
       injectManifest: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Escludi i PDF seed (vengono importati una tantum nello Storage al primo
+        // load admin): non vanno precached dal SW, sono assets statici serviti
+        // on-demand via /moduli-seed/<file>.pdf
+        globIgnores: ['**/moduli-seed/**'],
       },
       manifest: {
         name: 'Lenci LAB · ASD Lenci Poirino',

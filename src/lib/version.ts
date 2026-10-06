@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.118'
+export const APP_VERSION = '1.9.119'
 export const APP_VERSION_DATE = '2026-10-06'
 
 export interface Release {
@@ -20,6 +20,19 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.119',
+    date: '2026-10-06',
+    title: 'Nuova area "Moduli e documenti" per amministratori e dirigenti',
+    features: [
+      'Nuova pagina /moduli accessibile da amministratori e dirigenti (ruolo admin oppure flag is_director=true). Permette di scaricare i moduli societari (iscrizioni, autorizzazioni, informative, brochure) da stampare o inviare alle famiglie',
+      'Lista raggruppata per categoria (Iscrizioni, Autorizzazioni, Informative, Brochure). Ogni modulo mostra nome, descrizione, dimensione, data upload. Download con un tap tramite signed URL temporaneo (60s)',
+      'Solo per admin: bottone "Carica nuovo modulo" (upload diretto PDF/DOCX/immagini fino a 20MB) e bottone elimina per rimuovere moduli obsoleti. I direttori possono solo leggere/scaricare, non modificare',
+      'Pre-caricati automaticamente i 6 moduli iniziali al primo accesso di un admin (import silenzioso in background): Modulo iscrizione 2025/26, Richiesta certificato plurimo, Modulo uscita autonoma, Scarico responsabilità, Regole di comportamento, Brochure 2026/27',
+      'Accessibile da: menu laterale desktop (voce "Moduli", icona cartella) + voce dedicata nel Profilo per mobile',
+      'Backend: tabella moduli + bucket Storage privato "moduli" + policy RLS che espone i dati solo a chi ha diritto, upload file autorizzato solo ad admin del proprio club',
+    ],
+  },
   {
     version: '1.9.118',
     date: '2026-10-06',

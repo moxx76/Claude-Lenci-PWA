@@ -36,6 +36,7 @@ const DESKTOP_TABS_BASE: NavTab[] = [
 const MARKETING_TAB: NavTab = { to: '/marketing', label: 'Marketing', icon: 'campaign', accent: '#7a0071' }
 const COMUNICATI_TAB: NavTab = { to: '/comunicati', label: 'Comunicati LND', labelShort: 'Comunicati', icon: 'article', accent: '#005f98' }
 const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labelShort: 'Esercizi', icon: 'fitness_center', accent: '#c73434' }
+const MODULI_TAB: NavTab = { to: '/moduli', label: 'Moduli e documenti', labelShort: 'Moduli', icon: 'folder', accent: '#8b6f47' }
 // Referti: pagina centralizzata di tutti i post-match report delle squadre a carico.
 // Accento rosa Lenci per il legame diretto con la squadra
 const REFERTI_TAB: NavTab = { to: '/referti', label: 'Referti partite', labelShort: 'Referti', icon: 'edit_note', accent: '#b3005c' }
@@ -55,6 +56,8 @@ export function Layout() {
   const isJournalist = profile?.is_journalist === true && !isParentView
   const isMarketing = profile?.is_marketing === true && !isParentView
   const isStaff = (isAdmin(profile?.role) || isCoach(profile?.role)) && !isParentView
+  // Moduli societari: visibili ad admin + chi ha il flag is_director
+  const canSeeModuli = (isAdmin(profile?.role) || profile?.is_director === true) && !isParentView
 
   // Coach senza squadra assegnata (né head, né manager): menu limitato
   // Solo per coach puri, non per admin che si sono già assegnati o hanno più responsabilità
@@ -85,6 +88,7 @@ export function Layout() {
         ...(isStaff ? [REFERTI_TAB] : []),
         ...(isStaff ? [ESERCIZI_TAB] : []),
         ...(isStaff ? [COMUNICATI_TAB] : []),
+        ...(canSeeModuli ? [MODULI_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),
         { to: '/profilo', label: 'Profilo', icon: 'person' },
       ]

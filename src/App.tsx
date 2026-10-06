@@ -14,6 +14,7 @@ import { JournalistPage } from './pages/Journalist'
 import { ComunicatiPage } from './pages/Comunicati'
 import { Referti } from './pages/Referti'
 import { EserciziPage } from './pages/EserciziPage'
+import { Moduli } from './pages/Moduli'
 import { MatchSheetPrint } from './pages/MatchSheetPrint'
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
 import { VersionGuard } from './components/VersionGuard'
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="referti" element={<TeamAssignedGuard><Referti /></TeamAssignedGuard>} />
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="giornalisti" element={<JournalistPage />} />
+          <Route path="moduli" element={<Moduli />} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>
