@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.119'
-export const APP_VERSION_DATE = '2026-10-06'
+export const APP_VERSION = '1.9.120'
+export const APP_VERSION_DATE = '2026-10-07'
 
 export interface Release {
   version: string
@@ -20,6 +20,16 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.120',
+    date: '2026-10-07',
+    title: 'Milestone sicurezza M1: cache cross-user, push authz, recupero password',
+    fixes: [
+      'A01 — Cache service worker cross-user eliminata: /rest/v1/ passa da NetworkFirst (cache condivisa supabase-api-v2) a NetworkOnly. Impediva potenziali esposizioni cross-sessione del tipo "utente A fa logout, utente B apre la stessa URL in rete lenta, riceve i dati di A dal cache fallback". Al logout il client pulisce anche le Cache API residue (supabase-api-*, navigations) via caches.delete',
+      'A04 — send-push Edge Function v3 con autorizzazione completa: estrae il JWT dall\'header Authorization, verifica il caller via supabase.auth.getUser, valida che caller sia autorizzato a notificare target_id via nuova RPC can_notify_user (admin/coach/director/manager/marketing dello stesso club OR auto-notifica). Rate limit 20 push/min per caller tracciato nella nuova tabella push_log. Validazione payload (title/body/link length + allowlist domini). Prima qualunque JWT poteva triggerare push a qualunque user_id',
+      'A06 — Flow recupero password completo: aggiunta pagina /reset-password che gestisce l\'evento PASSWORD_RECOVERY di supabase-js (link email → updateUser con sessione di recovery, no password vecchia richiesta). Form con conferma + validazione minimo 8 caratteri. L\'auth store ora intercetta l\'evento e redirige a /reset-password da qualsiasi pagina. Prima il link email portava a route 404',
+    ],
+  },
   {
     version: '1.9.119',
     date: '2026-10-06',

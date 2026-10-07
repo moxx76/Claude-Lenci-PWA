@@ -3,7 +3,6 @@
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst, NetworkOnly } from 'workbox-strategies'
-import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
 declare const self: ServiceWorkerGlobalScope
@@ -54,19 +53,30 @@ registerRoute(
   )
 )
 
-// Cache API Supabase Network-First
+// Supabase REST /rest/v1/ → NetworkOnly (A01).
+// Prima era NetworkFirst con cache 'supabase-api-v2' condivisa fra sessioni:
+// vulnerabilità cross-user quando dopo un logout un altro utente faceva la stessa
+// request sulla stessa origine. Cache rimossa; se serve offline-read in futuro,
+// progettare cache per-identity scoped al JWT con pulizia al logout.
 registerRoute(
   ({ url }) => url.origin === 'https://nlgknkopottaxewpdofl.supabase.co'
     && url.pathname.startsWith('/rest/v1/'),
-  new NetworkFirst({
-    cacheName: 'supabase-api-v2',
-    networkTimeoutSeconds: 5,
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 5 }),
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-    ],
-  })
+  new NetworkOnly()
 )
+
+// Al logout il client chiama caches.delete per supabase-api-v2 (legacy): se è
+// ancora presente da deploy precedenti la svuotiamo in activate del nuovo SW.
+self.addEventListener('activate', (evt) => {
+  evt.waitUntil((async () => {
+    try {
+      const names = await caches.keys()
+      await Promise.all(
+        names.filter(n => n === 'supabase-api-v2' || n.startsWith('supabase-api-'))
+          .map(n => caches.delete(n))
+      )
+    } catch { /* ignore */ }
+  })())
+})
 
 // ============ PUSH NOTIFICATIONS ============
 interface PushPayload {

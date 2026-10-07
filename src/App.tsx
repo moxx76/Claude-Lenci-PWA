@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './store/auth'
 import { Login } from './pages/Login'
+import { ResetPassword } from './pages/ResetPassword'
 import { Layout } from './components/Layout'
 import { Logo } from './components/Logo'
 import { Dashboard } from './pages/Dashboard'
@@ -86,6 +87,7 @@ export default function App() {
       <VersionGuard />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
         <Route path="/foglio-partita/:matchId" element={
           <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>

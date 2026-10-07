@@ -28,7 +28,17 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ session, user: session?.user ?? null, loading: false, initialized: true })
     if (session?.user) await get().refreshProfile()
 
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // A06: su PASSWORD_RECOVERY (link ricevuto via email) forza il flow verso
+      // la pagina dedicata, qualunque sia la route corrente. Il link ha sessione
+      // di recovery che consente updateUser({password}) senza quella vecchia.
+      if (event === 'PASSWORD_RECOVERY') {
+        set({ session: newSession, user: newSession?.user ?? null })
+        if (typeof window !== 'undefined' && window.location.pathname !== '/reset-password') {
+          window.location.replace('/reset-password')
+        }
+        return
+      }
       set({ session: newSession, user: newSession?.user ?? null })
       if (newSession?.user) await get().refreshProfile()
       else set({ profile: null })
@@ -58,6 +68,21 @@ export const useAuth = create<AuthState>((set, get) => ({
   signOut: async () => {
     await supabase.auth.signOut()
     try { localStorage.removeItem('view_mode') } catch { /* ignore */ }
+    // A01: pulisci le Cache API al logout. Impedisce che una sessione successiva
+    // sullo stesso dispositivo possa vedere dati REST cached dalla sessione
+    // precedente (anche su rete lenta/down). Il SW nuovo è già NetworkOnly, ma
+    // potenziali cache 'supabase-api-v2' residue da versioni precedenti vengono
+    // comunque eliminate.
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys()
+        await Promise.all(
+          names
+            .filter(n => n.startsWith('supabase-api') || n === 'navigations')
+            .map(n => caches.delete(n))
+        )
+      }
+    } catch { /* ignore */ }
     set({ session: null, user: null, profile: null })
   },
 }))
