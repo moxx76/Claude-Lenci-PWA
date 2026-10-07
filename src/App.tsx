@@ -34,6 +34,7 @@ const RouteFallback = () => (
 )
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
 import { VersionGuard } from './components/VersionGuard'
+import { RoutePreloader } from './components/RoutePreloader'
 import { ToastProvider } from './components/Toast'
 import { useMyTeam } from './hooks/useMyTeam'
 import { isAdmin, isCoach } from './lib/types'
@@ -100,6 +101,7 @@ export default function App() {
     <ToastProvider>
       <SilentAutoUpdater />
       <VersionGuard />
+      <RoutePreloader />
       {/* M6: Suspense al livello Routes copre tutti i componenti lazy delle
           route. I componenti NON lazy (Login, ResetPassword) non attivano il
           fallback, quindi non c'è penalità UX per il flusso di autenticazione. */}

@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.127',
+    date: '2026-10-07',
+    title: 'Milestone M8: suite test estesa + preload intelligente route',
+    fixes: [
+      'Test suite espansa a 54 casi (24 → 54): aggiunti src/lib/formations.test.ts (9 casi su startersCount/benchMax/validità slot/4-3-2-1) e src/lib/eventLocation.test.ts (21 casi su extractCity con pattern reali di produzione, isTournamentCompetition, formatEventLocationParts per home/away/torneo/allenamento). Un test documenta un limite noto del parser V. I. abbreviazioni',
+      'Nuovo RoutePreloader: dopo il login, pre-scarica in 4 fasi (300/1500/3000/6000ms, idle-callback dove disponibile) i chunk delle route che l\'utente aprirà con alta probabilità. Fase 1 Dashboard+Profile, fase 2 Teams/Calendario/Referti, fase 3 Comunicati/Esercizi, fase 4 ruolo-specifiche (Journalist/Marketing/Moduli). Prima apertura di ogni pagina diventa pressoché istantanea, perché il chunk è già nella cache del browser',
+    ],
+  },
+  {
     version: '1.9.126',
     date: '2026-10-07',
     title: 'Milestone M7: test automatici su dateIT e sanitizeSvg',
