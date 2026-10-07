@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { dateIT } from '../lib/dateIT'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 
@@ -105,7 +106,7 @@ export function MeetingEditSheet({ open, onClose, clubId, currentUserId, existin
       // Default nuova: oggi + 3 giorni alle 20:30 (comodo per riunioni serali)
       const d = new Date()
       d.setDate(d.getDate() + 3)
-      setDraft({ ...EMPTY_DRAFT, meeting_date: d.toISOString().slice(0, 10) })
+      setDraft({ ...EMPTY_DRAFT, meeting_date: dateIT(d) })
     }
     setError(null)
     setConfirmDelete(false)

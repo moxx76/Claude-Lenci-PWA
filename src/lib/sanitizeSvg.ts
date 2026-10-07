@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify'
+import DOMPurify, { type Config } from 'dompurify'
 
 /**
  * Sanitizer per SVG salvati nel DB e renderizzati via dangerouslySetInnerHTML
@@ -17,7 +17,7 @@ import DOMPurify from 'dompurify'
  * la difesa è in lettura, che è il momento dove si manifesta l'eventuale XSS.
  */
 
-const config: DOMPurify.Config = {
+const config: Config = {
   USE_PROFILES: { svg: true, svgFilters: true },
   // Non consentire HTML: il campo deve essere SVG puro.
   // dompurify svg profile include già una allowlist stringente di tag/attrs.
@@ -37,7 +37,7 @@ const config: DOMPurify.Config = {
 export function sanitizeSvg(raw: string | null | undefined): string {
   if (!raw) return ''
   try {
-    return DOMPurify.sanitize(raw, config) as string
+    return DOMPurify.sanitize(raw, config) as unknown as string
   } catch {
     return ''
   }

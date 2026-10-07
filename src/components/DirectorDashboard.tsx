@@ -13,6 +13,7 @@ import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
 import { WeekendPlannerCard } from './WeekendPlannerCard'
 import { TeamPickerSheet } from './TeamPickerSheet'
 import { sortTeamsByAge } from '../lib/teamOrder'
+import { todayIT, dateIT } from '../lib/dateIT'
 
 interface Team {
   id: string
@@ -111,9 +112,9 @@ export function DirectorDashboard({ firstName }: { firstName: string }) {
 
   const load = async () => {
     setLoading(true)
-    const today = new Date().toISOString().slice(0, 10)
-    const in7d = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
-    const in30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+    const today = todayIT()
+    const in7d = dateIT(new Date(Date.now() + 7 * 86400000))
+    const in30d = dateIT(new Date(Date.now() + 30 * 86400000))
 
     // Fetch parallelo di tutte le metriche
     const [

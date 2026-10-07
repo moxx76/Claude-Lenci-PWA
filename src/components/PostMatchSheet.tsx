@@ -3,6 +3,7 @@ import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
 import { avatarBg } from '../lib/utils'
+import { dateIT } from '../lib/dateIT'
 import { StaffAttendanceSection } from './StaffAttendanceSection'
 import { PitchView, pitchToPngDataUrl, dataUrlToBlob, type PitchPlayer } from './PitchView'
 import { MatchTimeline } from './MatchTimeline'
@@ -1876,7 +1877,7 @@ function RecapExport({
 
   const buildFileName = () => {
     const isHome = match!.venue === 'home'
-    const dateStr = new Date(match!.match_date).toISOString().slice(0, 10)
+    const dateStr = dateIT(match!.match_date)
     const oppSlug = match!.opponent.replace(/[^a-zA-Z0-9]/g, '_')
     return `locandina-${dateStr}-${isHome ? 'vs' : 'a'}-${oppSlug}.png`
   }

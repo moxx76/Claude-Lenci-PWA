@@ -3,6 +3,7 @@ import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
 import { PlayerAttendanceTimelineSheet } from './PlayerAttendanceTimelineSheet'
+import { todayIT } from '../lib/dateIT'
 
 interface Row {
   player_id: string
@@ -858,7 +859,7 @@ function MatchesMatrix({ data }: { data: MatchMatrixRow[] }) {
 
   const matches = Array.from(matchesMap.values()).sort((a, b) => a.date.localeCompare(b.date))
   const players = Array.from(playersMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = todayIT()
 
   return (
     <>

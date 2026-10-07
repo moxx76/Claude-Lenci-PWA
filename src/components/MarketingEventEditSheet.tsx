@@ -7,6 +7,7 @@ import {
   CATEGORY_META, STATUS_META,
   type MarketingCategory, type MarketingStatus, type MarketingEvent,
 } from '../lib/marketing'
+import { todayIT } from '../lib/dateIT'
 
 interface Props {
   open: boolean
@@ -79,7 +80,7 @@ export function MarketingEventEditSheet({ open, onClose, event, clubId, onSaved,
         setChecklist(event.checklist ?? [])
       } else {
         setTitle(''); setDescription(''); setCategory('other'); setStatus('planning')
-        setEventDate(new Date().toISOString().slice(0, 10))
+        setEventDate(todayIT())
         setStartTime(''); setEndTime(''); setLocation(''); setAddress('')
         setEstAttendance(''); setActualAttendance('')
         setBudgetEst(''); setBudgetAct(''); setRevenueEst(''); setRevenueAct('')

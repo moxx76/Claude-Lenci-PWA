@@ -859,8 +859,8 @@ function CoachDashboard({ firstName }: { firstName: string }) {
 
   useEffect(() => { if (myTeam?.id) load(myTeam.id) }, [myTeam?.id])
   const load = async (teamId: string) => {
-    const today = new Date().toISOString().slice(0, 10)
-    const in30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+    const today = todayIT()
+    const in30d = dateIT(new Date(Date.now() + 30 * 86400000))
     const [rosterRes, certRes] = await Promise.all([
       supabase
         .from('players')
@@ -881,7 +881,7 @@ function CoachDashboard({ firstName }: { firstName: string }) {
     setCertExpiring(certRes.data ?? [])
   }
 
-  const isToday = nextEvent && nextEvent.date === new Date().toISOString().slice(0, 10)
+  const isToday = nextEvent && nextEvent.date === todayIT()
   const eventDateLabel = nextEvent
     ? (isToday ? `Oggi, ${nextEvent.startTime}` : `${new Date(nextEvent.date + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })}, ${nextEvent.startTime}`)
     : ''
@@ -1277,7 +1277,7 @@ function EventPickerSheet({ open, onClose, events, onPick }: {
   onPick: (e: any) => void
 }) {
   // Divide passati vs futuri
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIT()
   const past = events.filter(e => e.date < today).slice(-5).reverse()
   const upcoming = events.filter(e => e.date >= today).slice(0, 10)
 
@@ -1602,7 +1602,7 @@ function ParentDashboard({ firstName }: { firstName: string }) {
     // Prossimi 5 eventi (allenamenti + partite) per le squadre dei figli
     if (kidsClean.length > 0) {
       const teamIds = kidsClean.map(k => k.team_id).filter(Boolean)
-      const today = new Date().toISOString().slice(0, 10)
+      const today = todayIT()
       const [trRes, mtRes] = await Promise.all([
         supabase.from('trainings').select('id, training_date, start_time, location, team_id, team:teams(id, name, color)')
           .in('team_id', teamIds).gte('training_date', today).order('training_date').limit(4),
@@ -1687,8 +1687,8 @@ function ParentDashboard({ firstName }: { firstName: string }) {
       {children.map(child => {
         const initials = getInitials(child.first_name, child.last_name).toUpperCase()
         const medExpiry = child.medical_expiry
-        const today = new Date().toISOString().slice(0, 10)
-        const in30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+        const today = todayIT()
+        const in30d = dateIT(new Date(Date.now() + 30 * 86400000))
         const medStatus = !medExpiry ? 'missing'
           : medExpiry < today ? 'expired'
           : medExpiry <= in30d ? 'expiring' : 'ok'

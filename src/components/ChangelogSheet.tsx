@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
-import { APP_VERSION, APP_VERSION_DATE, CHANGELOG, type Release } from '../lib/version'
+import { APP_VERSION, APP_VERSION_DATE, type Release } from '../lib/version'
 
 interface Props {
   open: boolean
@@ -9,6 +10,21 @@ interface Props {
 }
 
 export function ChangelogSheet({ open, onClose, highlightLatest }: Props) {
+  // M5: lazy load del changelog (~150KB di stringhe). Caricato solo quando il
+  // bottom sheet si apre: fuori dal bundle main, nessun costo per chi non apre
+  // il changelog mai.
+  const [changelog, setChangelog] = useState<Release[] | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || changelog) return
+    setLoading(true)
+    import('../lib/changelog')
+      .then(mod => setChangelog(mod.CHANGELOG))
+      .catch(() => setChangelog([]))
+      .finally(() => setLoading(false))
+  }, [open, changelog])
+
   return (
     <BottomSheet open={open} onClose={onClose} title={highlightLatest ? '🎉 Novità della nuova versione' : 'Novità e versioni'}>
       <div style={{ padding: '10px 16px 30px' }}>
@@ -40,7 +56,7 @@ export function ChangelogSheet({ open, onClose, highlightLatest }: Props) {
           </div>
         </div>
 
-        {highlightLatest && CHANGELOG[0] && (
+        {highlightLatest && changelog && changelog[0] && (
           <div
             style={{
               padding: '10px 12px',
@@ -58,8 +74,14 @@ export function ChangelogSheet({ open, onClose, highlightLatest }: Props) {
           </div>
         )}
 
+        {loading && (
+          <div style={{ padding: 20, textAlign: 'center', color: '#707882', fontSize: 13 }}>
+            Caricamento storico release…
+          </div>
+        )}
+
         <div style={{ display: 'grid', gap: 14 }}>
-          {CHANGELOG.map((rel, i) => (
+          {changelog?.map((rel, i) => (
             <ReleaseCard key={rel.version} release={rel} isLatest={i === 0} />
           ))}
         </div>

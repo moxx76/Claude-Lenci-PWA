@@ -45,6 +45,7 @@ const FOOT_OPTIONS = ['Destro', 'Sinistro', 'Ambidestro']
 
 // ============= INTERFACCE =============
 import { classifyBMI, ageInMonths } from '../lib/bmiClassification'
+import { todayIT } from '../lib/dateIT'
 
 // Helper: calcola BMI = peso (kg) / altezza (m)^2. Restituisce numero con 1 decimale o null se input mancante.
 // Nota: il BMI è un indicatore di riferimento adulto — per gli atleti in età evolutiva serve confrontarlo nel
@@ -115,7 +116,7 @@ export function PlayerAssessmentSheet({ open, onClose, player, canEdit, onSaved 
   const [heightCm, setHeightCm] = useState('')
   const [weightKg, setWeightKg] = useState('')
   const [shoeSize, setShoeSize] = useState('')
-  const [assessmentDate, setAssessmentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [assessmentDate, setAssessmentDate] = useState(todayIT())
 
   // Form scores
   const [technical, setTechnical] = useState<Record<string, number>>({})
@@ -139,7 +140,7 @@ export function PlayerAssessmentSheet({ open, onClose, player, canEdit, onSaved 
     setHeightCm(player.height_cm != null ? String(player.height_cm) : '')
     setWeightKg(player.weight_kg != null ? String(player.weight_kg) : '')
     setShoeSize(player.shoe_size != null ? String(player.shoe_size) : '')
-    setAssessmentDate(new Date().toISOString().slice(0, 10))
+    setAssessmentDate(todayIT())
     setTechnical({}); setPhysical({}); setTactical({}); setNote('')
   }, [open, player?.id])
 
@@ -254,7 +255,7 @@ export function PlayerAssessmentSheet({ open, onClose, player, canEdit, onSaved 
     setHeightCm(player?.height_cm != null ? String(player.height_cm) : '')
     setWeightKg(player?.weight_kg != null ? String(player.weight_kg) : '')
     setShoeSize(player?.shoe_size != null ? String(player.shoe_size) : '')
-    setAssessmentDate(new Date().toISOString().slice(0, 10))
+    setAssessmentDate(todayIT())
     setTechnical({}); setPhysical({}); setTactical({}); setNote('')
   }
 
@@ -267,7 +268,7 @@ export function PlayerAssessmentSheet({ open, onClose, player, canEdit, onSaved 
   // storicizzato sulle valutazioni, quindi resta sempre quello anagrafico.
   const startNew = () => {
     setEditingId(null)
-    setAssessmentDate(new Date().toISOString().slice(0, 10))
+    setAssessmentDate(todayIT())
     setTechnical({}); setPhysical({}); setTactical({}); setNote('')
     // history è ordinato per assessment_date DESC in loadHistory() →
     // history[0] è la più recente.

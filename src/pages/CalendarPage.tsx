@@ -26,6 +26,7 @@ import { ParentAttendanceSheet } from '../components/ParentAttendanceSheet'
 import { ConvocationSheet } from '../components/ConvocationSheet'
 import { DistintaTatticaSheet, type DistintaTatticaData } from '../components/DistintaTatticaSheet'
 import { supabase } from '../lib/supabase'
+import { todayIT } from '../lib/dateIT'
 
 function formatDate(iso: string): { day: string; date: string; month: string } {
   const d = new Date(iso + 'T00:00:00')
@@ -1101,7 +1102,7 @@ function DateGroup({ date, events, showTeamTag, isStaff, attCounts, matchCounts,
   hasChildren?: boolean;
 }) {
   const { day, date: d, month } = formatDate(date)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIT()
   const isToday = date === today
   const isPast = date < today
 

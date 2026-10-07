@@ -9,6 +9,7 @@ import {
   CATEGORY_META, STATUS_META,
   type MarketingCategory, type MarketingStatus, type MarketingEvent,
 } from '../lib/marketing'
+import { todayIT, dateIT } from '../lib/dateIT'
 
 const MONTH_LABELS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre']
@@ -48,7 +49,7 @@ export function MarketingPage() {
   }
 
   const filtered = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = todayIT()
     let list = events.filter(e => {
       if (categoryFilter !== 'all' && e.category !== categoryFilter) return false
       if (statusFilter !== 'all' && e.status !== statusFilter) return false
@@ -87,7 +88,7 @@ export function MarketingPage() {
 
   // KPI aggregati
   const kpi = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayIT()
     const upcoming = events.filter(e => e.event_date >= today && e.status !== 'cancelled')
     const completed = events.filter(e => e.status === 'completed')
     const totalBudget = events.reduce((s, e) => s + (e.budget_actual ?? e.budget_estimated ?? 0), 0)
@@ -260,12 +261,12 @@ function CalendarView({ events, monthCursor, setMonthCursor, onEventClick }: {
   for (let i = 0; i < startDow; i++) days.push({ date: null, events: [] })
   for (let d = 1; d <= daysInMonth; d++) {
     const dt = new Date(year, month, d)
-    const dtStr = dt.toISOString().slice(0, 10)
+    const dtStr = dateIT(dt)
     days.push({ date: dt, events: events.filter(e => e.event_date === dtStr) })
   }
   while (days.length % 7 !== 0) days.push({ date: null, events: [] })
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = todayIT()
 
   return (
     <div style={{ background: '#fff', borderRadius: 14, padding: 14, boxShadow: '0 10px 24px rgba(0,120,191,0.06)' }}>
@@ -297,7 +298,7 @@ function CalendarView({ events, monthCursor, setMonthCursor, onEventClick }: {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
         {days.map((d, i) => {
           if (!d.date) return <div key={i} />
-          const isToday = d.date.toISOString().slice(0, 10) === todayStr
+          const isToday = dateIT(d.date) === todayStr
           return (
             <div key={i} style={{
               minHeight: 62, padding: 4, borderRadius: 6,

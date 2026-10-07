@@ -6,6 +6,7 @@ import type { PlayerDetailData } from './PlayerDetailSheet'
 import { AvatarUploader } from './AvatarUploader'
 import { useAuth } from '../store/auth'
 import { isAdmin } from '../lib/types'
+import { todayIT, dateIT } from '../lib/dateIT'
 
 interface PlayerEditSheetProps {
   open: boolean
@@ -331,10 +332,10 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
           <div style={{
             padding: 10, borderRadius: 10,
             background: !medicalExpiry ? 'rgba(244,208,242,0.35)'
-              : medicalExpiry < new Date().toISOString().slice(0, 10) ? 'rgba(255,218,214,0.6)'
+              : medicalExpiry < todayIT() ? 'rgba(255,218,214,0.6)'
               : 'rgba(128,249,139,0.15)',
             border: `1px solid ${!medicalExpiry ? '#f4b0f0'
-              : medicalExpiry < new Date().toISOString().slice(0, 10) ? '#ffbdb6'
+              : medicalExpiry < todayIT() ? '#ffbdb6'
               : '#80f98b'}`,
             marginBottom: 4,
           }}>
@@ -349,7 +350,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                 onClick={() => {
                   const d = new Date()
                   d.setFullYear(d.getFullYear() + 1)
-                  setMedicalExpiry(d.toISOString().slice(0, 10))
+                  setMedicalExpiry(dateIT(d))
                 }}
                 style={quickBtn}
               >+1 anno da oggi</button>
@@ -357,7 +358,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                 onClick={() => {
                   const d = new Date()
                   d.setMonth(d.getMonth() + 6)
-                  setMedicalExpiry(d.toISOString().slice(0, 10))
+                  setMedicalExpiry(dateIT(d))
                 }}
                 style={quickBtn}
               >+6 mesi</button>
@@ -370,7 +371,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
             <p style={{ fontSize: 10.5, color: '#404751', margin: '6px 0 0', lineHeight: 1.35 }}>
               {!medicalExpiry
                 ? '⚠️ Nessuna visita medica registrata. Inserisci la data di scadenza per mettere in bonis il giocatore.'
-                : medicalExpiry < new Date().toISOString().slice(0, 10)
+                : medicalExpiry < todayIT()
                   ? '⚠️ Certificato scaduto — aggiorna la data della nuova visita.'
                   : '✅ Giocatore in regola per la stagione.'}
             </p>
@@ -463,7 +464,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                 onChange={e => {
                   setRegistrationPaid(e.target.checked)
                   if (e.target.checked && !registrationPaidAt) {
-                    setRegistrationPaidAt(new Date().toISOString().slice(0, 10))
+                    setRegistrationPaidAt(todayIT())
                   }
                 }}
                 style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#00838f' }} />
@@ -497,7 +498,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                 onChange={e => {
                   setBalancePaid(e.target.checked)
                   if (e.target.checked && !balancePaidAt) {
-                    setBalancePaidAt(new Date().toISOString().slice(0, 10))
+                    setBalancePaidAt(todayIT())
                   }
                 }}
                 style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#00838f' }} />

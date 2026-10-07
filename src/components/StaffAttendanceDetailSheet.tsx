@@ -4,6 +4,7 @@ import { useAuth } from '../store/auth'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { useToast } from './Toast'
+import { todayIT } from '../lib/dateIT'
 
 type Status = 'present' | 'absent' | 'late' | 'excused'
 
@@ -83,7 +84,7 @@ export function StaffAttendanceDetailSheet({ open, onClose, profileId, fullName,
         const { data } = await supabase.from('trainings')
           .select('id, team_id, training_date, start_time, focus')
           .in('team_id', teamIds)
-          .lte('training_date', new Date().toISOString().slice(0, 10))
+          .lte('training_date', todayIT())
           .order('training_date', { ascending: false })
         evs = (data ?? []).map(t => ({
           event_id: t.id, event_date: t.training_date, event_time: t.start_time?.slice(0, 5) ?? null,

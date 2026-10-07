@@ -4,6 +4,7 @@ import { useAuth } from '../store/auth'
 import { isAdmin, isCoach } from '../lib/types'
 import { Icon } from '../components/Icon'
 import { sortTeamsByAge } from '../lib/teamOrder'
+import { todayIT } from '../lib/dateIT'
 
 // ============================================================
 // TYPES
@@ -283,7 +284,7 @@ function RilieviTab({ rilievi }: { rilievi: Rilievo[] }) {
     })
   }, [rilievi, filter])
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIT()
 
   return (
     <>
@@ -437,7 +438,7 @@ function ComunicatiTab({ comunicati }: { comunicati: Comunicato[] }) {
 // ============================================================
 
 function GareTab({ gare }: { gare: Gara[] }) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIT()
 
   if (gare.length === 0) {
     return <div style={{ padding: 30, textAlign: 'center', color: '#707882', fontSize: 13 }}>Nessuna gara in archivio.</div>

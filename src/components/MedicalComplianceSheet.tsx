@@ -111,7 +111,7 @@ export function MedicalComplianceSheet({ open, onClose, onUpdated }: Props) {
 
   const statusOf = (p: RowPlayer): Status => {
     if (!p.medical_expiry) return 'missing'
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayIT()
     if (p.medical_expiry < today) return 'expired'
     return 'expiring'
   }

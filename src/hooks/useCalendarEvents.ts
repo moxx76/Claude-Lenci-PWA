@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { sortTeamsByAge } from '../lib/teamOrder'
+import { todayIT } from '../lib/dateIT'
 
 export type EventKind = 'training' | 'match' | 'tournament' | 'marketing' | 'meeting'
 
@@ -43,7 +44,7 @@ interface UseCalendarEventsOptions {
 export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
   const {
     teamId,
-    from = new Date().toISOString().slice(0, 10),
+    from = todayIT(),
     to,
     limit = 100,
   } = options

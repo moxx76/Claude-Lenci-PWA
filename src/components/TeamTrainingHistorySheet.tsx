@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
+import { todayIT } from '../lib/dateIT'
 
 interface Props {
   open: boolean
@@ -45,7 +46,7 @@ export function TeamTrainingHistorySheet({ open, onClose, teamId, teamName, onOp
     setError(null)
     ;(async () => {
       try {
-        const today = new Date().toISOString().slice(0, 10)
+        const today = todayIT()
         // 1. Trainings (di una squadra o di tutte)
         let q = supabase
           .from('trainings')
@@ -119,7 +120,7 @@ export function TeamTrainingHistorySheet({ open, onClose, teamId, teamName, onOp
     return date.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
   }
 
-  const isPast = (d: string) => d < new Date().toISOString().slice(0, 10)
+  const isPast = (d: string) => d < todayIT()
 
   return (
     <BottomSheet open={open} onClose={onClose} title={`Storico allenamenti${teamName ? ' — ' + teamName : ''}`}>

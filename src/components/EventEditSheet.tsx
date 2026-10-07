@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
-import { dateIT } from '../lib/dateIT'
+import { todayIT, dateIT } from '../lib/dateIT'
 import { TrainingSessionComposerSheet } from './TrainingSessionComposerSheet'
 import { TrainingAttachmentsSection } from './TrainingAttachmentsSection'
 import { useToast } from './Toast'
@@ -334,7 +334,7 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
         </Field>
 
         {/* Banner retroattivo: data nel passato */}
-        {eventDate && eventDate < new Date().toISOString().slice(0, 10) && (
+        {eventDate && eventDate < todayIT() && (
           <div
             style={{
               padding: '8px 10px',

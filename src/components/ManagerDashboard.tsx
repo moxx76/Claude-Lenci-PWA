@@ -16,6 +16,7 @@ import { CoachPlayerStatsDashboard } from './CoachPlayerStatsDashboard'
 import { WeekendPlannerCard } from './WeekendPlannerCard'
 import { useAuth } from '../store/auth'
 import { extractCity, isTournamentCompetition, HOME_CITY } from '../lib/eventLocation'
+import { todayIT, dateIT } from '../lib/dateIT'
 
 // Elenco user_id dei dirigenti autorizzati a vedere la card "Weekend del club"
 // nella Dashboard manager. Normalmente la card è riservata ad admin/director,
@@ -135,11 +136,11 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
     console.log(`[ManagerDashboard] load() #${loadNum} — team ${teamId}`)
     setLoading(true)
     try {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = todayIT()
 
       // Fetch parallelo
-      const in14d = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
-      const from14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
+      const in14d = dateIT(new Date(Date.now() + 14 * 86400000))
+      const from14 = dateIT(new Date(Date.now() - 14 * 86400000))
 
       const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes, teamDurRes] = await Promise.all([
         supabase.from('matches')

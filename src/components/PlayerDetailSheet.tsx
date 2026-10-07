@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/auth'
 import { PlayerEditSheet } from './PlayerEditSheet'
 import { PlayerAssessmentSheet } from './PlayerAssessmentSheet'
+import { todayIT } from '../lib/dateIT'
 
 export interface PlayerDetailData {
   id: string
@@ -227,7 +228,7 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
         player_id: player.id,
         kind: noteType,
         content: noteText.trim(),
-        occurred_on: new Date().toISOString().slice(0, 10),
+        occurred_on: todayIT(),
         author_id: profile?.id ?? null,
       })
       if (error) throw error
