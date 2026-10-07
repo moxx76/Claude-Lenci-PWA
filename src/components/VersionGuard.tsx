@@ -10,7 +10,7 @@ import { APP_VERSION } from '../lib/version'
  *   e almeno un carattere digitato (euristica: value non vuoto per campi
  *   di tipo text/number/password/email/tel/search e textarea)
  */
-function hasUnsavedWork(): boolean {
+export function hasUnsavedWork(): boolean {
   try {
     // 1. Marker esplicito via data-dirty
     if (document.querySelector('[data-dirty="true"]')) return true

@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.130',
+    date: '2026-10-07',
+    title: 'Milestone M11: test automatici su VersionGuard.hasUnsavedWork + fix tipi CI',
+    fixes: [
+      'Nuovo src/components/VersionGuard.test.ts (20 casi) che copre la funzione hasUnsavedWork — logica critica che impedisce il reload automatico sopra una bozza in corso del coach/dirigente. Coverage per: marker data-dirty (tipi e nesting), chiavi localStorage con prefisso draft:/postmatch_draft_, BottomSheet aperti con input/textarea valorizzati (ignorando hidden/button/submit, trim degli spazi, defaultValue uguale al value, sheet chiusi), e combinazioni. hasUnsavedWork() esportata dal modulo per renderla testabile',
+      'Fix tipi che facevano fallire il CI su bmiClassification.test.ts: usavo "male"/"female" invece di "M"/"F" (la signature di classifyBMI accetta "M" | "F" | null | undefined), e mancava la guard su null nei risultati del test (classifyBMI può ritornare null per età fuori range). 10 errori TypeScript risolti, test suite ora 94/94 verde',
+    ],
+  },
+  {
     version: '1.9.129',
     date: '2026-10-07',
     title: 'Milestone M10: vendor splitting + bundle main a 57KB',

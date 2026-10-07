@@ -39,35 +39,40 @@ describe('ageInMonths', () => {
 describe('classifyBMI', () => {
   test('adulto con BMI normale → "normal"', () => {
     // 25 anni ha ageMonths > 228 (massimo WHO 5-19), usa curve adulto
-    const r = classifyBMI(22, 25 * 12, 'male')
-    expect(r.category).toBe('normal')
-    expect(r.reference).toBe('adult')
+    const r = classifyBMI(22, 25 * 12, 'M')
+    expect(r).not.toBeNull()
+    expect(r!.category).toBe('normal')
+    expect(r!.reference).toBe('adult')
   })
 
   test('adulto obeso → "obesity"', () => {
-    const r = classifyBMI(35, 30 * 12, 'female')
-    expect(r.category).toBe('obesity')
+    const r = classifyBMI(35, 30 * 12, 'F')
+    expect(r).not.toBeNull()
+    expect(r!.category).toBe('obesity')
   })
 
   test('adulto sottopeso → "thinness"', () => {
-    const r = classifyBMI(17, 25 * 12, 'male')
-    expect(r.category).toBe('thinness')
+    const r = classifyBMI(17, 25 * 12, 'M')
+    expect(r).not.toBeNull()
+    expect(r!.category).toBe('thinness')
   })
 
   test('bambino 10 anni usa curve WHO 5-19', () => {
-    const r = classifyBMI(16, 120, 'male')
-    expect(r.reference).toBe('who-5-19')
+    const r = classifyBMI(16, 120, 'M')
+    expect(r).not.toBeNull()
+    expect(r!.reference).toBe('who-5-19')
   })
 
   test('tutti i risultati hanno label non vuota e colori', () => {
-    const r = classifyBMI(22, 180, 'female')
-    expect(r.label).toBeTruthy()
-    expect(r.color).toMatch(/^#/)
-    expect(r.bg).toMatch(/^#|^rgba/)
+    const r = classifyBMI(22, 180, 'F')
+    expect(r).not.toBeNull()
+    expect(r!.label).toBeTruthy()
+    expect(r!.color).toMatch(/^#/)
+    expect(r!.bg).toMatch(/^#|^rgba/)
   })
 
   test('BMI invalido (NaN/negativo) non crasha', () => {
-    expect(() => classifyBMI(NaN, 120, 'male')).not.toThrow()
-    expect(() => classifyBMI(-5, 120, 'male')).not.toThrow()
+    expect(() => classifyBMI(NaN, 120, 'M')).not.toThrow()
+    expect(() => classifyBMI(-5, 120, 'M')).not.toThrow()
   })
 })
