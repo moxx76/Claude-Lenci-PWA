@@ -57,7 +57,14 @@ export function Layout() {
   const isMarketing = profile?.is_marketing === true && !isParentView
   const isStaff = (isAdmin(profile?.role) || isCoach(profile?.role)) && !isParentView
   // Moduli societari: visibili ad admin + chi ha il flag is_director
-  const canSeeModuli = (isAdmin(profile?.role) || profile?.is_director === true) && !isParentView
+  // M20 — Decisione prodotto 2026-10-07: i team manager (is_manager=true,
+  // tipicamente coach della prima squadra o responsabili settori) possono
+  // vedere e scaricare i moduli (iscrizioni, certificati, uscita autonoma,
+  // ecc.) perché gestiscono i rapporti con famiglie dei propri giocatori.
+  // La policy RLS moduli_select è stata estesa in parallelo. Il WRITE
+  // (upload/delete) resta admin-only, enforced sia dalla UI (canManage in
+  // src/pages/Moduli.tsx) che dalla policy moduli_write.
+  const canSeeModuli = (isAdmin(profile?.role) || profile?.is_director === true || profile?.is_manager === true) && !isParentView
 
   // Coach senza squadra assegnata (né head, né manager): menu limitato
   // Solo per coach puri, non per admin che si sono già assegnati o hanno più responsabilità

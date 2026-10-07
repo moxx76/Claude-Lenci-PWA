@@ -3,6 +3,16 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.135',
+    date: '2026-10-07',
+    title: 'Fix: Marcello Genna (coach manager) non vedeva i moduli',
+    fixes: [
+      "Marcello Genna (ruolo coach, is_manager=true) riportava di non vedere nessun modulo. Causa: la policy RLS moduli_select limitava la SELECT a role='admin' OR is_director=true. Un team manager, pur gestendo iscrizioni/certificati plurimo dei propri giocatori, non rientrava.",
+      "Fix lato DB: nuova policy additiva moduli_select_managers che consente la SELECT ai profili con is_manager=true (del proprio club_id). Le due policy SELECT si combinano in OR, quindi admin+director continuano a vedere senza modifiche; i manager ora vedono anche loro. La policy di WRITE (upload/delete) resta admin-only tramite moduli_write — i manager possono scaricare ma non caricare.",
+      "Fix lato UI: Layout.tsx canSeeModuli ora include is_manager=true nella condizione, così il link 'Moduli' nel menu di navigazione compare anche per i manager (prima era nascosto a prescindere dalla RLS).",
+    ],
+  },
+  {
     version: '1.9.134',
     date: '2026-10-07',
     title: 'Milestone M16+M17+M18: E2E Playwright, RLS smoke, matrice test manuale, fix critical push_log',
