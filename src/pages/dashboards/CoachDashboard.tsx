@@ -1,33 +1,24 @@
-import type React from 'react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../store/auth'
 import { todayIT, dateIT } from '../../lib/dateIT'
-import { isAdmin, isCoach, isParent, isAthlete, avatarBg } from '../../lib/types'
+import { avatarBg } from '../../lib/types'
 import { Icon } from '../../components/Icon'
-import { PlayerDetailSheet, type PlayerDetailData } from '../../components/PlayerDetailSheet'
-import { AttendanceSheet } from '../../components/AttendanceSheet'
-import { EventEditSheet } from '../../components/EventEditSheet'
-import { DatabaseBackupSheet } from '../../components/DatabaseBackupSheet'
-import { TrainingExerciseCatalogSheet } from '../../components/TrainingExerciseCatalogSheet'
+import { type PlayerDetailData } from '../../components/PlayerDetailSheet'
 import { BottomSheet } from '../../components/BottomSheet'
-import { MedicalComplianceSheet } from '../../components/MedicalComplianceSheet'
-import { PresenceLogSheet } from '../../components/PresenceLogSheet'
-import { ParentAttendanceSheet } from '../../components/ParentAttendanceSheet'
-import { CalendarSubscribeSheet } from '../../components/CalendarSubscribeSheet'
-import { DirectorDashboard } from '../../components/DirectorDashboard'
-import { ManagerDashboard } from '../../components/ManagerDashboard'
-import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
-import { TeamPickerSheet } from '../../components/TeamPickerSheet'
 import { ShuttleServiceCard } from '../../components/ShuttleServiceCard'
-import { AdminStaffOverviewCard } from '../../components/AdminStaffOverviewCard'
-import { WeekendPlannerCard } from '../../components/WeekendPlannerCard'
+import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
 import { useCalendarEvents } from '../../hooks/useCalendarEvents'
 import { extractCity, isTournamentCompetition, HOME_CITY } from '../../lib/eventLocation'
 import { useMyTeam } from '../../hooks/useMyTeam'
-import { useViewMode } from '../../store/viewMode'
-import { useImpersonation } from '../../store/impersonation'
+
+// M13 — Sheet aperti su click: lazy. Il coach apre PlayerDetail per vedere
+// un giocatore, Attendance per prendere le presenze, EventEdit per
+// creare evento. Nessuno è un render iniziale, quindi caricamento al click.
+const PlayerDetailSheet = lazy(() => import('../../components/PlayerDetailSheet').then(m => ({ default: m.PlayerDetailSheet })))
+const AttendanceSheet = lazy(() => import('../../components/AttendanceSheet').then(m => ({ default: m.AttendanceSheet })))
+const EventEditSheet = lazy(() => import('../../components/EventEditSheet').then(m => ({ default: m.EventEditSheet })))
 
 
 function CoachDashboard({ firstName }: { firstName: string }) {
@@ -409,35 +400,47 @@ function CoachDashboard({ firstName }: { firstName: string }) {
         </div>
       </div>
 
-      {/* Modals */}
-      <PlayerDetailSheet
-        open={selectedPlayer !== null}
-        onClose={() => setSelectedPlayer(null)}
-        player={selectedPlayer}
-        canEdit={true}
-        onUpdated={() => { if (myTeam?.id) load(myTeam.id); setSelectedPlayer(null) }}
-      />
-      <AttendanceSheet
-        open={attendanceOpen}
-        onClose={() => setAttendanceOpen(false)}
-        eventTitle={attendanceEvent?.title || ''}
-        eventDate={attendanceEvent?.date || ''}
-        eventTime={attendanceEvent?.time || ''}
-        trainingId={attendanceEvent?.id ?? null}
-        players={rosterFull.map(p => ({
-          id: p.id,
-          firstName: p.first_name || '',
-          lastName: p.last_name || '',
-          position: p.position,
-        }))}
-      />
-      <EventEditSheet
-        open={eventEditOpen}
-        onClose={() => setEventEditOpen(false)}
-        teams={[{ id: myTeam.id, name: myTeam.name, color: myTeam.color }]}
-        defaultTeamId={myTeam.id}
-        onSaved={() => { setEventEditOpen(false); refreshEvents() }}
-      />
+      {/* Modals — tutti i Sheet pesanti lazy-loaded on-demand (M13) */}
+      {selectedPlayer !== null && (
+        <Suspense fallback={null}>
+          <PlayerDetailSheet
+            open={selectedPlayer !== null}
+            onClose={() => setSelectedPlayer(null)}
+            player={selectedPlayer}
+            canEdit={true}
+            onUpdated={() => { if (myTeam?.id) load(myTeam.id); setSelectedPlayer(null) }}
+          />
+        </Suspense>
+      )}
+      {attendanceOpen && (
+        <Suspense fallback={null}>
+          <AttendanceSheet
+            open={attendanceOpen}
+            onClose={() => setAttendanceOpen(false)}
+            eventTitle={attendanceEvent?.title || ''}
+            eventDate={attendanceEvent?.date || ''}
+            eventTime={attendanceEvent?.time || ''}
+            trainingId={attendanceEvent?.id ?? null}
+            players={rosterFull.map(p => ({
+              id: p.id,
+              firstName: p.first_name || '',
+              lastName: p.last_name || '',
+              position: p.position,
+            }))}
+          />
+        </Suspense>
+      )}
+      {eventEditOpen && (
+        <Suspense fallback={null}>
+          <EventEditSheet
+            open={eventEditOpen}
+            onClose={() => setEventEditOpen(false)}
+            teams={[{ id: myTeam.id, name: myTeam.name, color: myTeam.color }]}
+            defaultTeamId={myTeam.id}
+            onSaved={() => { setEventEditOpen(false); refreshEvents() }}
+          />
+        </Suspense>
+      )}
       {/* Selezione evento per presenze */}
       {pickEventOpen && (
         <EventPickerSheet

@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.132',
+    date: '2026-10-07',
+    title: 'Milestone M13+M14: lazy sheet nei dashboard + 80 nuovi test (174 totali)',
+    fixes: [
+      'M13 — Tutti i BottomSheet pesanti aperti on-click dai sub-dashboard sono stati convertiti a React.lazy con render condizionato su Suspense fallback null: EventEditSheet (41KB), PlayerDetailSheet (70KB), AttendanceSheet (6KB), MedicalComplianceSheet (9KB), DatabaseBackupSheet (8KB), TrainingExerciseCatalogSheet (6KB), PresenceLogSheet (6KB), CalendarSubscribeSheet (7KB), ParentAttendanceSheet. Prima erano import eager e il loro codice (incluso il transitivo pdf-lib/html2canvas del backup) finiva nel chunk sub-dashboard anche se l\'utente non li apriva mai in quella sessione',
+      'M13 — Pulizia import ereditati non usati nei 5 sub-dashboard (AdminDashboard, CoachDashboard, AthleteDashboard, ParentDashboard, PublicDashboard): tolti ~25 import morti per file, risultato visibile su cliente lento perché il browser trasferisce meno bytes nel bootstrap',
+      'M14 — Test suite espansa a 174 casi (94 → 174, +80): nuovi file src/lib/teamOrder.test.ts (15 casi: ordinamento FIGC Prima Squadra→Piccoli Amici, Pulcini A/B, Under X=50+N), src/lib/utils.test.ts (25 casi: formatDate/formatDateShort/formatDateTime/calculateAge con fakeTimers deterministici al 7/10/2026, initials, greeting mattina/pomeriggio/sera, avatarBg deterministico), src/lib/types.test.ts (29 casi: isAdmin/isCoach/isParent/isAthlete/isStaff edge cases, categoryStyle per U-11/12/13/15/17/19, avatarBg hash djb2), src/lib/ical.test.ts (11 casi: RFC 5545 VCALENDAR/VTIMEZONE Europe/Rome con CET+CEST, VEVENT con escape virgola/semicolon/newline, line folding a 75 ottetti, multi-evento, default end=start+90min)',
+      'Audit npm: 0 critical, 0 high, 2 moderate residue (react-router open redirect — già audit-reviewed in M6 come non sfruttabile su BrowserRouter con tutti to= hardcoded; richiede upgrade 6→7 breaking che resta debito tecnico documentato)',
+    ],
+  },
+  {
     version: '1.9.131',
     date: '2026-10-07',
     title: 'Milestone M12: Dashboard splittata per ruolo, chunk 198KB → 4KB',

@@ -1,33 +1,27 @@
 import type React from 'react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../store/auth'
 import { todayIT, dateIT } from '../../lib/dateIT'
-import { isAdmin, isCoach, isParent, isAthlete, avatarBg } from '../../lib/types'
+import { avatarBg } from '../../lib/types'
 import { Icon } from '../../components/Icon'
-import { PlayerDetailSheet, type PlayerDetailData } from '../../components/PlayerDetailSheet'
-import { AttendanceSheet } from '../../components/AttendanceSheet'
-import { EventEditSheet } from '../../components/EventEditSheet'
-import { DatabaseBackupSheet } from '../../components/DatabaseBackupSheet'
-import { TrainingExerciseCatalogSheet } from '../../components/TrainingExerciseCatalogSheet'
-import { BottomSheet } from '../../components/BottomSheet'
-import { MedicalComplianceSheet } from '../../components/MedicalComplianceSheet'
-import { PresenceLogSheet } from '../../components/PresenceLogSheet'
-import { ParentAttendanceSheet } from '../../components/ParentAttendanceSheet'
-import { CalendarSubscribeSheet } from '../../components/CalendarSubscribeSheet'
-import { DirectorDashboard } from '../../components/DirectorDashboard'
-import { ManagerDashboard } from '../../components/ManagerDashboard'
-import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
 import { TeamPickerSheet } from '../../components/TeamPickerSheet'
-import { ShuttleServiceCard } from '../../components/ShuttleServiceCard'
 import { AdminStaffOverviewCard } from '../../components/AdminStaffOverviewCard'
 import { WeekendPlannerCard } from '../../components/WeekendPlannerCard'
+import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
 import { useCalendarEvents } from '../../hooks/useCalendarEvents'
 import { extractCity, isTournamentCompetition, HOME_CITY } from '../../lib/eventLocation'
-import { useMyTeam } from '../../hooks/useMyTeam'
-import { useViewMode } from '../../store/viewMode'
-import { useImpersonation } from '../../store/impersonation'
+
+// M13 — Sheet pesanti aperti raramente dall'admin: lazy-loaded così il
+// loro codice (e il transitivo pdf-lib/html2canvas per il backup) non
+// entra nel chunk AdminDashboard. Il fallback è null: il tempo di
+// caricamento è <1 frame tipico, l'overlay dello Sheet maschera già.
+const EventEditSheet = lazy(() => import('../../components/EventEditSheet').then(m => ({ default: m.EventEditSheet })))
+const DatabaseBackupSheet = lazy(() => import('../../components/DatabaseBackupSheet').then(m => ({ default: m.DatabaseBackupSheet })))
+const TrainingExerciseCatalogSheet = lazy(() => import('../../components/TrainingExerciseCatalogSheet').then(m => ({ default: m.TrainingExerciseCatalogSheet })))
+const MedicalComplianceSheet = lazy(() => import('../../components/MedicalComplianceSheet').then(m => ({ default: m.MedicalComplianceSheet })))
+const PresenceLogSheet = lazy(() => import('../../components/PresenceLogSheet').then(m => ({ default: m.PresenceLogSheet })))
 
 
 function AdminDashboard({ firstName }: { firstName: string }) {
@@ -713,30 +707,52 @@ function AdminDashboard({ firstName }: { firstName: string }) {
         )}
       </div>
 
-      {/* Editor evento */}
-      <EventEditSheet
-        open={eventEditOpen}
-        onClose={() => setEventEditOpen(false)}
-        teams={teams}
-        onSaved={() => { setEventEditOpen(false); load() }}
-      />
-      <MedicalComplianceSheet
-        open={complianceOpen}
-        onClose={() => setComplianceOpen(false)}
-        onUpdated={() => load()}
-      />
-      <PresenceLogSheet
-        open={presenceLogOpen}
-        onClose={() => setPresenceLogOpen(false)}
-      />
-      <DatabaseBackupSheet
-        open={backupOpen}
-        onClose={() => setBackupOpen(false)}
-      />
-      <TrainingExerciseCatalogSheet
-        open={catalogOpen}
-        onClose={() => setCatalogOpen(false)}
-      />
+      {/* M13 — Editor evento e sheet admin pesanti caricati on-demand solo
+          quando aperti (il chunk arriva al primo click, poi è in cache per
+          la sessione). Fallback null: lo scrim dello Sheet copre il frame. */}
+      {eventEditOpen && (
+        <Suspense fallback={null}>
+          <EventEditSheet
+            open={eventEditOpen}
+            onClose={() => setEventEditOpen(false)}
+            teams={teams}
+            onSaved={() => { setEventEditOpen(false); load() }}
+          />
+        </Suspense>
+      )}
+      {complianceOpen && (
+        <Suspense fallback={null}>
+          <MedicalComplianceSheet
+            open={complianceOpen}
+            onClose={() => setComplianceOpen(false)}
+            onUpdated={() => load()}
+          />
+        </Suspense>
+      )}
+      {presenceLogOpen && (
+        <Suspense fallback={null}>
+          <PresenceLogSheet
+            open={presenceLogOpen}
+            onClose={() => setPresenceLogOpen(false)}
+          />
+        </Suspense>
+      )}
+      {backupOpen && (
+        <Suspense fallback={null}>
+          <DatabaseBackupSheet
+            open={backupOpen}
+            onClose={() => setBackupOpen(false)}
+          />
+        </Suspense>
+      )}
+      {catalogOpen && (
+        <Suspense fallback={null}>
+          <TrainingExerciseCatalogSheet
+            open={catalogOpen}
+            onClose={() => setCatalogOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   )
 }

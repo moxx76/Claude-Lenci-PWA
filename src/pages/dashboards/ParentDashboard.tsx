@@ -1,33 +1,15 @@
-import type React from 'react'
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../store/auth'
 import { todayIT, dateIT } from '../../lib/dateIT'
-import { isAdmin, isCoach, isParent, isAthlete, avatarBg } from '../../lib/types'
+import { avatarBg } from '../../lib/types'
 import { Icon } from '../../components/Icon'
-import { PlayerDetailSheet, type PlayerDetailData } from '../../components/PlayerDetailSheet'
-import { AttendanceSheet } from '../../components/AttendanceSheet'
-import { EventEditSheet } from '../../components/EventEditSheet'
-import { DatabaseBackupSheet } from '../../components/DatabaseBackupSheet'
-import { TrainingExerciseCatalogSheet } from '../../components/TrainingExerciseCatalogSheet'
-import { BottomSheet } from '../../components/BottomSheet'
-import { MedicalComplianceSheet } from '../../components/MedicalComplianceSheet'
-import { PresenceLogSheet } from '../../components/PresenceLogSheet'
-import { ParentAttendanceSheet } from '../../components/ParentAttendanceSheet'
-import { CalendarSubscribeSheet } from '../../components/CalendarSubscribeSheet'
-import { DirectorDashboard } from '../../components/DirectorDashboard'
-import { ManagerDashboard } from '../../components/ManagerDashboard'
-import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
-import { TeamPickerSheet } from '../../components/TeamPickerSheet'
 import { ShuttleServiceCard } from '../../components/ShuttleServiceCard'
-import { AdminStaffOverviewCard } from '../../components/AdminStaffOverviewCard'
-import { WeekendPlannerCard } from '../../components/WeekendPlannerCard'
-import { useCalendarEvents } from '../../hooks/useCalendarEvents'
-import { extractCity, isTournamentCompetition, HOME_CITY } from '../../lib/eventLocation'
-import { useMyTeam } from '../../hooks/useMyTeam'
-import { useViewMode } from '../../store/viewMode'
-import { useImpersonation } from '../../store/impersonation'
+
+// M13 — Sheet lazy on-demand
+const ParentAttendanceSheet = lazy(() => import('../../components/ParentAttendanceSheet').then(m => ({ default: m.ParentAttendanceSheet })))
+const CalendarSubscribeSheet = lazy(() => import('../../components/CalendarSubscribeSheet').then(m => ({ default: m.CalendarSubscribeSheet })))
 
 
 function ParentDashboard({ firstName }: { firstName: string }) {
@@ -330,26 +312,31 @@ function ParentDashboard({ firstName }: { firstName: string }) {
         </div>
       )}
 
-      {/* Sheet gestione presenza */}
-      <ParentAttendanceSheet
-        open={attSheetOpen}
-        onClose={() => setAttSheetOpen(false)}
-        event={attEvent}
-        child={attChild}
-        onSaved={reloadResponses}
-      />
+      {/* Sheet lazy on-demand (M13) */}
+      {attSheetOpen && (
+        <Suspense fallback={null}>
+          <ParentAttendanceSheet
+            open={attSheetOpen}
+            onClose={() => setAttSheetOpen(false)}
+            event={attEvent}
+            child={attChild}
+            onSaved={reloadResponses}
+          />
+        </Suspense>
+      )}
 
-      {/* Sheet sottoscrizione calendario */}
-      {profile && (
-        <CalendarSubscribeSheet
-          open={subscribeOpen}
-          onClose={() => setSubscribeOpen(false)}
-          scope="children"
-          scopeId={profile.id}
-          label={children.length > 0
-            ? `Lenci Poirino · ${children.map(k => k.first_name).join(' + ')}`
-            : 'Lenci Poirino'}
-        />
+      {profile && subscribeOpen && (
+        <Suspense fallback={null}>
+          <CalendarSubscribeSheet
+            open={subscribeOpen}
+            onClose={() => setSubscribeOpen(false)}
+            scope="children"
+            scopeId={profile.id}
+            label={children.length > 0
+              ? `Lenci Poirino · ${children.map(k => k.first_name).join(' + ')}`
+              : 'Lenci Poirino'}
+          />
+        </Suspense>
       )}
 
       {!loading && children.length === 0 && (
