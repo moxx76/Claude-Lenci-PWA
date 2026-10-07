@@ -32,7 +32,7 @@ function ParentDashboard({ firstName }: { firstName: string }) {
   const load = async () => {
     setLoading(true)
     const { data: kids } = await supabase.from('players')
-      .select('id, first_name, last_name, birth_date, position, jersey_number, card_number, medical_expiry, team_id, team:teams(id, name, color, category)')
+      .select('id, first_name, last_name, birth_date, position, jersey_number, card_number, medical_expiry, avatar_url, team_id, team:teams(id, name, color, category)')
       .eq('parent_profile_id', profile!.id)
       .order('birth_date')
     const kidsClean = (kids ?? []).map((k: any) => ({
@@ -141,10 +141,30 @@ function ParentDashboard({ firstName }: { firstName: string }) {
           }}>
             {/* Header figlio */}
             <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+              {child.avatar_url ? (
+                <img
+                  src={child.avatar_url}
+                  alt={`${child.first_name} ${child.last_name}`}
+                  loading="lazy"
+                  style={{
+                    width: 52, height: 52, borderRadius: '50%',
+                    objectFit: 'cover', flexShrink: 0,
+                    background: avatarBg(initials),
+                  }}
+                  onError={(e) => {
+                    // Fallback alle iniziali se l'immagine non carica
+                    const img = e.currentTarget
+                    img.style.display = 'none'
+                    const fallback = img.nextElementSibling as HTMLElement | null
+                    if (fallback) fallback.style.display = 'flex'
+                  }}
+                />
+              ) : null}
               <div style={{
                 width: 52, height: 52, borderRadius: '50%',
                 background: avatarBg(initials), color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: child.avatar_url ? 'none' : 'flex',
+                alignItems: 'center', justifyContent: 'center',
                 fontFamily: 'Anybody', fontWeight: 800, fontSize: 17, flexShrink: 0,
               }}>{initials}</div>
               <div style={{ flex: 1, minWidth: 0 }}>

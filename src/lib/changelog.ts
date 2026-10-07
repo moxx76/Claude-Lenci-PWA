@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.136',
+    date: '2026-10-07',
+    title: 'Foto dei figli visibili nella Dashboard Genitore',
+    fixes: [
+      "Nella Dashboard Genitore ogni card figlio mostrava sempre un placeholder con le iniziali, anche quando il giocatore aveva una foto caricata in players.avatar_url. Query aggiornata per includere avatar_url nel SELECT.",
+      "La card ora mostra <img> con la foto reale (object-fit cover, 52×52, lazy-load); se l'immagine non carica (URL rotto, offline), onError fa fallback automatico al placeholder iniziali — nessun avatar vuoto.",
+    ],
+  },
+  {
     version: '1.9.135',
     date: '2026-10-07',
     title: 'Fix: Marcello Genna (coach manager) non vedeva i moduli',
