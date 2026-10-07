@@ -195,22 +195,21 @@ export function TrainingSessionComposerSheet({
         .eq('id', trainingId)
       if (eUpd) throw eUpd
 
-      // 2. Cancella tutti gli esercizi esistenti e reinserisci (approccio semplice, atomico)
-      const { error: eDel } = await supabase.from('training_session_exercises').delete().eq('training_id', trainingId)
-      if (eDel) throw eDel
-
-      if (rows.length > 0) {
-        const { error: eIns } = await supabase.from('training_session_exercises').insert(
-          rows.map((r, i) => ({
-            training_id: trainingId,
-            exercise_id: r.exercise_id,
-            order_num: i + 1,
-            custom_notes: r.custom_notes || null,
-            duration_override: r.duration_override,
-          }))
-        )
-        if (eIns) throw eIns
-      }
+      // 2. A03: sostituisce gli esercizi atomicamente via RPC.
+      // Prima erano DELETE + INSERT separati nel client (il commento "atomico"
+      // non corrispondeva a una transazione DB); se l'INSERT falliva, gli
+      // esercizi erano persi. replace_training_session_exercises fa entrambe
+      // le operazioni in una singola transazione Postgres.
+      const { error: eRpc } = await supabase.rpc('replace_training_session_exercises', {
+        p_training_id: trainingId,
+        p_rows: rows.map((r, i) => ({
+          exercise_id: r.exercise_id,
+          order_num: i + 1,
+          custom_notes: r.custom_notes || null,
+          duration_override: r.duration_override,
+        })),
+      })
+      if (eRpc) throw eRpc
 
       onSaved?.()
       onClose()

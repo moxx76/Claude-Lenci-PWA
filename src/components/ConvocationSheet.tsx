@@ -362,20 +362,22 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
     if (!match) return
     setSaving(true)
     try {
-      // 1. Salva colori maglie e campo sulla matches
-      await supabase.from('matches').update({
+      // 1. Salva colori maglie e campo sulla matches (controllo errore)
+      const { error: upErr } = await supabase.from('matches').update({
         shirt_color_home: shirtColorHome || null,
         shirt_color_gk: shirtColorGk || null,
         kickoff_field: kickoffField || null,
         meeting_time: meetingTimeOverride.trim() || null,
       }).eq('id', match.id)
+      if (upErr) throw upErr
 
-      // 2. Sostituisce le convocazioni: delete + insert
-      await supabase.from('convocations').delete().eq('match_id', match.id)
+      // 2. A03: sostituisce le convocazioni atomicamente via RPC
+      // Prima erano delete + insert separati; se l'insert falliva, le
+      // convocazioni precedenti erano già perse. replace_convocations fa
+      // tutto in una transazione.
       const inserts = Object.values(rows)
         .filter(r => r.status === 'accepted')
         .map(r => ({
-          match_id: match.id,
           player_id: r.player_id,
           status: r.status,
           is_captain: r.is_captain,
@@ -384,10 +386,11 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
           shirt_number_override: r.shirt_number_override,
           note: r.note,
         }))
-      if (inserts.length > 0) {
-        const { error } = await supabase.from('convocations').insert(inserts)
-        if (error) throw error
-      }
+      const { error } = await supabase.rpc('replace_convocations', {
+        p_match_id: match.id,
+        p_rows: inserts,
+      })
+      if (error) throw error
       setSavedOk(true)
       onSaved?.()
       setTimeout(() => setSavedOk(false), 1500)

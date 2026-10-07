@@ -563,9 +563,10 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         console.warn('[PostMatchSheet] opponent_own_goals/opponent_goal_minutes/captain_change_minute/effective_formation non salvati (migration mancante?)', err)
       }
 
-      // 2. Sostituisce match_player_stats: delete + insert
-      await supabase.from('match_player_stats').delete().eq('match_id', match.id)
-
+      // 2. A03: match_player_stats sostituite atomicamente via RPC.
+      // Prima erano delete + insert separati; se l'insert falliva, le stats
+      // precedenti erano già perse (dato operatore). replace_match_player_stats
+      // fa delete + insert in transazione.
       const rows = Object.values(stats)
         .filter(s =>
           s.was_starter || s.minute_in != null || s.goals > 0 || s.assists > 0 ||
@@ -573,33 +574,24 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           s.own_goals > 0 || s.penalties_scored > 0 || s.penalties_missed > 0
         )
         .map(s => {
-          // Se lo stato contiene campi provenienti dal SELECT precedente (id vuoto/valorizzato,
-          // created_at, updated_at) li scarto: dopo il DELETE la INSERT deve lasciare che il DB
-          // generi id via gen_random_uuid() e i timestamp via default now().
-          // Escludo anche `_uiRole` — flag UI-only che non esiste come colonna DB: senza questo
-          // filtro l'INSERT fallirebbe con "column _uiRole of relation match_player_stats does not exist".
+          // Scarta campi UI-only e di sistema (id/created_at/updated_at generati dal DB,
+          // _uiRole non è colonna). La RPC accetta jsonb e fa il cast colonna per colonna.
           const {
             id: _drop_id, created_at: _drop_ca, updated_at: _drop_ua,
-            _uiRole: _drop_uirole,
+            _uiRole: _drop_uirole, match_id: _drop_match,
             ...clean
           } = s as any
-          // Se l'utente ha lasciato _uiRole='sub' ma i minuti sono vuoti, in DB la riga finisce
-          // con was_starter=false e minute_in=null → questo record verrebbe letto come "non entrato"
-          // al reload (nessun uiRole in DB). Questo comportamento e' voluto: valori mancanti = record
-          // non completo. La regola funzionale chiede di NON forzare il reset dello stato durante
-          // l'editing (che facciamo), ma quando salvi con valori vuoti stai salvando esattamente
-          // cio' che vedi. Nessuna correzione al salvataggio quindi.
           return {
             ...clean,
-            match_id: match.id,
             rating: s.rating != null ? Number(s.rating) : null,
             notes: s.notes ? s.notes.trim() : null,
           }
         })
-      if (rows.length > 0) {
-        const { error } = await supabase.from('match_player_stats').insert(rows)
-        if (error) throw error
-      }
+      const { error } = await supabase.rpc('replace_match_player_stats', {
+        p_match_id: match.id,
+        p_rows: rows,
+      })
+      if (error) throw error
       // Bozza persistente non serve più: il DB ora ha i dati definitivi.
       // Kill esplicito del timer di debounce (senza, poteva riscrivere la bozza 500ms dopo il remove)
       if (draftSaveTimerRef.current !== null) {

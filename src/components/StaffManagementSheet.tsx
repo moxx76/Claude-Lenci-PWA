@@ -280,18 +280,28 @@ export function StaffManagementSheet({ open, onClose }: Props) {
     if (!editingId) return
     const target = staff.find(s => s.id === editingId)
     if (!target) return
-    if (!confirm(`Vuoi eliminare "${target.full_name || target.email}"?\n\nATTENZIONE: rimuoverà anche l'account di accesso e tutte le squadre a lui assegnate perderanno il collegamento. Azione irreversibile.`)) return
+    if (!confirm(`Vuoi eliminare "${target.full_name || target.email}"?\n\nATTENZIONE: rimuoverà l'account di accesso (l'utente non potrà più loggarsi), scollegherà da tutte le squadre (head/manager/second/third) ed eliminerà il profilo. Azione irreversibile.`)) return
     setDeleting(true)
     setError(null)
     try {
-      // Rimuovo eventuali assegnamenti team
-      await supabase.from('teams').update({ head_coach_id: null }).eq('head_coach_id', editingId)
-      await supabase.from('teams').update({ team_manager_id: null }).eq('team_manager_id', editingId)
-      // Elimino profile (cascade eliminerà anche auth.user tramite trigger? in genere no)
-      const { error: pErr } = await supabase.from('profiles').delete().eq('id', editingId)
-      if (pErr) throw pErr
-      // Nota: l'utente auth resta orfano — accettabile per un club (non pochi utenti). L'admin può cancellarlo manualmente via dashboard Supabase se serve
-      setSuccess('✅ Membro rimosso')
+      // A05: elimina via Edge Function 'delete-staff-user' che fa cleanup
+      // completo (slot team, profile, auth.admin.deleteUser) e verifica
+      // che il caller sia admin dello stesso club. Prima venivano puliti
+      // solo head_coach_id/team_manager_id e il profile; l'account auth
+      // restava orfano (potenzialmente ancora loggabile se qualche flusso
+      // non controlla `profile is null`), e gli slot second/third manager
+      // non venivano toccati.
+      const { data, error } = await supabase.functions.invoke('delete-staff-user', {
+        body: { target_id: editingId },
+      })
+      if (error) throw error
+      if (data?.warning) {
+        // Il profilo è stato cancellato ma auth non è stato pulito del tutto:
+        // informo l'admin ma considero successo lato UX (l'utente non può più loggarsi)
+        setSuccess('⚠️ Membro rimosso (cleanup auth parziale, verificare in Supabase)')
+      } else {
+        setSuccess('✅ Membro rimosso definitivamente')
+      }
       await load()
       setTimeout(() => setMode('list'), 1200)
     } catch (e: any) {

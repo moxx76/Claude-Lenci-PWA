@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.120'
+export const APP_VERSION = '1.9.121'
 export const APP_VERSION_DATE = '2026-10-07'
 
 export interface Release {
@@ -20,6 +20,15 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.121',
+    date: '2026-10-07',
+    title: 'Milestone integrità M2: salvataggi atomici + revoca staff completa',
+    fixes: [
+      'A03 — Salvataggi atomici per presenze, convocazioni, referti partita e composizione allenamento. Create 4 RPC Postgres (replace_attendances, replace_convocations, replace_match_player_stats, replace_training_session_exercises) che fanno DELETE+INSERT in UNA SOLA transazione. Prima erano due chiamate separate dal client: se l\'INSERT falliva (rete, RLS, conflitto), i dati precedenti erano già persi. Ora in caso di errore lo stato pre-chiamata resta integro. Impatto: zero perdita dati su errori di salvataggio di presenze/distinte/referti/allenamenti',
+      'A05 — Revoca staff completa via Edge Function delete-staff-user. Prima StaffManagementSheet cancellava solo il profile e due slot team (head_coach, team_manager), lasciando l\'account auth orfano (potenzialmente ancora loggabile) e gli slot second_manager/third_manager intatti. Ora la function: (1) verifica il caller è admin dello stesso club, (2) blocca l\'autoeliminazione, (3) pulisce tutti e 4 gli slot ruolo nei team, (4) cancella il profile, (5) chiama auth.admin.deleteUser con service_role. L\'account non può più loggarsi, nessun orfanamento',
+    ],
+  },
   {
     version: '1.9.120',
     date: '2026-10-07',

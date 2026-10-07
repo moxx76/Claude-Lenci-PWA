@@ -96,20 +96,18 @@ export function AttendanceSheet({
     }
     setSaving(true)
     try {
-      // 1. Cancello tutte le presenze pregresse per questo training
-      await supabase.from('attendances').delete().eq('training_id', trainingId)
-      // 2. Inserisco quelle nuove (solo per giocatori con status non-null)
+      // A03: delete + insert transazionali via RPC Postgres (prima erano 2
+      // chiamate separate; se la seconda falliva, le presenze precedenti erano
+      // già perse). replace_attendances fa entrambe nella stessa transazione:
+      // in caso di errore, lo stato pre-chiamata resta integro.
       const rows = Object.entries(attendance)
         .filter(([, status]) => status !== null)
-        .map(([playerId, status]) => ({
-          training_id: trainingId,
-          player_id: playerId,
-          status,
-        }))
-      if (rows.length > 0) {
-        const { error } = await supabase.from('attendances').insert(rows)
-        if (error) throw error
-      }
+        .map(([playerId, status]) => ({ player_id: playerId, status }))
+      const { error } = await supabase.rpc('replace_attendances', {
+        p_training_id: trainingId,
+        p_rows: rows,
+      })
+      if (error) throw error
       setSavedOk(true)
       onSaved?.()
       // Chiudi dopo un breve delay per mostrare feedback
