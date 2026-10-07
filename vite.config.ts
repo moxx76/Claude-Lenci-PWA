@@ -87,5 +87,44 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        /**
+         * M10 — manualChunks per splittare le vendor libs dal codice applicativo.
+         * Benefici:
+         * 1. Caching molto migliore: le vendor non cambiano tra deploy, il
+         *    browser le serve dalla cache per settimane
+         * 2. Il chunk shared tra pagine lazy non trascina più tutte le dipendenze
+         *    npm, solo utility applicative
+         * 3. Download parallelo: il browser scarica vendor e app simultaneamente
+         */
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          // React core: cambia solo quando aggiorno React major
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) {
+            return 'vendor-react'
+          }
+          // Supabase client: cambia raramente, grosso
+          if (id.includes('/@supabase/')) return 'vendor-supabase'
+          // Workbox/IDB (PWA): usati dal SW e dal client
+          if (id.includes('/workbox-') || id.includes('/idb/')) return 'vendor-pwa'
+          // Router: breaking change raro, cambio solo quando aggiorno
+          if (id.includes('/react-router')) return 'vendor-router'
+          // DOMPurify (sanitizeSvg): piccola ma isolata
+          if (id.includes('/dompurify/')) return 'vendor-sanitize'
+          // PDF + Canvas (gross, usati solo nei flussi export PNG/PDF):
+          // isolati così possono stare in chunk che vive solo quando serve.
+          if (id.includes('/pdf-lib') || id.includes('/html2canvas') || id.includes('/jspdf')) {
+            return 'vendor-pdf-canvas'
+          }
+          // Date/i18n libs
+          if (id.includes('/date-fns') || id.includes('/dayjs') || id.includes('/luxon')) {
+            return 'vendor-date'
+          }
+          // State management + utility piccole (zustand, immer, nanoid, ecc.)
+          return 'vendor-misc'
+        },
+      },
+    },
   },
 })

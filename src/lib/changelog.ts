@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.129',
+    date: '2026-10-07',
+    title: 'Milestone M10: vendor splitting + bundle main a 57KB',
+    fixes: [
+      'Vite rollupOptions.manualChunks: le dipendenze npm sono splittate per famiglia e cambiano raramente, quindi il browser le serve dalla cache per settimane. Chunk: vendor-react (React core), vendor-supabase (@supabase/*), vendor-pwa (workbox + idb), vendor-router (react-router), vendor-sanitize (DOMPurify), vendor-pdf-canvas (pdf-lib + html2canvas + jspdf), vendor-date (date-fns/dayjs/luxon se usati), vendor-misc (resto)',
+      'Bundle main index.js: 445KB → 57KB (-87%). vendor-pdf-canvas (545KB) è ora un chunk a sé stante, scaricato solo quando l\'utente apre il flusso di export PDF/PNG. vendor-react 142KB, vendor-supabase 214KB, vendor-misc 218KB: cambiano solo quando aggiorno le dipendenze, quindi non vengono riscaricati ad ogni deploy. Primo avvio dell\'app più leggero, deploy successivi quasi istantanei perché cambia solo il chunk app',
+    ],
+  },
+  {
     version: '1.9.128',
     date: '2026-10-07',
     title: 'Milestone M9: test suite a 74 casi (matchDuration + bmi)',
