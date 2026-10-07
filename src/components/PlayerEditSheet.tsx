@@ -151,8 +151,20 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
         } : {}),
       }
       if (isEdit) {
-        const { error: err } = await supabase.from('players').update(payload).eq('id', player!.id)
+        // Silent-fail RLS pattern: senza .select('id') un UPDATE bloccato
+        // dalle policy torna {error:null, data:null} e il flusso dice
+        // "salvato" senza che il DB cambi (sintomo riportato 2026-10-07
+        // sulla scadenza visita medica che "non si salvava"). Il .select
+        // forza RETURNING: 0 righe => errore esplicito.
+        const { data, error: err } = await supabase
+          .from('players')
+          .update(payload)
+          .eq('id', player!.id)
+          .select('id')
         if (err) throw err
+        if (!data || data.length === 0) {
+          throw new Error('Modifica non salvata: nessuna riga aggiornata (permessi insufficienti sul giocatore o giocatore eliminato)')
+        }
       } else {
         payload.team_id = createInTeamId
         const { error: err } = await supabase.from('players').insert(payload)

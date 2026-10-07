@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.137',
+    date: '2026-10-07',
+    title: 'Fix silent-fail RLS: scadenza visita medica (e altri campi) non venivano salvati senza errore',
+    fixes: [
+      "Segnalazione: aggiornando la data di scadenza della visita medica nel PlayerEditSheet, il modal si chiudeva senza errore ma il DB restava vecchio. Classico silent-fail del pattern RLS: supabase.from('players').update(...).eq('id', ...) senza .select('id') ritorna {error:null, data:null} anche quando la policy ha filtrato via la riga, e il codice non aveva modo di distinguere 'salvato' da 'bloccato'.",
+      "Fix in src/components/PlayerEditSheet.tsx handleSave: aggiunto .select('id') al chain dell'UPDATE e check esplicito data.length === 0 che throw 'Modifica non salvata: nessuna riga aggiornata (permessi insufficienti sul giocatore o giocatore eliminato)'. Ora l'utente vede un errore chiaro invece di credere che il salvataggio sia andato a buon fine.",
+    ],
+  },
+  {
     version: '1.9.136',
     date: '2026-10-07',
     title: 'Foto dei figli visibili nella Dashboard Genitore',
