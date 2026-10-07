@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.121'
+export const APP_VERSION = '1.9.122'
 export const APP_VERSION_DATE = '2026-10-07'
 
 export interface Release {
@@ -20,6 +20,18 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.122',
+    date: '2026-10-07',
+    title: 'Milestone M3: export dati reale, SVG sanitize, bozze protette, a11y',
+    fixes: [
+      'A07 — "Backup" rinominato Export dati con metadata onesti. Prima dichiarava "backup completato" anche su export parziale senza paginazione (PostgREST cap 1000 righe silente). Ora: paginazione range 1000 righe/pagina fino a 50k per tabella (safety cap), metadata include is_backup=false, warning esplicito, summary con tables_completed/tables_failed/rows_total, filename con suffisso _PARZIALE se qualche tabella fallisce, testo UI aggiornato: "non è un backup completo, non include file né schema"',
+      'A08 — SVG salvati nel DB (campo diagram_svg degli esercizi) ora passati attraverso DOMPurify prima di dangerouslySetInnerHTML. Config SVG profile + FORBID_TAGS script/foreignObject/iframe/object/embed + FORBID_ATTR su tutti gli handler on* + ALLOWED_URI_REGEXP che blocca javascript:. Nuovo modulo src/lib/sanitizeSvg.ts riutilizzabile. Pre-condizione: anche la scrittura dovrà essere sanitizzata lato RPC quando esisterà un endpoint dedicato',
+      'A09 — Terzo dirigente ora riconosciuto da useMyTeam. Prima erano 5 slot cercati con 5 query parallele (saltava third_manager_id introdotto nella migration 20260905). Ora una singola query .or() copre tutti e 6 i ruoli: head_coach, assistant_coach, helper_coach, team_manager, second_manager, third_manager. Allineato alla RPC public.my_team_ids() delle RLS',
+      'A11 — VersionGuard rimanda il reload automatico se rileva bozze non salvate: controlla data-dirty="true" sul DOM, chiavi localStorage con prefisso draft:/postmatch_draft_, e BottomSheet aperti con input testuali non vuoti. Riprova al prossimo check (5 min). Prima poteva ricaricare mentre il coach stava compilando un referto, perdendo la bozza non ancora persistita',
+      'A12 — Accessibilità: (1) viewport user-scalable=no sostituito con maximum-scale=5 per permettere lo zoom (WCAG 1.4.4), (2) label collegate agli input via htmlFor/id in Login, (3) BottomSheet con role="dialog" aria-modal="true" aria-labelledby, focus trap minimale Tab/Shift+Tab, focus iniziale sul primo input, ripristino focus al trigger alla chiusura. Contatore globale openSheetCount per gestire sheet stackati senza riabilitare lo scroll prematuramente',
+    ],
+  },
   {
     version: '1.9.121',
     date: '2026-10-07',

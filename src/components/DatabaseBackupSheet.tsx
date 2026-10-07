@@ -94,18 +94,36 @@ export function DatabaseBackupSheet({ open, onClose }: Props) {
     const initialStatuses: TableStatus[] = tables.map(t => ({ table: t, status: 'pending' }))
     setStatuses(initialStatuses)
 
+    // A07: non è un backup. È un export dati parziale (RLS applicate, no Storage,
+    // no schema, no auth). Il metadata lo dichiara esplicitamente.
     const backup: any = {
       metadata: {
+        kind: 'app-export',
+        is_backup: false,
+        warning: 'Questo export NON sostituisce un backup. Non include file Storage, schema, Auth, trigger, policy. Le righe sono filtrate dalle RLS come viste dall\'utente che le esporta.',
         export_date: new Date().toISOString(),
         club: 'ASD Lenci Poirino',
-        version: 1,
+        version: 2,
         tables_included: tables,
-        generated_by: 'Backup on-demand da app',
+        generated_by: 'Export dati on-demand da app',
       },
       data: {},
+      summary: {
+        tables_total: tables.length,
+        tables_completed: 0,
+        tables_failed: 0,
+        rows_total: 0,
+      },
     }
 
+    // A07: paginazione — il PostgREST default cap è 1000 righe. Senza paginazione
+    // una tabella con >1000 righe sarebbe silenziosamente troncata e il file
+    // sarebbe un export parziale che il metadata non segnalerebbe.
+    const PAGE_SIZE = 1000
+    const MAX_PAGES_PER_TABLE = 50 // safety cap: 50k righe per tabella
+
     let totRecs = 0
+    let failedCount = 0
     const finalStatuses = [...initialStatuses]
 
     for (let i = 0; i < tables.length; i++) {
@@ -113,26 +131,53 @@ export function DatabaseBackupSheet({ open, onClose }: Props) {
       finalStatuses[i] = { ...finalStatuses[i], status: 'loading' }
       setStatuses([...finalStatuses])
       try {
-        const { data, error } = await supabase.from(t).select('*')
-        if (error) throw error
-        backup.data[t] = data ?? []
-        const cnt = (data ?? []).length
+        const allRows: any[] = []
+        let page = 0
+        let hadError = false
+        let truncated = false
+        for (page = 0; page < MAX_PAGES_PER_TABLE; page++) {
+          const from = page * PAGE_SIZE
+          const to = from + PAGE_SIZE - 1
+          const { data, error } = await supabase.from(t).select('*').range(from, to)
+          if (error) {
+            hadError = true
+            console.error(`Export ${t} page ${page} err:`, error)
+            throw error
+          }
+          const batch = data ?? []
+          allRows.push(...batch)
+          if (batch.length < PAGE_SIZE) break // ultima pagina
+          if (page === MAX_PAGES_PER_TABLE - 1) truncated = true
+        }
+        backup.data[t] = allRows
+        const cnt = allRows.length
         totRecs += cnt
-        finalStatuses[i] = { table: t, status: 'done', count: cnt }
+        if (truncated) {
+          finalStatuses[i] = { table: t, status: 'error', count: cnt, error: `troncato a ${MAX_PAGES_PER_TABLE * PAGE_SIZE} righe` }
+          failedCount++
+        } else {
+          finalStatuses[i] = { table: t, status: 'done', count: cnt }
+        }
         setStatuses([...finalStatuses])
       } catch (e: any) {
-        console.error(`Backup ${t} err:`, e)
+        console.error(`Export ${t} err:`, e)
+        failedCount++
         finalStatuses[i] = { table: t, status: 'error', error: e.message || 'errore' }
         setStatuses([...finalStatuses])
       }
     }
 
     setTotalRecords(totRecs)
+    backup.summary.rows_total = totRecs
+    backup.summary.tables_completed = tables.length - failedCount
+    backup.summary.tables_failed = failedCount
+    backup.metadata.export_complete = failedCount === 0
 
     // Scarico il JSON
     const now = new Date()
     const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`
-    const filename = `lenci_backup_${stamp}.json`
+    const suffix = failedCount > 0 ? '_PARZIALE' : ''
+    const filename = `lenci_export${suffix}_${stamp}.json`
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -147,10 +192,10 @@ export function DatabaseBackupSheet({ open, onClose }: Props) {
   const totalTables = TABLE_GROUPS.filter(g => selected[g.key]).flatMap(g => g.tables).length
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="🗄 Backup del database">
+    <BottomSheet open={open} onClose={onClose} title="📥 Export dati">
       <div style={{ padding: '4px 20px 24px' }}>
         <p style={{ fontSize: 12, color: '#404751', lineHeight: 1.5, margin: '0 0 12px' }}>
-          Scarica un file JSON contenente tutti i dati del club selezionati. Il file può essere conservato in cloud (Drive, Dropbox) come copia di sicurezza aggiuntiva rispetto ai backup automatici di Supabase.
+          Scarica un file JSON con i dati del club che hai selezionato. <strong>Non è un backup completo</strong>: non include i file (foto, PDF, moduli), lo schema del DB né gli account Auth. Per il backup vero affidati a quelli automatici di Supabase e, dove serve, a un export Storage separato. Questo file è utile come snapshot leggibile dei record applicativi.
         </p>
 
         <div style={{

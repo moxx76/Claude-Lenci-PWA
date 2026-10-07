@@ -87,7 +87,9 @@ export function Login() {
               style={{ gap: 12, maxWidth: 300 }}
             >
               <div className="flex flex-col" style={{ gap: 6 }}>
+                {/* A12: htmlFor/id collegati per screen reader */}
                 <label
+                  htmlFor="login-email"
                   style={{
                     fontSize: 11, fontWeight: 700, color: '#404751',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -96,6 +98,7 @@ export function Login() {
                   Email
                 </label>
                 <input
+                  id="login-email"
                   type="email"
                   required
                   autoComplete="email"
@@ -112,6 +115,7 @@ export function Login() {
               </div>
               <div className="flex flex-col" style={{ gap: 6 }}>
                 <label
+                  htmlFor="login-password"
                   style={{
                     fontSize: 11, fontWeight: 700, color: '#404751',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -120,6 +124,7 @@ export function Login() {
                   Password
                 </label>
                 <input
+                  id="login-password"
                   type="password"
                   required
                   autoComplete="current-password"

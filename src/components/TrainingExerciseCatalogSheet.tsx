@@ -5,6 +5,7 @@ import { useExerciseCatalog, type TrainingExercise, type SessionPart, SESSION_PA
 import { TrainingExerciseDetailSheet } from './TrainingExerciseDetailSheet'
 import { TrainingExerciseFormSheet } from './TrainingExerciseFormSheet'
 import { useAuth } from '../store/auth'
+import { sanitizeSvg } from '../lib/sanitizeSvg'
 
 interface Props {
   open: boolean
@@ -252,7 +253,7 @@ export function TrainingExerciseCatalogSheet({
                       background: '#3d9b47',
                       border: '1px solid #d0d5db',
                     }}
-                    dangerouslySetInnerHTML={{ __html: ex.diagram_svg || '' }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeSvg(ex.diagram_svg) }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>

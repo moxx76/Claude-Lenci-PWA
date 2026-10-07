@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { Icon } from './Icon'
 
 interface BottomSheetProps {
@@ -9,23 +9,71 @@ interface BottomSheetProps {
   maxHeight?: string
 }
 
+// A12: counter globale di sheet aperti per gestire correttamente il lock dello
+// scroll body quando più sheet sono stackati (chiusura di uno interno non deve
+// riabilitare lo scroll se un altro è ancora aperto).
+let openSheetCount = 0
+
 /**
  * Bottom sheet mobile-first.
  * - Su mobile appare dal basso, con handle drag stile iOS
  * - Su desktop diventa un modal centrato
  * - ESC per chiudere
  * - Click sul backdrop per chiudere
+ * - A12: semantica aria dialog modale con focus trap minimale (focus iniziale
+ *   sul primo focusable, ritorno al trigger alla chiusura, Tab wrap)
  */
 export function BottomSheet({ open, onClose, title, children, maxHeight = '85vh' }: BottomSheetProps) {
+  const titleId = useId()
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    previousFocusRef.current = document.activeElement as HTMLElement | null
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      // Focus trap: wrap Tab/Shift+Tab dentro il sheet
+      if (e.key === 'Tab' && sheetRef.current) {
+        const focusables = sheetRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusables.length === 0) return
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
     window.addEventListener('keydown', handler)
-    // Blocca lo scroll body
-    document.body.style.overflow = 'hidden'
+
+    openSheetCount += 1
+    if (openSheetCount === 1) document.body.style.overflow = 'hidden'
+
+    // Focus iniziale sul primo focusable (microtask per lasciare che il DOM
+    // sia renderizzato)
+    const focusTimer = window.setTimeout(() => {
+      const el = sheetRef.current?.querySelector<HTMLElement>(
+        'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled])'
+      )
+      el?.focus()
+    }, 50)
+
     return () => {
       window.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
+      window.clearTimeout(focusTimer)
+      openSheetCount = Math.max(0, openSheetCount - 1)
+      if (openSheetCount === 0) document.body.style.overflow = ''
+      previousFocusRef.current?.focus()
     }
   }, [open, onClose])
 
@@ -47,6 +95,11 @@ export function BottomSheet({ open, onClose, title, children, maxHeight = '85vh'
 
       {/* Sheet */}
       <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        data-bottom-sheet="open"
         onClick={e => e.stopPropagation()}
         className="lenci-bottom-sheet"
         style={{
@@ -96,6 +149,7 @@ export function BottomSheet({ open, onClose, title, children, maxHeight = '85vh'
             }}
           >
             <h3
+              id={titleId}
               style={{
                 margin: 0,
                 fontFamily: 'Anybody',

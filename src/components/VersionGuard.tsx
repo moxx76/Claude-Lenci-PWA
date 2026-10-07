@@ -2,6 +2,47 @@ import { useEffect, useRef } from 'react'
 import { APP_VERSION } from '../lib/version'
 
 /**
+ * A11 — Rileva bozze non salvate per rimandare un reload automatico.
+ * Convenzione: ogni form/sheet con modifiche pendenti può aggiungere
+ * data-dirty="true" sul proprio root; in alternativa controlliamo:
+ * - localStorage con chiavi che cominciano con "draft:" (es. PostMatchSheet)
+ * - input testuali/textarea/select con value diverso da defaultValue
+ *   e almeno un carattere digitato (euristica: value non vuoto per campi
+ *   di tipo text/number/password/email/tel/search e textarea)
+ */
+function hasUnsavedWork(): boolean {
+  try {
+    // 1. Marker esplicito via data-dirty
+    if (document.querySelector('[data-dirty="true"]')) return true
+    // 2. Draft keys in localStorage (PostMatchSheet usa questa convenzione)
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && (k.startsWith('draft:') || k.startsWith('postmatch_draft_'))) {
+        return true
+      }
+    }
+    // 3. Un BottomSheet aperto con un form attivo è segnale di editing
+    //    (il sheet appare con role="dialog" o aria-modal; se c'è un sheet
+    //    aperto con dentro input/textarea con value, consideriamo dirty)
+    const sheets = document.querySelectorAll('[data-bottom-sheet="open"]')
+    if (sheets.length > 0) {
+      for (const sheet of Array.from(sheets)) {
+        const inputs = sheet.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
+        for (const el of Array.from(inputs)) {
+          if (el.type === 'hidden' || el.type === 'button' || el.type === 'submit') continue
+          if ('value' in el && el.value && el.value.trim().length > 0 && el.value !== el.defaultValue) {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
  * VersionGuard: all'avvio dell'app (e al rientro in foreground) fa un fetch
  * no-store a /version.json — scritto a build time (vite.config.ts) e servito
  * NetworkOnly dal service worker (sw.ts). Se la versione server è diversa da
@@ -42,6 +83,15 @@ export function VersionGuard() {
         console.log(
           `[VersionGuard] server=${data.version} vs locale=${APP_VERSION} → force refresh`
         )
+        // A11: non ricaricare mentre l'utente ha una modifica in corso.
+        // beforeunload torna truthy sse c'è almeno un form "dirty" registrato
+        // tramite marker DOM data-dirty="true" o input modificati. Riprovo
+        // automaticamente al prossimo check (3 min default): meglio ritardare
+        // l'update di qualche minuto che far perdere la bozza al coach.
+        if (hasUnsavedWork()) {
+          console.log('[VersionGuard] bozze in corso rilevate, update rimandato al prossimo check')
+          return
+        }
         // Hard refresh: smonto SW + cache, poi navigate con cache-buster di versione
         try {
           if ('serviceWorker' in navigator) {
@@ -55,8 +105,6 @@ export function VersionGuard() {
         } catch (e) {
           console.warn('[VersionGuard] cleanup SW/caches failed, forcing reload anyway', e)
         }
-        // Navigate con query distinta per versione: aggira cache HTTP di WKWebView
-        // (iOS PWA standalone tiene HTTP cache separata dalle Cache API)
         const url = new URL(window.location.href)
         url.searchParams.set('_v', data.version)
         window.location.replace(url.toString())

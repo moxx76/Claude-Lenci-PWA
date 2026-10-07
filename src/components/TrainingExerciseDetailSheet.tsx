@@ -4,6 +4,7 @@ import { Icon } from './Icon'
 import { type TrainingExercise, SESSION_PART_META } from '../hooks/useExerciseCatalog'
 import { useAuth } from '../store/auth'
 import { supabase } from '../lib/supabase'
+import { sanitizeSvg } from '../lib/sanitizeSvg'
 
 interface Props {
   exercise: TrainingExercise
@@ -84,7 +85,7 @@ export function TrainingExerciseDetailSheet({ exercise: ex, onClose, onPick, onE
             background: '#3d9b47',
             marginBottom: 16,
           }}
-          dangerouslySetInnerHTML={{ __html: ex.diagram_svg || '' }}
+          dangerouslySetInnerHTML={{ __html: sanitizeSvg(ex.diagram_svg) }}
         />
 
         {/* Descrizione */}

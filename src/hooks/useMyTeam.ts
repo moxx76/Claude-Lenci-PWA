@@ -35,23 +35,24 @@ export function useMyTeam() {
       const impersonating = !!(profile?.is_supervisor && managerId)
 
       if (impersonating || profile?.is_manager || profile?.role === 'coach') {
-        // Cerco squadre dove effectiveId è in uno dei 5 ruoli operativi:
-        // head_coach, assistant_coach, helper_coach, team_manager, second_manager
-        // (allineato a public.my_team_ids() delle RLS)
-        const [{ data: asHead }, { data: asAssist }, { data: asHelper }, { data: asMgr }, { data: asMgr2 }] = await Promise.all([
-          supabase.from('teams').select('id, name, category, age_range, color').eq('head_coach_id', effectiveId),
-          supabase.from('teams').select('id, name, category, age_range, color').eq('assistant_coach_id', effectiveId),
-          supabase.from('teams').select('id, name, category, age_range, color').eq('helper_coach_id', effectiveId),
-          supabase.from('teams').select('id, name, category, age_range, color').eq('team_manager_id', effectiveId),
-          supabase.from('teams').select('id, name, category, age_range, color').eq('second_manager_id', effectiveId),
-        ])
-        const map = new Map<string, MyTeam>()
-        for (const t of (asHead   ?? []) as MyTeam[]) map.set(t.id, t)
-        for (const t of (asAssist ?? []) as MyTeam[]) map.set(t.id, t)
-        for (const t of (asHelper ?? []) as MyTeam[]) map.set(t.id, t)
-        for (const t of (asMgr    ?? []) as MyTeam[]) map.set(t.id, t)
-        for (const t of (asMgr2   ?? []) as MyTeam[]) map.set(t.id, t)
-        const teams = Array.from(map.values())
+        // A09: cerco squadre dove effectiveId è in uno QUALSIASI dei 6 ruoli operativi.
+        // Prima la lista era di 5 (saltava third_manager_id, aggiunto in migration
+        // 20260905): un terzo dirigente assegnato solo a quello slot non trovava
+        // le sue squadre. Ora una singola query .or() copre tutti e 6 i ruoli,
+        // allineata a public.my_team_ids() delle RLS.
+        const slots = [
+          `head_coach_id.eq.${effectiveId}`,
+          `assistant_coach_id.eq.${effectiveId}`,
+          `helper_coach_id.eq.${effectiveId}`,
+          `team_manager_id.eq.${effectiveId}`,
+          `second_manager_id.eq.${effectiveId}`,
+          `third_manager_id.eq.${effectiveId}`,
+        ].join(',')
+        const { data } = await supabase
+          .from('teams')
+          .select('id, name, category, age_range, color')
+          .or(slots)
+        const teams = (data ?? []) as MyTeam[]
         setMyTeams(teams)
         setMyTeam(teams[0] ?? null)
       } else if (profile?.role === 'parent' || profile?.role === 'athlete') {
