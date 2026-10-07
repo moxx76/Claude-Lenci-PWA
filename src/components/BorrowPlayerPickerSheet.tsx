@@ -123,13 +123,17 @@ export function BorrowPlayerPickerSheet({
 
   const filtered = useMemo(() => {
     let base = allPlayers
-    // Filtro "solo categorie inferiori" (richiesta Davide v1.9.112): mantiene
-    // solo i giocatori di squadre con tier numericamente inferiore al corrente.
-    // Es. U14 (tier 14) → mostra solo tier ≤ 13 (U13/Esordienti e giù).
+    // Filtro "stesso tier o inferiore" (v1.9.138, prima era "<" cioè solo
+    // inferiori strette): mantiene i giocatori di squadre con tier numericamente
+    // uguale o inferiore al corrente. Fix segnalazione 2026-10-07: un allenatore
+    // dei Pulcini 2016 deve poter convocare dai Pulcini 2017 (stesso tier
+    // categoria, ma annata più piccola di maturazione) oltre che da Primi
+    // Calci/Piccoli Amici. Il filtro resta utile per nascondere Juniores/
+    // Prima Squadra agli allenatori giovanili.
     if (onlyLowerTiers && currentTier != null) {
       base = base.filter(p => {
         const t = categoryTier(p.team_category)
-        return t != null && t < currentTier
+        return t != null && t <= currentTier
       })
     }
     const q = query.trim().toLowerCase()
@@ -268,7 +272,7 @@ export function BorrowPlayerPickerSheet({
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                 {onlyLowerTiers && <Icon name="check" size={12} color="#fff" />}
-                Solo cat. inferiori (sotto-età)
+                Nascondi categorie superiori
               </button>
             </div>
           )}

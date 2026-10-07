@@ -3,6 +3,16 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.138',
+    date: '2026-10-07',
+    title: 'Fix picker convocazioni cross-team: Pulcini 2016 ora vede Pulcini 2017',
+    fixes: [
+      "Segnalazione Fabio Sant (manager Pulcini 2016): aprendo il picker 'convoca da altra squadra' non vedeva i Pulcini 2017 (annata più giovane). Causa: filtro default 'solo cat. inferiori strette' (t < currentTier) escludeva le squadre con stessa categoria FIGC anche se annata più giovane.",
+      "Fix in src/components/BorrowPlayerPickerSheet.tsx: cambiato il predicato da 't < currentTier' a 't <= currentTier' nel filtro onlyLowerTiers. Ora un allenatore Pulcini 2016 vede anche Pulcini 2017 (stesso tier categoria, ma annata di maturazione più piccola) oltre a Primi Calci e Piccoli Amici. Juniores/Prima Squadra restano nascoste se il toggle è ON.",
+      "Rinominato toggle UI da 'Solo cat. inferiori (sotto-età)' a 'Nascondi categorie superiori' per riflettere meglio il nuovo comportamento (stesso tier + inferiori visibili; solo superiori nascoste).",
+    ],
+  },
+  {
     version: '1.9.137',
     date: '2026-10-07',
     title: 'Fix silent-fail RLS: scadenza visita medica (e altri campi) non venivano salvati senza errore',
