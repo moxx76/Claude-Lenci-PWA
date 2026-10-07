@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.133',
+    date: '2026-10-07',
+    title: 'Milestone M15: react-router-dom 6→7 (0 vulnerabilità in produzione)',
+    fixes: [
+      'Upgrade react-router-dom da ^6.27 a ^7.18.4 (ultima stabile): risolve CVE-2025-68470 open redirect via backslash in <Link> e useNavigate (moderate), oltre al suo bypass (GHSA-wrjc-x8rr-h8h6). audit npm --omit=dev ora riporta 0 vulnerabilità in production (prima 2 moderate), 0 high, 0 critical',
+      'Nessuna modifica al codice applicativo necessaria: le 12 API che usiamo (BrowserRouter, Routes, Route, Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useParams, useSearchParams, redirect) sono tutte compatibili tra v6 e v7. Non usavamo loader/action/useFetcher/createBrowserRouter/useBlocker, che avrebbero richiesto refactor',
+      'Trade-off bundle: vendor-router cresce da 14.22KB a 39.67KB (ungzipped, ~+7KB gzipped) per la nuova architettura v7 unificata. Resta in un chunk cached a lungo termine (cambia solo con upgrade router), quindi il costo di +7KB gzipped è pagato una tantum al primo accesso e poi mai più',
+      'Test suite 174/174 verde con v7; tsc --noEmit 0 errori. Il debito tecnico documentato in M6 è ora chiuso',
+    ],
+  },
+  {
     version: '1.9.132',
     date: '2026-10-07',
     title: 'Milestone M13+M14: lazy sheet nei dashboard + 80 nuovi test (174 totali)',
