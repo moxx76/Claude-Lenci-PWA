@@ -16,7 +16,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # jsdom@30 richiede Node ^22.22.2 || ^24.15.0 || >=26 — fissato
+          # a 22 (LTS attuale, allineato all'ambiente locale /opt/node22).
+          # Vitest 2 e @vitejs/plugin-react supportano Node 22. Node 20 è
+          # EOL ad aprile 2026, questo migra prima della scadenza.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
