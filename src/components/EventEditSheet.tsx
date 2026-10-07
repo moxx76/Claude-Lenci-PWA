@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
+import { dateIT } from '../lib/dateIT'
 import { TrainingSessionComposerSheet } from './TrainingSessionComposerSheet'
 import { TrainingAttachmentsSection } from './TrainingAttachmentsSection'
 import { useToast } from './Toast'
@@ -103,9 +104,9 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
       // Modalità creazione
       setKind('training')
       setTeamId(defaultTeamId || teams[0]?.id || '')
-      const today = new Date()
-      today.setDate(today.getDate() + 1)
-      setEventDate(today.toISOString().slice(0, 10))
+      // A10: data di default = domani civile Italia (non UTC)
+      const tomorrow = new Date(Date.now() + 86_400_000)
+      setEventDate(dateIT(tomorrow))
       setStartTime('19:00')
       setEndTime('20:30')
       setLocation('Campo Sportivo Poirino')

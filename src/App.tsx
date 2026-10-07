@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './store/auth'
 import { Login } from './pages/Login'
@@ -16,7 +16,8 @@ import { ComunicatiPage } from './pages/Comunicati'
 import { Referti } from './pages/Referti'
 import { EserciziPage } from './pages/EserciziPage'
 import { Moduli } from './pages/Moduli'
-import { MatchSheetPrint } from './pages/MatchSheetPrint'
+// Lazy: MatchSheetPrint pesa ~100KB e serve solo nel flusso di stampa referto
+const MatchSheetPrint = lazy(() => import('./pages/MatchSheetPrint').then(m => ({ default: m.MatchSheetPrint })))
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
 import { VersionGuard } from './components/VersionGuard'
 import { ToastProvider } from './components/Toast'
@@ -90,7 +91,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
         <Route path="/foglio-partita/:matchId" element={
-          <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>
+          <ProtectedRoute><Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Caricamento foglio…</div>}><MatchSheetPrint /></Suspense></ProtectedRoute>
         } />
         <Route
           path="/"
@@ -100,18 +101,21 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          {/* Review (assessment): NotForJournalist era applicato solo a /
+              lasciando accessibili per URL diretto le altre pagine. Ora copre
+              tutte le route sensibili. I giornalisti vedono solo /giornalisti
+              e /profilo. */}
           <Route index element={<NotForJournalist><Dashboard /></NotForJournalist>} />
-          <Route path="teams" element={<TeamAssignedGuard><Teams /></TeamAssignedGuard>} />
-          {/* Alias per compatibilità con vecchi bookmark */}
+          <Route path="teams" element={<NotForJournalist><TeamAssignedGuard><Teams /></TeamAssignedGuard></NotForJournalist>} />
           <Route path="atleti" element={<Navigate to="/teams" replace />} />
-          <Route path="calendario" element={<TeamAssignedGuard><CalendarPage /></TeamAssignedGuard>} />
-          <Route path="esercizi" element={<TeamAssignedGuard><EserciziPage /></TeamAssignedGuard>} />
-          <Route path="annunci" element={<TeamAssignedGuard><AnnouncementsPage /></TeamAssignedGuard>} />
-          <Route path="comunicati" element={<TeamAssignedGuard><ComunicatiPage /></TeamAssignedGuard>} />
-          <Route path="referti" element={<TeamAssignedGuard><Referti /></TeamAssignedGuard>} />
-          <Route path="marketing" element={<MarketingPage />} />
+          <Route path="calendario" element={<NotForJournalist><TeamAssignedGuard><CalendarPage /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="esercizi" element={<NotForJournalist><TeamAssignedGuard><EserciziPage /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="annunci" element={<NotForJournalist><TeamAssignedGuard><AnnouncementsPage /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="comunicati" element={<NotForJournalist><TeamAssignedGuard><ComunicatiPage /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="referti" element={<NotForJournalist><TeamAssignedGuard><Referti /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="marketing" element={<NotForJournalist><MarketingPage /></NotForJournalist>} />
           <Route path="giornalisti" element={<JournalistPage />} />
-          <Route path="moduli" element={<Moduli />} />
+          <Route path="moduli" element={<NotForJournalist><Moduli /></NotForJournalist>} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>

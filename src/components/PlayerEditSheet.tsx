@@ -72,22 +72,31 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
       setParentProfileId((player as any).parentProfileId || '')
       setAvatarUrl((player as any).avatarUrl || null)
 
-      // Carico stato pagamenti e dati genitore diretti dal DB
+      // Carico stato pagamenti e dati genitore direttamente dal DB.
+      // Review (assessment): richiedere le colonne payment_* solo se canSeePayments.
+      // Prima venivano sempre selezionate anche quando canSeePayments era false;
+      // rendering omesso in UI non equivale a non trasmettere il dato lato wire.
+      // Ora chi non è admin NON riceve le colonne pagamento dal server.
+      const paymentCols = canSeePayments
+        ? 'registration_paid, registration_paid_at, registration_amount, balance_paid, balance_paid_at, balance_amount, payment_notes, '
+        : ''
       supabase.from('players')
-        .select('registration_paid, registration_paid_at, registration_amount, balance_paid, balance_paid_at, balance_amount, payment_notes, parent_name, parent_phone, parent_email')
+        .select(paymentCols + 'parent_name, parent_phone, parent_email')
         .eq('id', player.id).single()
         .then(({ data }) => {
           if (data) {
-            setRegistrationPaid(!!data.registration_paid)
-            setRegistrationPaidAt(data.registration_paid_at || '')
-            setRegistrationAmount(data.registration_amount != null ? String(data.registration_amount) : '')
-            setBalancePaid(!!data.balance_paid)
-            setBalancePaidAt(data.balance_paid_at || '')
-            setBalanceAmount(data.balance_amount != null ? String(data.balance_amount) : '')
-            setPaymentNotes(data.payment_notes || '')
-            setParentName(data.parent_name || '')
-            setParentPhone(data.parent_phone || '')
-            setParentEmail(data.parent_email || '')
+            if (canSeePayments) {
+              setRegistrationPaid(!!(data as any).registration_paid)
+              setRegistrationPaidAt((data as any).registration_paid_at || '')
+              setRegistrationAmount((data as any).registration_amount != null ? String((data as any).registration_amount) : '')
+              setBalancePaid(!!(data as any).balance_paid)
+              setBalancePaidAt((data as any).balance_paid_at || '')
+              setBalanceAmount((data as any).balance_amount != null ? String((data as any).balance_amount) : '')
+              setPaymentNotes((data as any).payment_notes || '')
+            }
+            setParentName((data as any).parent_name || '')
+            setParentPhone((data as any).parent_phone || '')
+            setParentEmail((data as any).parent_email || '')
           }
         })
     } else {

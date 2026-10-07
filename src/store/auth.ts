@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Session, User } from '@supabase/supabase-js'
+import type { Session, User, Subscription } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
 
@@ -16,6 +16,15 @@ interface AuthState {
   signOut: () => Promise<void>
 }
 
+// A14 (bonus assessment): idempotenza di init.
+// StrictMode in sviluppo monta App due volte: senza queste guardie, init si
+// registrava due listener auth e invocava refreshProfile due volte,
+// potenzialmente con risultati race-condition. Ora:
+// - initPromise: se init è già in corso, le chiamate successive attendono
+// - authSubscription: tenuta in modulo scope, unsubscribe al secondo init
+let initPromise: Promise<void> | null = null
+let authSubscription: Subscription | null = null
+
 export const useAuth = create<AuthState>((set, get) => ({
   session: null,
   user: null,
@@ -24,32 +33,46 @@ export const useAuth = create<AuthState>((set, get) => ({
   initialized: false,
 
   init: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    set({ session, user: session?.user ?? null, loading: false, initialized: true })
-    if (session?.user) await get().refreshProfile()
-
-    supabase.auth.onAuthStateChange(async (event, newSession) => {
-      // A06: su PASSWORD_RECOVERY (link ricevuto via email) forza il flow verso
-      // la pagina dedicata, qualunque sia la route corrente. Il link ha sessione
-      // di recovery che consente updateUser({password}) senza quella vecchia.
-      if (event === 'PASSWORD_RECOVERY') {
-        set({ session: newSession, user: newSession?.user ?? null })
-        if (typeof window !== 'undefined' && window.location.pathname !== '/reset-password') {
-          window.location.replace('/reset-password')
-        }
-        return
+    if (initPromise) return initPromise
+    if (get().initialized) return
+    initPromise = (async () => {
+      // Clean up listener precedente (dev StrictMode remount, hot-reload)
+      if (authSubscription) {
+        authSubscription.unsubscribe()
+        authSubscription = null
       }
-      set({ session: newSession, user: newSession?.user ?? null })
-      if (newSession?.user) await get().refreshProfile()
-      else set({ profile: null })
-    })
+
+      const { data: { session } } = await supabase.auth.getSession()
+      set({ session, user: session?.user ?? null, loading: false, initialized: true })
+      if (session?.user) await get().refreshProfile()
+
+      const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        // A06: su PASSWORD_RECOVERY forza il flow verso la pagina dedicata
+        if (event === 'PASSWORD_RECOVERY') {
+          set({ session: newSession, user: newSession?.user ?? null })
+          if (typeof window !== 'undefined' && window.location.pathname !== '/reset-password') {
+            window.location.replace('/reset-password')
+          }
+          return
+        }
+        set({ session: newSession, user: newSession?.user ?? null })
+        if (newSession?.user) await get().refreshProfile()
+        else set({ profile: null })
+      })
+      authSubscription = data.subscription
+    })()
+    return initPromise
   },
 
   refreshProfile: async () => {
-    const user = get().user
-    if (!user) return
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    const currentUserId = get().user?.id
+    if (!currentUserId) return
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', currentUserId).single()
+    // Guardia race: se durante la fetch l'utente è cambiato (logout o altro),
+    // non sovrascrivere il profilo con dati che non appartengono alla sessione attuale
+    if (get().user?.id !== currentUserId) return
     if (!error && data) set({ profile: data as Profile })
+    else if (error && error.code !== 'PGRST116') console.warn('[auth] refreshProfile error', error)
   },
 
   signIn: async (email, password) => {

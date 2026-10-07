@@ -3,6 +3,7 @@ import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
 import { supabase } from '../lib/supabase'
 import { PlayerEditSheet } from './PlayerEditSheet'
+import { todayIT, dateIT } from '../lib/dateIT'
 import type { PlayerDetailData } from './PlayerDetailSheet'
 import { avatarBg } from '../lib/utils'
 
@@ -45,8 +46,9 @@ export function MedicalComplianceSheet({ open, onClose, onUpdated }: Props) {
 
   const load = async () => {
     setLoading(true)
-    const today = new Date().toISOString().slice(0, 10)
-    const in30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+    // A10: usa todayIT/dateIT (fuso Europa/Roma)
+    const today = todayIT()
+    const in30d = dateIT(new Date(Date.now() + 30 * 86400000))
 
     // Query in parallelo: (1) non-in-regola, (2) tutti i players per contare totali per squadra, (3) squadre
     const [notOkRes, allPlayersRes, teamsRes] = await Promise.all([

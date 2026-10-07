@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/auth'
+import { todayIT, dateIT } from '../lib/dateIT'
 import { isAdmin, isCoach, isParent, isAthlete, avatarBg } from '../lib/types'
 import { Icon } from '../components/Icon'
 import { PlayerDetailSheet, type PlayerDetailData } from '../components/PlayerDetailSheet'
@@ -148,9 +149,10 @@ function AdminDashboard({ firstName }: { firstName: string }) {
   }
 
   const load = async () => {
-    const today = new Date().toISOString().slice(0, 10)
-    const in30d = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
-    const in14d = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+    // A10: usa todayIT/dateIT per "oggi civile Italia", non UTC
+    const today = todayIT()
+    const in30d = dateIT(new Date(Date.now() + 30 * 86400000))
+    const in14d = dateIT(new Date(Date.now() + 14 * 86400000))
     const [pl, tm, tr, mt, certExpiring, certExpired, certMissing, leadsPending, expiringList, upTr, upMt, pendAnn] = await Promise.all([
       supabase.from('players').select('id', { count: 'exact', head: true }),
       supabase.from('teams').select('id, name, color'),

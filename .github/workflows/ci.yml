@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: TypeScript type-check
+        run: npm run typecheck
+
+      - name: Build (verifica che il bundle generi)
+        run: npm run build
+        env:
+          # Variabili richieste da Supabase client. Valori placeholder sufficienti
+          # per il build (il client viene inizializzato al runtime, non a build time).
+          VITE_SUPABASE_URL: https://example.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiJ9.ci-placeholder.sig
+
+      - name: Audit (production only, no fail su high transitive)
+        run: npm audit --omit=dev --audit-level=critical || true

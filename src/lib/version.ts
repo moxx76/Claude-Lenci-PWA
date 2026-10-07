@@ -7,7 +7,7 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.122'
+export const APP_VERSION = '1.9.123'
 export const APP_VERSION_DATE = '2026-10-07'
 
 export interface Release {
@@ -20,6 +20,20 @@ export interface Release {
 }
 
 export const CHANGELOG: Release[] = [
+  {
+    version: '1.9.123',
+    date: '2026-10-07',
+    title: 'Milestone M4: operatività (auth, journalist route, payment columns, date helper, CI, lazy)',
+    fixes: [
+      'auth.ts idempotente: initPromise globale evita double-init in StrictMode e hot-reload; authSubscription tenuto in modulo-scope e unsubscribed al re-init. refreshProfile protetto da race condition (controlla user.id prima di set), ignora PGRST116 (profile missing) senza warning rumorosi',
+      'NotForJournalist esteso a tutte le route sensibili (prima solo su /). Un giornalista non può più accedere a Teams/Calendario/Esercizi/Comunicati/Referti/Marketing/Moduli per URL diretto: viene reindirizzato a /giornalisti',
+      'PlayerEditSheet non richiede più le colonne pagamento quando canSeePayments è false. Prima la SELECT trasmetteva registration_paid/balance_paid/payment_notes anche a chi non le poteva vedere nella UI (rendering omesso ≠ dato nascosto)',
+      'A10 — Helper src/lib/dateIT.ts con todayIT(), dateIT(), timeIT(), sameDayIT(), labelDayIT() basati su Intl Europe/Rome. Primi 3 call-site migrati: Dashboard, EventEditSheet, MedicalComplianceSheet. Prima toISOString().slice(0,10) in 49 punti dava data UTC invece di civile italiana (bug alle 00:30-01:59 e durante cambio ora)',
+      'CI GitHub Actions (.github/workflows/ci.yml): npm ci --ignore-scripts, tsc --noEmit, vite build, npm audit --omit=dev --audit-level=critical. Scatta ad ogni push su main e PR',
+      'package.json: nuovi script typecheck, lint, check (prima solo build, tsc non obbligato nel pipeline)',
+      'Lazy loading di MatchSheetPrint (~100KB) via React.lazy + Suspense: la pagina di stampa referto non è più nel bundle iniziale, caricata on-demand al primo accesso',
+    ],
+  },
   {
     version: '1.9.122',
     date: '2026-10-07',
