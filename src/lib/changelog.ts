@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.131',
+    date: '2026-10-07',
+    title: 'Milestone M12: Dashboard splittata per ruolo, chunk 198KB → 4KB',
+    fixes: [
+      'Dashboard.tsx (prima 1975 righe monolitiche con AdminDashboard, CoachDashboard, AthleteDashboard, ParentDashboard, PublicDashboard tutti nello stesso file) è stata rifattorizzata in un dispatcher thin di 90 righe + 5 file in src/pages/dashboards/ (AdminDashboard.tsx, CoachDashboard.tsx, AthleteDashboard.tsx, ParentDashboard.tsx, PublicDashboard.tsx), ciascuno caricato on-demand via React.lazy',
+      'Anche DirectorDashboard e ManagerDashboard (già componenti separati in src/components/, ma importati eager da Dashboard) sono stati lazy-ificati: li vedono solo dirigenti e manager rispettivamente, non ha senso trasportarli nel chunk principale per tutti',
+      'Risultato bundle: chunk Dashboard crolla da 198KB a 4.39KB (dispatcher). Un admin ora scarica 4.39KB + 21.71KB (AdminDashboard chunk) = 26KB totali, prima erano 198KB per TUTTI i ruoli (-87% per il ruolo medio). Chunk per ruolo: Admin 21.71KB, Coach 14.15KB, Athlete 5.25KB, Parent 9.84KB, Director 24.45KB, Manager 39.26KB, Public 0.80KB',
+      'Nessuna modifica funzionale: il dispatcher mantiene la stessa logica di routing per ruolo (forcedParent, impersonation, isDirector/isManager). Suspense con fallback minimale "Caricamento…" copre il tempo (1-2 frame) di caricamento del chunk sub-dashboard al primo accesso',
+    ],
+  },
+  {
     version: '1.9.130',
     date: '2026-10-07',
     title: 'Milestone M11: test automatici su VersionGuard.hasUnsavedWork + fix tipi CI',
