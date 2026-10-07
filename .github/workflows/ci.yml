@@ -25,6 +25,9 @@ jobs:
       - name: TypeScript type-check
         run: npm run typecheck
 
+      - name: Unit tests (vitest)
+        run: npm test
+
       - name: Build (verifica che il bundle generi)
         run: npm run build
         env:

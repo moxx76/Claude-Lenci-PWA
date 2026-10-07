@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.126',
+    date: '2026-10-07',
+    title: 'Milestone M7: test automatici su dateIT e sanitizeSvg',
+    fixes: [
+      'Setup Vitest + jsdom come framework di test. Nuovo script npm run test / test:watch. CI GitHub Actions aggiornato per eseguire tsc + vitest + build + audit in sequenza',
+      'Test dateIT (15 casi): comportamento Europe/Rome in CEST/CET, boundary 00:30 (bug UTC prima bonificato), transizione cambio ora, labelDayIT Oggi/Domani/Ieri, parsing di Date/string/number. Previene regressioni sulla logica che ha richiesto il refactor massivo di 49 call-site',
+      'Test sanitizeSvg (9 casi): payload XSS tipici (script tag, handler on*, href=javascript:, foreignObject HTML-in-SVG, iframe), gestione null/empty, preservazione elementi legittimi. Due test marcati come limited-by-jsdom (viewBox/d= rimossi dal parser di test, in Chrome vero sopravvivono)',
+      '24/24 test passano localmente e in CI',
+    ],
+  },
+  {
     version: '1.9.125',
     date: '2026-10-07',
     title: 'Milestone M6: lazy loading esteso a tutte le route, audit review',
