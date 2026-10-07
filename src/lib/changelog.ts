@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.128',
+    date: '2026-10-07',
+    title: 'Milestone M9: test suite a 74 casi (matchDuration + bmi)',
+    fixes: [
+      'Test suite espansa a 74 casi (54 → 74): aggiunti src/lib/matchDuration.test.ts (9 casi su makeMatchDuration con default 2x45, Piccoli Amici 3x10, Pulcini 3x15, Under 14 2x30, preset FIGC ordinati crescenti) e src/lib/bmiClassification.test.ts (11 casi su ageInMonths con boundary mesi, classifyBMI adulto normale/obeso/sottopeso, curve WHO 5-19, resilienza a input NaN/negativi)',
+      'La logica core del club — età in mesi per BMI, durate campionati per categoria, classificazione BMI — ora è coperta da test automatici che girano in CI ad ogni push',
+    ],
+  },
+  {
     version: '1.9.127',
     date: '2026-10-07',
     title: 'Milestone M8: suite test estesa + preload intelligente route',
