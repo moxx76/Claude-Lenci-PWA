@@ -3,21 +3,35 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './store/auth'
 import { Login } from './pages/Login'
 import { ResetPassword } from './pages/ResetPassword'
+
+// M6: route lazy-loaded. Login + ResetPassword restano eager perché sono i
+// due entry point critici (il reset password arriva da un link email, deve
+// risolversi subito). Dashboard è la landing page post-login: la mettiamo lazy
+// per abbassare il tempo di parse del bundle iniziale sui device low-end, al
+// costo di uno spinner di ~200ms al primo accesso. Tutte le altre pagine sono
+// montate solo quando l'utente naviga la rispettiva route.
 import { Layout } from './components/Layout'
 import { Logo } from './components/Logo'
-import { Dashboard } from './pages/Dashboard'
-import { Teams } from './pages/Teams'
-import { CalendarPage } from './pages/CalendarPage'
-import { Profile } from './pages/Profile'
-import { AnnouncementsPage } from './pages/AnnouncementsPage'
-import { MarketingPage } from './pages/Marketing'
-import { JournalistPage } from './pages/Journalist'
-import { ComunicatiPage } from './pages/Comunicati'
-import { Referti } from './pages/Referti'
-import { EserciziPage } from './pages/EserciziPage'
-import { Moduli } from './pages/Moduli'
-// Lazy: MatchSheetPrint pesa ~100KB e serve solo nel flusso di stampa referto
-const MatchSheetPrint = lazy(() => import('./pages/MatchSheetPrint').then(m => ({ default: m.MatchSheetPrint })))
+const Dashboard         = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })))
+const Teams             = lazy(() => import('./pages/Teams').then(m => ({ default: m.Teams })))
+const CalendarPage      = lazy(() => import('./pages/CalendarPage').then(m => ({ default: m.CalendarPage })))
+const Profile           = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })))
+const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage').then(m => ({ default: m.AnnouncementsPage })))
+const MarketingPage     = lazy(() => import('./pages/Marketing').then(m => ({ default: m.MarketingPage })))
+const JournalistPage    = lazy(() => import('./pages/Journalist').then(m => ({ default: m.JournalistPage })))
+const ComunicatiPage    = lazy(() => import('./pages/Comunicati').then(m => ({ default: m.ComunicatiPage })))
+const Referti           = lazy(() => import('./pages/Referti').then(m => ({ default: m.Referti })))
+const EserciziPage      = lazy(() => import('./pages/EserciziPage').then(m => ({ default: m.EserciziPage })))
+const Moduli            = lazy(() => import('./pages/Moduli').then(m => ({ default: m.Moduli })))
+const MatchSheetPrint   = lazy(() => import('./pages/MatchSheetPrint').then(m => ({ default: m.MatchSheetPrint })))
+
+// Fallback compatto per Suspense: lo spinner centrale della landing page
+// serve a dare feedback immediato mentre il bundle della route arriva.
+const RouteFallback = () => (
+  <div style={{ padding: 40, textAlign: 'center', color: '#707882', fontSize: 13 }}>
+    Caricamento…
+  </div>
+)
 import { SilentAutoUpdater } from './components/SilentAutoUpdater'
 import { VersionGuard } from './components/VersionGuard'
 import { ToastProvider } from './components/Toast'
@@ -86,12 +100,16 @@ export default function App() {
     <ToastProvider>
       <SilentAutoUpdater />
       <VersionGuard />
+      {/* M6: Suspense al livello Routes copre tutti i componenti lazy delle
+          route. I componenti NON lazy (Login, ResetPassword) non attivano il
+          fallback, quindi non c'è penalità UX per il flusso di autenticazione. */}
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
         <Route path="/foglio-partita/:matchId" element={
-          <ProtectedRoute><Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Caricamento foglio…</div>}><MatchSheetPrint /></Suspense></ProtectedRoute>
+          <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>
         } />
         <Route
           path="/"
@@ -121,6 +139,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </ToastProvider>
   )
 }

@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.125',
+    date: '2026-10-07',
+    title: 'Milestone M6: lazy loading esteso a tutte le route, audit review',
+    fixes: [
+      'Lazy loading esteso — tutte le 12 pagine di navigazione principale ora caricate on-demand via React.lazy + Suspense. Solo Login e ResetPassword restano eager (entry point critici). Suspense a livello Routes con fallback compatto. Pagine lazy: Dashboard, Teams, CalendarPage, Profile, AnnouncementsPage, MarketingPage, JournalistPage, ComunicatiPage, Referti, EserciziPage, Moduli, MatchSheetPrint. Ciascuna route ora genera il proprio chunk JS caricato solo quando l\'utente ci naviga',
+      'Audit npm — verificate le 2 vulnerabilità moderate residue di react-router (CVE-2025 open redirect e deserializeErrors SSR). La seconda è SSR-only, non applicabile a BrowserRouter SPA. La prima richiede valori user-controlled nei to= di Link / useNavigate: scan completo del codice conferma che tutte le navigate() e Link usano path hardcoded, mai valori di URL o query string lato utente. Non applicato audit fix --force perché richiederebbe upgrade react-router 6→7 breaking (loader API diversa, refactor significativo). Rimane come debito tecnico non sfruttabile oggi, da pianificare a parte quando esisterà uno sprint dedicato al refactor router',
+    ],
+  },
+  {
     version: '1.9.124',
     date: '2026-10-07',
     title: 'Milestone M5: date UTC bonificate, changelog lazy, cleanup finale',
