@@ -57,3 +57,7 @@ coverage/
 *.tmp
 scratch/
 tmp/
+
+# Playwright E2E (M16)
+playwright-report/
+test-results/

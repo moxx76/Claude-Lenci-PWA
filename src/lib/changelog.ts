@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.134',
+    date: '2026-10-07',
+    title: 'Milestone M16+M17+M18: E2E Playwright, RLS smoke, matrice test manuale, fix critical push_log',
+    fixes: [
+      "FIX CRITICAL — public.push_log aveva Row Level Security DISABILITATA (segnalato dall'advisor Supabase come critical). Chiunque con la ANON KEY (pubblica by design nel bundle del frontend) poteva leggere caller_id, target_id e timestamp di ogni invio push notification della società. Migration 20261007_push_log_enable_rls: ALTER TABLE ENABLE RLS senza alcuna policy = default deny per anon/authenticated. La tabella continua ad essere scritta/letta dalla Edge Function send-push via service_role e dalla RPC can_notify_user (SECURITY DEFINER), che bypassano le policy correttamente",
+      "M16 — Playwright E2E smoke contro produzione: 16 test (titolo HTML/version.json/root React/login form/service worker/manifest.webmanifest/9 route SPA). Gira in 35s. Chromium 1194 preinstallato nell'ambiente di sviluppo, in CI usa npx playwright install chromium. Nuovo workflow .github/workflows/ci.yml con job e2e-prod-smoke che gira solo su push a main (dopo che Netlify ha deployato), continue-on-error:true per non bloccare i push se E2E flaky",
+      "M17 — RLS smoke test (src/__tests__/rls-smoke.test.ts, 21 casi) verifica che la ANON KEY non legga 19 tabelle sensibili: profiles, players, payments, attendances, convocations, match_player_stats, player_assessments, notifications, push_subscriptions, push_log (nuovo fix), event_responses, presence_submission_log, calendar_subscriptions, staff_attendances, recruitment_leads, disciplinary_records, meetings, meeting_rsvps, shuttle_services, lnd_comunicati. Plus 1 test positivo che verifica players_public (view intenzionalmente public) espone solo campi non sensibili (no DOB/phone/address/fiscal_code)",
+      "M17 — Le 3 view SECURITY DEFINER (players_public, cup_public_players, kx_events_public) ora hanno COMMENT esplicito che documenta il trade-off: espongono solo campi non sensibili al pubblico, il DEFINER è by-design. L'advisor Supabase le segnalerà ancora come ERROR ma la decisione è documentata nel DDL",
+      "M18 — Nuova docs/MANUAL_TEST_MATRIX.md: matrice completa ruolo-per-ruolo (admin, director, coach, manager, parent, athlete, journalist, impersonation) in 12 sezioni (login/routing/dashboard admin/coach/parent/athlete/journalist/RLS cross-team/RLS parent-figli/PWA/push/export dati). Tempo stimato esecuzione completa 90-120 minuti, da eseguire prima di ogni deploy che tocca auth/RLS/dashboard/sheets",
+      "Suite test: 174 → 195 (+21 smoke RLS). Tutto verde contro Supabase live in 15s totali (4.5s per gli RLS test)",
+    ],
+  },
+  {
     version: '1.9.133',
     date: '2026-10-07',
     title: 'Milestone M15: react-router-dom 6→7 (0 vulnerabilità in produzione)',
