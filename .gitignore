@@ -61,3 +61,6 @@ tmp/
 # Playwright E2E (M16)
 playwright-report/
 test-results/
+
+# Netlify MCP deploy artifacts (zip temporanei)
+deploy-*.zip
