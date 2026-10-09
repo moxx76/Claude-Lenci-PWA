@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.144',
+    date: '2026-10-09',
+    title: 'Scadenziario in cima: menu subito dopo Dashboard + widget nella Dashboard admin',
+    features: [
+      "Nel menu admin lo 'Scadenziario' è ora in seconda posizione, subito dopo la Dashboard (prima era in fondo con Moduli/Inventario). La cosa più importante da controllare apre con un tap.",
+      "Nuovo widget Scadenziario in testa alla Dashboard admin: mostra le 5 prossime incombenze actionable entro 14 giorni ordinate per scadenza, con calendario-badge data a sinistra, testo breve, e badge rosso 'SCADE OGGI' / 'scade domani' per le più urgenti. Numero di incombenze oltre 14 giorni mostrato come 'N oltre'. Tap su qualunque riga apre /incombenze.",
+      "Rigenerazione VAPID keypair: le push notification lato server non avevano mai funzionato (push_log vuoto, VAPID_PRIVATE_KEY mai impostata). Nuova pub key nel frontend (src/hooks/usePushNotifications.ts), nuova priv come secret del progetto. Chi aveva push attivate deve riattivarle dal profilo (le 7 subscription precedenti sono ora inutilizzabili).",
+    ],
+    notes: [
+      "Deploy di una Edge Function one-shot scadenziario-blast-oneshot per invio immediato di push ai responsabili. Richiede che i 3 secret VAPID siano stati accettati nella dashboard Supabase prima dell'invio.",
+    ],
+  },
+  {
     version: '1.9.143',
     date: '2026-10-09',
     title: 'Inventario: voci esistenti visibili inline sotto ciascuna squadra',

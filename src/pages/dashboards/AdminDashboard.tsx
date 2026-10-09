@@ -1,5 +1,5 @@
 import type React from 'react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../store/auth'
@@ -12,6 +12,7 @@ import { WeekendPlannerCard } from '../../components/WeekendPlannerCard'
 import { CoachPlayerStatsDashboard } from '../../components/CoachPlayerStatsDashboard'
 import { useCalendarEvents } from '../../hooks/useCalendarEvents'
 import { extractCity, isTournamentCompetition, HOME_CITY } from '../../lib/eventLocation'
+import { ScadenziarioWidget } from '../../components/ScadenziarioWidget'
 
 // M13 — Sheet pesanti aperti raramente dall'admin: lazy-loaded così il
 // loro codice (e il transitivo pdf-lib/html2canvas per il backup) non
@@ -182,6 +183,10 @@ function AdminDashboard({ firstName }: { firstName: string }) {
           Panoramica globale delle attività del club.
         </p>
       </div>
+
+      {/* M22+ — Scadenziario in testa alla dashboard (richiesta Davide
+          2026-10-09): deve essere la prima cosa che un admin vede. */}
+      <ScadenziarioWidget />
 
       {/* CTA Nuovo Evento */}
       {canWrite && (

@@ -3,7 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/auth'
 
 // VAPID public key — sicuro esporla nel frontend
-const VAPID_PUBLIC_KEY = 'BPC0U9g6CuAKWeyzsSC5Rb0woGoz1oGln19er4kX7_AvVOuJRP4jzbSPz71LWck6GE59-7GJk6VdVyACkWSTo24'
+// Rigenerato 2026-10-09: le subscription precedenti erano firmate con una
+// pub key la cui priv non era mai stata caricata come secret delle Edge
+// Function (push_log vuoto, mai inviata nessuna push). Nuovo keypair,
+// priv impostata come VAPID_PRIVATE_KEY secret del progetto Supabase.
+// Chi aveva push attivate deve riattivarle dal profilo (le subscription
+// vecchie sono state purgate in cleanup).
+const VAPID_PUBLIC_KEY = 'BP33S0QPpb750N3DsL58b7UjYAw2Ru0hagTt9FCzJvEhNj3ezEj3uhJfB3HHsiPWftPnpnyfowHSXmX8nBbecsw'
 
 export type PushStatus =
   | 'unsupported'      // browser non supporta

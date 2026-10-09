@@ -102,13 +102,16 @@ export function Layout() {
     : isCoachWithoutTeam
     ? [DESKTOP_TABS_BASE[0], { to: '/profilo', label: 'Profilo', icon: 'person' }] // Solo Dashboard + Profilo
     : [
-        ...DESKTOP_TABS_BASE,
+        DESKTOP_TABS_BASE[0], // Dashboard sempre in prima posizione
+        // Scadenziario subito dopo Dashboard per gli admin (richiesta Davide
+        // 2026-10-09: la cosa più importante da vedere all'avvio).
+        ...(canSeeIncombenze ? [INCOMBENZE_TAB] : []),
+        ...DESKTOP_TABS_BASE.slice(1),
         ...(isStaff ? [REFERTI_TAB] : []),
         ...(isStaff ? [ESERCIZI_TAB] : []),
         ...(isStaff ? [COMUNICATI_TAB] : []),
         ...(canSeeModuli ? [MODULI_TAB] : []),
         ...(canSeeInventario ? [INVENTARIO_TAB] : []),
-        ...(canSeeIncombenze ? [INCOMBENZE_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),
         { to: '/profilo', label: 'Profilo', icon: 'person' },
       ]
