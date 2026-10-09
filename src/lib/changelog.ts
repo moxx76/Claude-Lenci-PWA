@@ -3,6 +3,16 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.139',
+    date: '2026-10-09',
+    title: 'Picker convocazioni: stessa categoria in cima + badge visibili',
+    fixes: [
+      "Follow-up segnalazione Fabio Sant: dopo v1.9.138 (filtro <= per includere stesso tier) Fabio comunque non vedeva Pulcini 2017 — appariva in fondo alla lista sotto Primi Calci e Piccoli Amici, probabilmente scrollando era passato inosservato.",
+      "Riordinamento gruppi in BorrowPlayerPickerSheet.tsx: ora stesso tier del corrente (es. altra annata della stessa categoria) appare per primo, poi tier inferiori (sotto-età), infine tier superiori quando il filtro è off. Un allenatore Pulcini 2016 vede subito in cima 'Pulcini 2017' prima di Primi Calci/Piccoli Amici.",
+      "Badge colorati per leggibilità: STESSA CATEGORIA (azzurro), SOTTO-ETÀ (verde, già esistente), SOPRA-ETÀ (ambra, visibile solo con toggle 'Nascondi categorie superiori' disattivato). Nessuno più scambia 'in fondo alla lista' per 'non c'è'.",
+    ],
+  },
+  {
     version: '1.9.138',
     date: '2026-10-07',
     title: 'Fix picker convocazioni cross-team: Pulcini 2016 ora vede Pulcini 2017',

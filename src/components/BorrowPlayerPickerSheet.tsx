@@ -166,12 +166,21 @@ export function BorrowPlayerPickerSheet({
         players: byTeam[teamId],
       }
     })
-    // Ordinamento:
-    //   1. Se c'è currentTier: prima tier < currentTier (più vicino al corrente
-    //      per primo), poi tier >= currentTier, poi senza categoria.
-    //   2. Fallback alfabetico sul nome squadra.
+    // Ordinamento (v1.9.139 — segnalazione Fabio Pulcini 2016):
+    //   1. Stesso tier del corrente in cima (es. Pulcini 2016 → Pulcini 2017
+    //      per prime: l'altra annata della stessa categoria è il caso più
+    //      naturale di prestito con compagni di pari livello).
+    //   2. Poi tier inferiori stretti, dal più vicino al più lontano.
+    //   3. Poi tier superiori, dal più basso al più alto.
+    //   4. Infine squadre senza categoria.
+    //   5. Fallback alfabetico sul nome squadra.
     return groups.sort((a, b) => {
       if (currentTier != null) {
+        const aIsSame = a.teamTier === currentTier
+        const bIsSame = b.teamTier === currentTier
+        if (aIsSame && !bIsSame) return -1
+        if (!aIsSame && bIsSame) return 1
+
         const aIsLower = a.teamTier != null && a.teamTier < currentTier
         const bIsLower = b.teamTier != null && b.teamTier < currentTier
         if (aIsLower && !bIsLower) return -1
@@ -180,8 +189,8 @@ export function BorrowPlayerPickerSheet({
           // Entrambi inferiori: più vicino al corrente per primo
           return (currentTier - (a.teamTier!)) - (currentTier - (b.teamTier!))
         }
-        // Entrambi superiori/uguali o senza tier: tier alto per primo
-        if (a.teamTier != null && b.teamTier != null) return b.teamTier - a.teamTier
+        // Entrambi superiori o senza tier: tier basso per primo (più vicino al corrente)
+        if (a.teamTier != null && b.teamTier != null) return a.teamTier - b.teamTier
         if (a.teamTier != null) return -1
         if (b.teamTier != null) return 1
       }
@@ -292,6 +301,8 @@ export function BorrowPlayerPickerSheet({
           )}
           {!loading && grouped.map(g => {
             const isLowerTier = currentTier != null && g.teamTier != null && g.teamTier < currentTier
+            const isSameTier = currentTier != null && g.teamTier != null && g.teamTier === currentTier
+            const isUpperTier = currentTier != null && g.teamTier != null && g.teamTier > currentTier
             return (
             <div key={g.teamName} style={{ marginBottom: 14 }}>
               <div style={{
@@ -301,12 +312,26 @@ export function BorrowPlayerPickerSheet({
                 display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
               }}>
                 <span>{g.teamName} · {g.players.length} gioc.</span>
+                {isSameTier && (
+                  <span style={{
+                    background: '#cfe5ff', color: '#004a78',
+                    padding: '1px 7px', borderRadius: 999,
+                    fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3,
+                  }}>STESSA CATEGORIA</span>
+                )}
                 {isLowerTier && (
                   <span style={{
                     background: '#dcf5df', color: '#006e25',
                     padding: '1px 7px', borderRadius: 999,
                     fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3,
                   }}>SOTTO-ETÀ</span>
+                )}
+                {isUpperTier && (
+                  <span style={{
+                    background: '#ffe8c7', color: '#8e6300',
+                    padding: '1px 7px', borderRadius: 999,
+                    fontSize: 9.5, fontWeight: 800, letterSpacing: 0.3,
+                  }}>SOPRA-ETÀ</span>
                 )}
               </div>
               {g.players.map(p => {
