@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 import type { RecruitmentLead, LeadStatus } from '../lib/types'
 import { STATUS_LABEL, STATUS_STYLE, categoryStyle, avatarBg, isAdmin, isCoach } from '../lib/types'
@@ -18,6 +18,10 @@ import { TeamMatchHistorySheet } from '../components/TeamMatchHistorySheet'
 import { AttendanceSheet } from '../components/AttendanceSheet'
 import { useAuth } from '../store/auth'
 import { useMyTeam } from '../hooks/useMyTeam'
+
+// M21 — Lazy: lo sheet inventario pesa 19KB di suo + viene aperto solo su
+// richiesta esplicita del dirigente, quindi non entra nel bundle di Teams.
+const InventoryTeamSheet = lazy(() => import('../components/InventoryTeamSheet').then(m => ({ default: m.InventoryTeamSheet })))
 
 const FILTERS: Array<{ key: 'all' | LeadStatus; label: string }> = [
   { key: 'enrolled', label: 'Tesserati' },
@@ -42,6 +46,8 @@ export function Teams() {
   const [teamPickerOpen, setTeamPickerOpen] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  // M21: inventario materiale per squadra, apribile dalla toolbar del dettaglio
+  const [inventoryOpen, setInventoryOpen] = useState(false)
   const [detailTrainingId, setDetailTrainingId] = useState<string | null>(null)
   const [editTrainingEvent, setEditTrainingEvent] = useState<{ kind: 'training'; id: string; team_id: string; training_date?: string; start_time?: string | null; end_time?: string | null; location?: string | null; focus?: string | null; program?: string | null; notes?: string | null } | null>(null)
   const [attendanceState, setAttendanceState] = useState<{ trainingId: string; date: string; startTime: string; players: Array<{ id: string; firstName: string; lastName: string; position?: string | null }>; title: string } | null>(null)
@@ -153,6 +159,7 @@ export function Teams() {
           onEditTeam={isManagerView && canWrite ? () => { setTeamSheetEditing(currentTeam); setTeamSheetOpen(true) } : undefined}
           onOpenStats={() => setStatsOpen(true)}
           onOpenHistory={() => setHistoryOpen(true)}
+          onOpenInventory={() => setInventoryOpen(true)}
           canSeePayments={false}
         />
       ) : isAdminView && adminCurrentTeam ? (
@@ -164,6 +171,7 @@ export function Teams() {
           onEditTeam={canWrite ? () => { setTeamSheetEditing(adminCurrentTeam); setTeamSheetOpen(true) } : undefined}
           onOpenStats={() => setStatsOpen(true)}
           onOpenHistory={() => setHistoryOpen(true)}
+          onOpenInventory={() => setInventoryOpen(true)}
           canSeePayments={true}
         />
       ) : isAdminView ? (
@@ -241,6 +249,20 @@ export function Teams() {
           reloadKey={rosterReloadTick}
           onOpenTraining={(trainingId) => setDetailTrainingId(trainingId)}
         />
+      )}
+
+      {/* M21: inventario materiale della squadra selezionata — lazy per
+          non caricare il bundle finché non si apre */}
+      {inventoryOpen && (currentTeam || adminCurrentTeam) && (
+        <Suspense fallback={null}>
+          <InventoryTeamSheet
+            open={inventoryOpen}
+            onClose={() => setInventoryOpen(false)}
+            teamId={(isCoachView ? currentTeam!.id : adminCurrentTeam!.id)}
+            teamName={(isCoachView ? currentTeam!.name : adminCurrentTeam!.name)}
+            teamColor={(isCoachView ? currentTeam!.color : adminCurrentTeam!.color)}
+          />
+        </Suspense>
       )}
 
       {/* Dettaglio singolo allenamento (dallo storico) */}
@@ -341,7 +363,7 @@ function TabBtn({ active, onClick, label, icon, color }: {
 // ============================================================
 // COACH VIEW: solo rosa della sua squadra dalla tabella players
 // ============================================================
-function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpenStats, onOpenHistory, canSeePayments }: {
+function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpenStats, onOpenHistory, onOpenInventory, canSeePayments }: {
   team: { id: string; name: string; color: string | null; category: string | null };
   onSelect: (p: PlayerDetailData) => void;
   canManage: boolean;
@@ -349,6 +371,7 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
   onEditTeam?: () => void;
   onOpenStats?: () => void;
   onOpenHistory?: () => void;
+  onOpenInventory?: () => void;
   canSeePayments?: boolean;
 }) {
   const [players, setPlayers] = useState<any[]>([])
@@ -441,6 +464,20 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
           >
             <Icon name="history" size={15} color="#005f98" />
             Storico
+          </button>
+        )}
+        {onOpenInventory && (
+          <button
+            onClick={onOpenInventory}
+            style={{
+              flex: 1, background: '#fff', border: '1px solid #4a7c59',
+              borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              fontSize: 12, fontWeight: 800, color: '#4a7c59', fontFamily: 'inherit',
+            }}
+          >
+            <Icon name="inventory_2" size={15} color="#4a7c59" />
+            Inventario
           </button>
         )}
         {canManage && onEditTeam && (

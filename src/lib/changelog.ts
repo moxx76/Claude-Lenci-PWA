@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.141',
+    date: '2026-10-09',
+    title: 'Inventario: nuovo bottone in Squadre per aprire l\'inventario della squadra selezionata',
+    features: [
+      "Dentro Squadre, nella toolbar del dettaglio di una squadra (accanto a 'Rosa', 'Presenze', 'Storico'), nuovo bottone verde 'Inventario' che apre direttamente lo sheet del materiale di quella squadra senza passare dalla pagina Inventario top-level.",
+      "Lo sheet è lazy (chunk 15KB a parte), caricato solo al click; non appesantisce il bundle Teams.",
+    ],
+  },
+  {
     version: '1.9.140',
     date: '2026-10-09',
     title: 'Milestone M21: nuova sezione Inventario materiale per squadra',
