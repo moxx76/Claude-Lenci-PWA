@@ -37,6 +37,8 @@ const MARKETING_TAB: NavTab = { to: '/marketing', label: 'Marketing', icon: 'cam
 const COMUNICATI_TAB: NavTab = { to: '/comunicati', label: 'Comunicati LND', labelShort: 'Comunicati', icon: 'article', accent: '#005f98' }
 const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labelShort: 'Esercizi', icon: 'fitness_center', accent: '#c73434' }
 const MODULI_TAB: NavTab = { to: '/moduli', label: 'Moduli e documenti', labelShort: 'Moduli', icon: 'folder', accent: '#8b6f47' }
+// M21 — Inventario materiale per squadra (maglie/pettorine/borsa medica/materiale allenamento)
+const INVENTARIO_TAB: NavTab = { to: '/inventario', label: 'Inventario materiale', labelShort: 'Inventario', icon: 'inventory_2', accent: '#4a7c59' }
 // Referti: pagina centralizzata di tutti i post-match report delle squadre a carico.
 // Accento rosa Lenci per il legame diretto con la squadra
 const REFERTI_TAB: NavTab = { to: '/referti', label: 'Referti partite', labelShort: 'Referti', icon: 'edit_note', accent: '#b3005c' }
@@ -65,6 +67,10 @@ export function Layout() {
   // (upload/delete) resta admin-only, enforced sia dalla UI (canManage in
   // src/pages/Moduli.tsx) che dalla policy moduli_write.
   const canSeeModuli = (isAdmin(profile?.role) || profile?.is_director === true || profile?.is_manager === true) && !isParentView
+  // M21 — Inventario: visibile allo staff del team (coach + dirigenti) e ad
+  // admin/direttori. isStaff gia' copre admin+coach; aggiungo is_manager e
+  // is_director per i dirigenti puri. Niente parent, niente journalist.
+  const canSeeInventario = (isStaff || profile?.is_manager === true || profile?.is_director === true) && !isParentView
 
   // Coach senza squadra assegnata (né head, né manager): menu limitato
   // Solo per coach puri, non per admin che si sono già assegnati o hanno più responsabilità
@@ -96,6 +102,7 @@ export function Layout() {
         ...(isStaff ? [ESERCIZI_TAB] : []),
         ...(isStaff ? [COMUNICATI_TAB] : []),
         ...(canSeeModuli ? [MODULI_TAB] : []),
+        ...(canSeeInventario ? [INVENTARIO_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),
         { to: '/profilo', label: 'Profilo', icon: 'person' },
       ]

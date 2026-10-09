@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.140',
+    date: '2026-10-09',
+    title: 'Milestone M21: nuova sezione Inventario materiale per squadra',
+    features: [
+      "Nuova pagina 'Inventario materiale' nel menu (admin, direttori, dirigenti e coach dello staff): elenca tutte le squadre con contatore 'da rifornire' sintetico, un tap apre il dettaglio per squadra.",
+      "Sheet dettaglio con 5 categorie fisse (Maglie, Pettorine, Materiale allenamento, Borsa medica, Altro). Ogni voce ha 2 modalità: 'pezzo singolo' (presente/assente + stato ok/usurato/danneggiato/perso/in_riparazione, per maglie numerate e articoli borsa medica) oppure 'quantità' (contatore libero con pulsanti +/-, per palloni/coni/pettorine).",
+      "Soglia minima per voce con badge rosso 'DA RIFORNIRE' quando l'inventario scende sotto soglia; conteggio aggregato nell'header della pagina.",
+      "Audit automatico: ogni modifica salva autore e timestamp, mostrati accanto a ogni voce come 'ultima verifica: Marcello Genna, 2 ott'. La storia completa resta su team_inventory_audit per responsabilità in caso di contestazioni.",
+      "Permessi via RLS: scrittura per tutto lo staff del team (6 ruoli operativi: head/assistant/helper coach + 3 team manager) e admin; lettura allargata a direttori e manager. Silent-fail protection: ogni UPDATE/INSERT/DELETE fa .select('id') e segnala errore esplicito se RLS blocca.",
+    ],
+  },
+  {
     version: '1.9.139',
     date: '2026-10-09',
     title: 'Picker convocazioni: stessa categoria in cima + badge visibili',
