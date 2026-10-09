@@ -69,10 +69,19 @@ export function Profile() {
     .toUpperCase() || 'LP'
   const roleLabel = ROLE_LABEL[profile?.role ?? 'public'] ?? 'Utente'
 
-  const canSeeModuli = (profile?.role === 'admin') || profile?.is_director === true
+  const isAdminRole = profile?.role === 'admin'
+  const canSeeModuli = isAdminRole || profile?.is_director === true || profile?.is_manager === true
+  // Inventario: staff del team (coach/dirigenti) + admin
+  const canSeeInventario = isAdminRole || profile?.role === 'coach' || profile?.is_manager === true || profile?.is_director === true
+  // Scadenziario + Import FIGC: admin only
+  const canSeeIncombenze = isAdminRole
+  const canSeeImportFigc = isAdminRole
 
   const settingsItems = [
+    ...(canSeeIncombenze ? [{ icon: 'assignment_late', label: 'Scadenziario', onClick: () => { window.location.href = '/incombenze' } }] : []),
+    ...(canSeeInventario ? [{ icon: 'inventory_2', label: 'Inventario materiale', onClick: () => { window.location.href = '/inventario' } }] : []),
     ...(canSeeModuli ? [{ icon: 'folder', label: 'Moduli e documenti', onClick: () => { window.location.href = '/moduli' } }] : []),
+    ...(canSeeImportFigc ? [{ icon: 'upload_file', label: 'Import tesserati FIGC', onClick: () => { window.location.href = '/import-figc' } }] : []),
     { icon: 'person', label: 'Modifica profilo', onClick: () => alert('Funzionalità in arrivo nel prossimo sprint') },
     { icon: 'lock', label: 'Cambia password', onClick: () => alert('Funzionalità in arrivo nel prossimo sprint') },
     { icon: 'help', label: 'Supporto', onClick: () => window.open('mailto:info@lencipoirino.it') },

@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.147',
+    date: '2026-10-09',
+    title: 'Mobile: menu Profilo con collegamenti alle sezioni admin',
+    fixes: [
+      "Scadenziario, Inventario materiale, Moduli e documenti e Import tesserati FIGC prima erano raggiungibili solo dalla sidebar desktop. Da mobile ora compaiono nel Profilo come voci di menu con icona dedicata, visibili in base al ruolo (Scadenziario/Import FIGC solo admin; Inventario anche a staff/dirigenti/manager; Moduli ad admin/dirigenti/manager).",
+    ],
+  },
+  {
     version: '1.9.146',
     date: '2026-10-09',
     title: 'Import tesserati FIGC da PDF — anteprima (dry-run)',
