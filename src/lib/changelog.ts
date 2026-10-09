@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.145',
+    date: '2026-10-09',
+    title: 'Push notification: auto-detect rotazione VAPID keypair',
+    fixes: [
+      "Risolto errore VapidPkHashMismatch dopo rotazione delle chiavi di firma push lato server: il hook delle notifiche riusava la vecchia subscription registrata con la chiave precedente, con il risultato che Apple/Google rifiutavano le push firmate con la nuova. Ora il hook confronta la chiave della subscription esistente con quella corrente e, se diverse, disiscrive e ricrea pulito prima di salvare in DB. Chi ha riattivato le push oggi e non le riceve basta che vada in Profilo → Notifiche push, disattivi, riattivi.",
+    ],
+  },
+  {
     version: '1.9.144',
     date: '2026-10-09',
     title: 'Scadenziario in cima: menu subito dopo Dashboard + widget nella Dashboard admin',

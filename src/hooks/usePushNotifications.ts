@@ -87,6 +87,29 @@ export function usePushNotifications() {
 
       const reg = await navigator.serviceWorker.ready
       let sub = await reg.pushManager.getSubscription()
+      // Se c'è già una subscription ma è legata a una VAPID public key diversa
+      // dall'attuale (es. dopo rotazione keypair lato server), va buttata e rifatta:
+      // altrimenti il server firma con la nuova priv e Apple/FCM rifiuta con
+      // VapidPkHashMismatch perché la subscription è stata registrata con la vecchia pub.
+      if (sub) {
+        const options = sub.options as any
+        const existingKey = options?.applicationServerKey as ArrayBuffer | null
+        const expectedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        let mismatch = true
+        if (existingKey && existingKey.byteLength === expectedKey.byteLength) {
+          const existingView = new Uint8Array(existingKey)
+          mismatch = false
+          for (let i = 0; i < expectedKey.length; i++) {
+            if (existingView[i] !== expectedKey[i]) { mismatch = true; break }
+          }
+        }
+        if (mismatch) {
+          try { await sub.unsubscribe() } catch {}
+          // pulizia DB best-effort (non blocca)
+          try { await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint) } catch {}
+          sub = null
+        }
+      }
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
