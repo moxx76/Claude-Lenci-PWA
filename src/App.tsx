@@ -24,6 +24,7 @@ const Referti           = lazy(() => import('./pages/Referti').then(m => ({ defa
 const EserciziPage      = lazy(() => import('./pages/EserciziPage').then(m => ({ default: m.EserciziPage })))
 const Moduli            = lazy(() => import('./pages/Moduli').then(m => ({ default: m.Moduli })))
 const Inventario        = lazy(() => import('./pages/Inventario').then(m => ({ default: m.Inventario })))
+const Incombenze        = lazy(() => import('./pages/Incombenze').then(m => ({ default: m.Incombenze })))
 const MatchSheetPrint   = lazy(() => import('./pages/MatchSheetPrint').then(m => ({ default: m.MatchSheetPrint })))
 
 // Fallback compatto per Suspense: lo spinner centrale della landing page
@@ -138,6 +139,7 @@ export default function App() {
           <Route path="giornalisti" element={<JournalistPage />} />
           <Route path="moduli" element={<NotForJournalist><Moduli /></NotForJournalist>} />
           <Route path="inventario" element={<NotForJournalist><Inventario /></NotForJournalist>} />
+          <Route path="incombenze" element={<NotForJournalist><Incombenze /></NotForJournalist>} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>

@@ -39,6 +39,8 @@ const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labe
 const MODULI_TAB: NavTab = { to: '/moduli', label: 'Moduli e documenti', labelShort: 'Moduli', icon: 'folder', accent: '#8b6f47' }
 // M21 — Inventario materiale per squadra (maglie/pettorine/borsa medica/materiale allenamento)
 const INVENTARIO_TAB: NavTab = { to: '/inventario', label: 'Inventario materiale', labelShort: 'Inventario', icon: 'inventory_2', accent: '#4a7c59' }
+// M22 — Scadenziario incombenze dai comunicati LND, admin-only
+const INCOMBENZE_TAB: NavTab = { to: '/incombenze', label: 'Scadenziario', labelShort: 'Scadenze', icon: 'assignment_late', accent: '#b3005c' }
 // Referti: pagina centralizzata di tutti i post-match report delle squadre a carico.
 // Accento rosa Lenci per il legame diretto con la squadra
 const REFERTI_TAB: NavTab = { to: '/referti', label: 'Referti partite', labelShort: 'Referti', icon: 'edit_note', accent: '#b3005c' }
@@ -71,6 +73,9 @@ export function Layout() {
   // admin/direttori. isStaff gia' copre admin+coach; aggiungo is_manager e
   // is_director per i dirigenti puri. Niente parent, niente journalist.
   const canSeeInventario = (isStaff || profile?.is_manager === true || profile?.is_director === true) && !isParentView
+  // M22 — Scadenziario incombenze: solo admin (i 4 responsabili Christian/
+  // Palermo/Davide/Enzo sono tutti admin, chi legge/scrive sono gli admin).
+  const canSeeIncombenze = isAdmin(profile?.role) && !isParentView
 
   // Coach senza squadra assegnata (né head, né manager): menu limitato
   // Solo per coach puri, non per admin che si sono già assegnati o hanno più responsabilità
@@ -103,6 +108,7 @@ export function Layout() {
         ...(isStaff ? [COMUNICATI_TAB] : []),
         ...(canSeeModuli ? [MODULI_TAB] : []),
         ...(canSeeInventario ? [INVENTARIO_TAB] : []),
+        ...(canSeeIncombenze ? [INCOMBENZE_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),
         { to: '/profilo', label: 'Profilo', icon: 'person' },
       ]

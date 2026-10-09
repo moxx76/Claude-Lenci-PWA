@@ -3,6 +3,22 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.142',
+    date: '2026-10-09',
+    title: 'Milestone M22: nuova area Scadenziario incombenze da comunicati LND',
+    features: [
+      "Nuova pagina 'Scadenziario' nel menu admin: aggrega tutte le incombenze estratte dai comunicati LND Piemonte VdA (iscrizioni campionati, variazioni gara, versamento ammende, deposito moduli societari, ecc.) con filtro per 'da fare', 'da triare', 'fatte', 'tutto'.",
+      "Ogni incombenza mostra: scadenza con giorni rimanenti, chip criterio (SCADENZE/DISCIPLINARE/GARE/SOCIETA), testo esteso, assegnatario, chi/quando l'ha completata, link al CU PDF di origine, note di lavorazione.",
+      "Default assegnatario per nuove incombenze: Christian Trovato (segreteria). Luca Palermo, Davide Mantovani ed Enzo Paoletti verificano e possono marcare come fatto in cooperativa.",
+      "Nuova colonna lnd_rilievi.azione_richiesta (true/false/null) distingue incombenze reali di Lenci da rilievi informativi (es. 'ammende non a carico di Lenci'). I rilievi che non riguardano Lenci sono già stati auto-marcati false in backfill; quelli ambigui restano 'da triare'.",
+      "Oggi (9 ott 2026) risultano 7 incombenze attive da fare, fra cui 3 critiche entro 72h: comunicare orario Primi Calci/Piccoli Amici (10/10), risposta istanza CENTROCAMPO per U16 (12/10 h 12:00), iscrizione Under 14 Provinciale (13/10 h 18:00).",
+      "Permessi: scrittura solo admin via nuova policy 'admin aggiorna rilievi'. Visibilità pagina: admin. Chunk lazy 12KB.",
+    ],
+    notes: [
+      "Prossimo step: notifiche push automatiche (alla creazione nuovo rilievo + 48h prima scadenza + mattina scadenza + daily reminder). Richiede pg_cron o scheduler esterno — chiedi quale preferisci e lo configuro.",
+    ],
+  },
+  {
     version: '1.9.141',
     date: '2026-10-09',
     title: 'Inventario: nuovo bottone in Squadre per aprire l\'inventario della squadra selezionata',
