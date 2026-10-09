@@ -14,6 +14,15 @@ import { sortTeamsByAge } from '../lib/teamOrder'
  * manager + chi è nello staff di almeno una squadra).
  */
 
+interface ItemPreview {
+  id: string
+  name: string
+  category: string
+  kind: 'singolo' | 'quantita'
+  current_quantity: number
+  min_quantity: number
+}
+
 interface TeamRow {
   id: string
   name: string
@@ -22,6 +31,15 @@ interface TeamRow {
   total: number
   below_min: number
   last_updated: string | null
+  items: ItemPreview[]
+}
+
+const CAT_META: Record<string, { label: string; icon: string; color: string }> = {
+  maglie: { label: 'Maglie', icon: 'checkroom', color: '#004a78' },
+  pettorine: { label: 'Pettorine', icon: 'style', color: '#8e6300' },
+  materiale_allenamento: { label: 'Materiale', icon: 'sports_soccer', color: '#006e25' },
+  borsa_medica: { label: 'Borsa medica', icon: 'medical_services', color: '#93000a' },
+  altro: { label: 'Altro', icon: 'inventory_2', color: '#404751' },
 }
 
 export function Inventario() {
@@ -41,19 +59,30 @@ export function Inventario() {
     if (tErr) {
       setError(tErr.message); setLoading(false); return
     }
-    // 2. Prendo i conteggi aggregati dai items (RLS applicata)
+    // 2. Prendo le voci (RLS applicata) con nome/qty/categoria per anteprima inline
     const { data: items, error: iErr } = await supabase
       .from('team_inventory_items')
-      .select('team_id, current_quantity, min_quantity, updated_at')
+      .select('id, team_id, name, category, kind, current_quantity, min_quantity, updated_at, sort_order')
+      .order('category')
+      .order('sort_order')
+      .order('name')
     if (iErr) {
       setError(iErr.message); setLoading(false); return
     }
-    const stats: Record<string, { total: number; belowMin: number; lastUpdated: string | null }> = {}
+    const stats: Record<string, { total: number; belowMin: number; lastUpdated: string | null; items: ItemPreview[] }> = {}
     for (const it of (items || []) as any[]) {
-      const s = stats[it.team_id] ||= { total: 0, belowMin: 0, lastUpdated: null }
+      const s = stats[it.team_id] ||= { total: 0, belowMin: 0, lastUpdated: null, items: [] }
       s.total++
       if ((it.current_quantity ?? 0) < (it.min_quantity ?? 0)) s.belowMin++
       if (!s.lastUpdated || it.updated_at > s.lastUpdated) s.lastUpdated = it.updated_at
+      s.items.push({
+        id: it.id,
+        name: it.name,
+        category: it.category,
+        kind: it.kind,
+        current_quantity: it.current_quantity,
+        min_quantity: it.min_quantity,
+      })
     }
     const combined: TeamRow[] = (teams || []).map((t: any) => ({
       id: t.id,
@@ -63,6 +92,7 @@ export function Inventario() {
       total: stats[t.id]?.total ?? 0,
       below_min: stats[t.id]?.belowMin ?? 0,
       last_updated: stats[t.id]?.lastUpdated ?? null,
+      items: stats[t.id]?.items ?? [],
     }))
     setRows(sortTeamsByAge(combined))
     setLoading(false)
@@ -137,47 +167,113 @@ export function Inventario() {
       )}
 
       {!loading && rows.map(team => (
-        <button
+        <div
           key={team.id}
-          onClick={() => setOpenTeamId(team.id)}
           style={{
-            background: '#fff', borderRadius: 14, padding: 14,
+            background: '#fff', borderRadius: 14,
             borderLeft: `4px solid ${team.color || '#005f98'}`,
             boxShadow: '0 6px 16px rgba(0,120,191,0.05)',
-            border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 4,
-            cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-            display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: '#181c20' }}>
-              {team.name}
+          {/* Header squadra cliccabile → apre lo sheet dettaglio (add/edit) */}
+          <button
+            onClick={() => setOpenTeamId(team.id)}
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              textAlign: 'left', fontFamily: 'inherit', width: '100%',
+              display: 'flex', alignItems: 'center', gap: 12, padding: 14,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: '#181c20' }}>
+                {team.name}
+              </div>
+              <div style={{ fontSize: 11, color: '#707882', marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {team.category && <span>{team.category}</span>}
+                <span>·</span>
+                <span>{team.total === 0 ? 'Nessuna voce — tocca per aggiungere' : `${team.total} ${team.total === 1 ? 'voce' : 'voci'}`}</span>
+                {team.last_updated && (
+                  <>
+                    <span>·</span>
+                    <span>aggiornato {new Date(team.last_updated).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}</span>
+                  </>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: '#707882', marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {team.category && <span>{team.category}</span>}
-              <span>·</span>
-              <span>{team.total === 0 ? 'Nessuna voce' : `${team.total} voci`}</span>
-              {team.last_updated && (
-                <>
-                  <span>·</span>
-                  <span>aggiornato {new Date(team.last_updated).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}</span>
-                </>
-              )}
-            </div>
-          </div>
-          {team.below_min > 0 && (
-            <div style={{
-              background: '#ffdad6', color: '#93000a',
-              padding: '4px 10px', borderRadius: 999,
-              fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4,
-              flexShrink: 0,
-            }}>
-              <Icon name="warning" size={12} color="#93000a" />
-              {team.below_min}
+            {team.below_min > 0 && (
+              <div style={{
+                background: '#ffdad6', color: '#93000a',
+                padding: '4px 10px', borderRadius: 999,
+                fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4,
+                flexShrink: 0,
+              }}>
+                <Icon name="warning" size={12} color="#93000a" />
+                {team.below_min}
+              </div>
+            )}
+            <Icon name="chevron_right" size={18} color="#c0c7d2" />
+          </button>
+
+          {/* Lista voci inline (sotto la squadra, raggruppate per categoria).
+              Tap su una voce → stesso sheet dettaglio pre-focalizzato sulla
+              categoria. Mostro solo nome + stato compatti; +/-, edit, note
+              restano nello sheet per non appesantire la lista. */}
+          {team.items.length > 0 && (
+            <div style={{ borderTop: '1px solid #eef0f5' }}>
+              {groupByCategory(team.items).map(([cat, catItems]) => {
+                const meta = CAT_META[cat] || CAT_META.altro
+                return (
+                  <div key={cat} style={{ padding: '8px 14px', borderBottom: '1px solid #f6f7fb' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 10, fontWeight: 800, color: meta.color,
+                      textTransform: 'uppercase', letterSpacing: 0.3,
+                      marginBottom: 4,
+                    }}>
+                      <Icon name={meta.icon} size={11} color={meta.color} />
+                      {meta.label}
+                    </div>
+                    {catItems.map(it => {
+                      const belowMin = it.current_quantity < it.min_quantity
+                      return (
+                        <button
+                          key={it.id}
+                          onClick={() => setOpenTeamId(team.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '4px 2px', width: '100%',
+                            background: 'transparent', border: 'none',
+                            cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                          }}
+                        >
+                          <span style={{ flex: 1, fontSize: 12.5, color: '#181c20', fontWeight: 600 }}>
+                            {it.name}
+                          </span>
+                          <span style={{
+                            fontSize: 11, color: belowMin ? '#93000a' : '#404751',
+                            fontWeight: belowMin ? 800 : 600,
+                          }}>
+                            {it.kind === 'quantita'
+                              ? `${it.current_quantity}${it.min_quantity > 0 ? ` / ${it.min_quantity}` : ''}`
+                              : it.current_quantity > 0 ? 'ok' : 'assente'}
+                          </span>
+                          {belowMin && (
+                            <span style={{
+                              background: '#ffdad6', color: '#93000a',
+                              padding: '1px 6px', borderRadius: 999,
+                              fontSize: 9, fontWeight: 800, letterSpacing: 0.3,
+                            }}>DA RIFORNIRE</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
             </div>
           )}
-          <Icon name="chevron_right" size={18} color="#c0c7d2" />
-        </button>
+        </div>
       ))}
 
       {openTeamId && (() => {
@@ -195,6 +291,17 @@ export function Inventario() {
       })()}
     </div>
   )
+}
+
+// Raggruppa items per categoria mantenendo l'ordine di CAT_META
+function groupByCategory(items: ItemPreview[]): Array<[string, ItemPreview[]]> {
+  const map: Record<string, ItemPreview[]> = {}
+  for (const it of items) {
+    if (!map[it.category]) map[it.category] = []
+    map[it.category].push(it)
+  }
+  const order = ['maglie', 'pettorine', 'materiale_allenamento', 'borsa_medica', 'altro']
+  return order.filter(c => map[c]?.length).map(c => [c, map[c]] as [string, ItemPreview[]])
 }
 
 export default Inventario

@@ -3,19 +3,29 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.143',
+    date: '2026-10-09',
+    title: 'Inventario: voci esistenti visibili inline sotto ciascuna squadra',
+    features: [
+      "Nella pagina Inventario, sotto il nome di ogni squadra sono ora elencate direttamente le voci già inserite, raggruppate per categoria (Maglie, Pettorine, Materiale, Borsa medica, Altro). Si vede a colpo d'occhio quante e quali voci esistono senza dover prima aprire lo sheet.",
+      "Ogni riga mostra nome voce + quantità attuale / soglia minima (per voci quantità) oppure stato ok/assente (per pezzi singoli), con badge rosso DA RIFORNIRE quando current < min. Tap su una voce o sull'intestazione squadra apre lo sheet dettaglio per modificare quantità, soglia, stato e note.",
+      "Chunk Inventario scende da 19.2KB a 6.8KB (-64%) perché la logica dello sheet lazy è ora condivisa fra pagina top-level e tab in Squadre.",
+    ],
+  },
+  {
     version: '1.9.142',
     date: '2026-10-09',
     title: 'Milestone M22: nuova area Scadenziario incombenze da comunicati LND',
     features: [
       "Nuova pagina 'Scadenziario' nel menu admin: aggrega tutte le incombenze estratte dai comunicati LND Piemonte VdA (iscrizioni campionati, variazioni gara, versamento ammende, deposito moduli societari, ecc.) con filtro per 'da fare', 'da triare', 'fatte', 'tutto'.",
       "Ogni incombenza mostra: scadenza con giorni rimanenti, chip criterio (SCADENZE/DISCIPLINARE/GARE/SOCIETA), testo esteso, assegnatario, chi/quando l'ha completata, link al CU PDF di origine, note di lavorazione.",
-      "Default assegnatario per nuove incombenze: Christian Trovato (segreteria). Luca Palermo, Davide Mantovani ed Enzo Paoletti verificano e possono marcare come fatto in cooperativa.",
-      "Nuova colonna lnd_rilievi.azione_richiesta (true/false/null) distingue incombenze reali di Lenci da rilievi informativi (es. 'ammende non a carico di Lenci'). I rilievi che non riguardano Lenci sono già stati auto-marcati false in backfill; quelli ambigui restano 'da triare'.",
-      "Oggi (9 ott 2026) risultano 7 incombenze attive da fare, fra cui 3 critiche entro 72h: comunicare orario Primi Calci/Piccoli Amici (10/10), risposta istanza CENTROCAMPO per U16 (12/10 h 12:00), iscrizione Under 14 Provinciale (13/10 h 18:00).",
+      "Modello di assegnazione cooperativo: ogni incombenza ha un responsabile designato di default (segreteria); gli altri responsabili vedono tutto e possono marcare fatto senza passaggio di consegne formale.",
+      "Nuova colonna lnd_rilievi.azione_richiesta (true/false/null) distingue incombenze reali di Lenci da rilievi informativi (es. ammende non a carico). I rilievi che non riguardano Lenci sono già stati auto-marcati false in backfill; quelli ambigui restano 'da triare'.",
+      "Oggi (9 ott 2026) risultano 7 incombenze attive da fare, fra cui 3 critiche entro 72h: comunicare orario Primi Calci/Piccoli Amici (10/10), risposta a istanza di variazione per U16 (12/10 h 12:00), iscrizione Under 14 Provinciale (13/10 h 18:00).",
       "Permessi: scrittura solo admin via nuova policy 'admin aggiorna rilievi'. Visibilità pagina: admin. Chunk lazy 12KB.",
     ],
     notes: [
-      "Prossimo step: notifiche push automatiche (alla creazione nuovo rilievo + 48h prima scadenza + mattina scadenza + daily reminder). Richiede pg_cron o scheduler esterno — chiedi quale preferisci e lo configuro.",
+      "Prossimo step: notifiche push automatiche (alla creazione nuovo rilievo + 48h prima scadenza + mattina scadenza + daily reminder). Richiede pg_cron o scheduler esterno.",
     ],
   },
   {
