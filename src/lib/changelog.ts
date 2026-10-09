@@ -3,6 +3,22 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.146',
+    date: '2026-10-09',
+    title: 'Import tesserati FIGC da PDF — anteprima (dry-run)',
+    features: [
+      "Nuova area amministrativa 'Import tesserati FIGC' (menu admin): trascina il tabulato PDF ufficiale FIGC del club e la pagina lo legge direttamente, estrae i 140+ giocatori con matricola, codice fiscale, data di nascita, disciplina, data di tesseramento, anno di scadenza e tipologia federale.",
+      "Matching deterministico contro l'anagrafica interna: prima per matricola FIGC, poi per codice fiscale, poi per cognome+nome+data di nascita. Ogni riga classificata come Pronto per aggiornare, Già allineato, Non trovato, Ambiguo o Conflitto; mai sovrascritture silenziose su nome/CF/matricola.",
+      "Tabella anteprima con filtri per esito e diff campo-per-campo (vecchio → nuovo), evidenziando in rosso le modifiche che richiedono revisione (campi anagrafici) in grigio quelle sicure (campi federali stagionali vuoti o solo stagione corrente).",
+      "7 nuovi campi su players (figc_season, figc_discipline, figc_registered_at, figc_expiry_year, figc_registration_type_code, figc_registration_type_label, figc_club_id) + 3 tabelle di supporto per audit degli import (figc_imports, figc_import_rows, figc_import_audit).",
+      "Parser PDF e UI caricati on-demand solo quando apri la pagina (lazy chunk ~360KB + worker 1.4MB): bundle principale non appesantito per gli altri utenti.",
+    ],
+    notes: [
+      "Questa release espone SOLO il dry-run: nessuna scrittura sui giocatori. L'applicazione effettiva (bottone 'Applica' con RPC transazionale + audit immutabile) arriva nel prossimo rilascio dopo verifica dell'anteprima sul tabulato reale.",
+      "Fase 2 (creazione assistita dei NOT_FOUND) verrà implementata dopo validazione del flusso di update.",
+    ],
+  },
+  {
     version: '1.9.145',
     date: '2026-10-09',
     title: 'Push notification: auto-detect rotazione VAPID keypair',

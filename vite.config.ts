@@ -117,6 +117,11 @@ export default defineConfig({
           if (id.includes('/pdf-lib') || id.includes('/html2canvas') || id.includes('/jspdf')) {
             return 'vendor-pdf-canvas'
           }
+          // pdfjs-dist: usato solo nell'import FIGC (M23). ~500KB, chunk a sé
+          // caricato lazy insieme a ImportFigc.
+          if (id.includes('/pdfjs-dist/')) {
+            return 'vendor-pdfjs'
+          }
           // Date/i18n libs
           if (id.includes('/date-fns') || id.includes('/dayjs') || id.includes('/luxon')) {
             return 'vendor-date'

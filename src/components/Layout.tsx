@@ -41,6 +41,8 @@ const MODULI_TAB: NavTab = { to: '/moduli', label: 'Moduli e documenti', labelSh
 const INVENTARIO_TAB: NavTab = { to: '/inventario', label: 'Inventario materiale', labelShort: 'Inventario', icon: 'inventory_2', accent: '#4a7c59' }
 // M22 — Scadenziario incombenze dai comunicati LND, admin-only
 const INCOMBENZE_TAB: NavTab = { to: '/incombenze', label: 'Scadenziario', labelShort: 'Scadenze', icon: 'assignment_late', accent: '#b3005c' }
+// M23 — Import tesserati FIGC da PDF, admin-only
+const IMPORT_FIGC_TAB: NavTab = { to: '/import-figc', label: 'Import tesserati FIGC', labelShort: 'FIGC', icon: 'upload_file', accent: '#7a003e' }
 // Referti: pagina centralizzata di tutti i post-match report delle squadre a carico.
 // Accento rosa Lenci per il legame diretto con la squadra
 const REFERTI_TAB: NavTab = { to: '/referti', label: 'Referti partite', labelShort: 'Referti', icon: 'edit_note', accent: '#b3005c' }
@@ -76,6 +78,8 @@ export function Layout() {
   // M22 — Scadenziario incombenze: solo admin (i 4 responsabili Christian/
   // Palermo/Davide/Enzo sono tutti admin, chi legge/scrive sono gli admin).
   const canSeeIncombenze = isAdmin(profile?.role) && !isParentView
+  // M23 — Import FIGC: operazione sensibile sui tesseramenti → solo admin.
+  const canSeeImportFigc = isAdmin(profile?.role) && !isParentView
 
   // Coach senza squadra assegnata (né head, né manager): menu limitato
   // Solo per coach puri, non per admin che si sono già assegnati o hanno più responsabilità
@@ -112,6 +116,7 @@ export function Layout() {
         ...(isStaff ? [COMUNICATI_TAB] : []),
         ...(canSeeModuli ? [MODULI_TAB] : []),
         ...(canSeeInventario ? [INVENTARIO_TAB] : []),
+        ...(canSeeImportFigc ? [IMPORT_FIGC_TAB] : []),
         ...(isMarketing ? [MARKETING_TAB] : []),
         { to: '/profilo', label: 'Profilo', icon: 'person' },
       ]
