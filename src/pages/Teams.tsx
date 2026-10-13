@@ -189,6 +189,52 @@ export function Teams() {
         onClose={() => setSelected(null)}
         player={selected}
         canEdit={(isAdminView || isCoachView) && canWrite}
+        onUpdated={async () => {
+          // Bug fix 2026-10-13: dopo PlayerEditSheet.save (lanciato dalla scheda
+          // dettaglio) la rosa non veniva refetch e la scheda stessa continuava
+          // a mostrare il player prop stale → l'utente credeva che il salvataggio
+          // non fosse andato a buon fine (invece in DB era aggiornato grazie al
+          // silent-fail RLS fix). Qui:
+          //   1) refetch del singolo player appena salvato → aggiorna `selected`
+          //      così la scheda dettaglio mostra i dati freschi senza chiuderla
+          //   2) bump reloadTick → la rosa (dietro) rilegge e riflette le note/
+          //      visita medica aggiornate
+          if (selected) {
+            const { data } = await supabase
+              .from('players')
+              .select('id, team_id, first_name, last_name, birth_date, position, jersey_number, card_number, medical_expiry, fiscal_code, avatar_url, parent_name, parent_phone, parent_email, dominant_foot, secondary_positions, height_cm, weight_kg, shoe_size, sex')
+              .eq('id', selected.id)
+              .maybeSingle()
+            if (data) {
+              setSelected({
+                id: data.id,
+                firstName: data.first_name,
+                lastName: data.last_name,
+                birthDate: data.birth_date,
+                position: data.position,
+                category: selected.category,
+                previousClub: selected.previousClub,
+                parentName: data.parent_name,
+                parentPhone: data.parent_phone,
+                parentEmail: data.parent_email,
+                fiscalCode: data.fiscal_code,
+                jerseyNumber: data.jersey_number,
+                cardNumber: data.card_number,
+                medicalExpiry: data.medical_expiry,
+                teamId: data.team_id,
+                avatarUrl: data.avatar_url,
+                dominantFoot: data.dominant_foot,
+                secondaryPositions: data.secondary_positions,
+                heightCm: data.height_cm,
+                weightKg: data.weight_kg,
+                shoeSize: data.shoe_size,
+                sex: data.sex,
+                source: selected.source,
+              })
+            }
+          }
+          setRosterReloadTick(t => t + 1)
+        }}
       />
 
       {/* Sheet crea/modifica squadra (admin crea/modifica; dirigente solo modifica sua squadra) */}

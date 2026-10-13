@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.148',
+    date: '2026-10-13',
+    title: 'Fix critico scheda giocatore: dopo salva, dati freschi subito visibili',
+    fixes: [
+      "Modificando note o scadenza visita medica dalla scheda giocatore (Rosa → categoria → giocatore → Modifica → Salva), il salvataggio avveniva correttamente in database ma la scheda continuava a mostrare i vecchi dati e la rosa alle spalle non si aggiornava. Chi usciva e rientrava vedeva ancora i vecchi valori perché la rosa non veniva ricaricata, con il risultato che sembrava che il Salva non avesse funzionato. Ora dopo il salvataggio il giocatore viene subito riletto dal database con tutti i campi aggiornati e la rosa viene forzata a ricaricare: le modifiche compaiono immediatamente senza dover chiudere e riaprire.",
+    ],
+  },
+  {
     version: '1.9.147',
     date: '2026-10-09',
     title: 'Mobile: menu Profilo con collegamenti alle sezioni admin',
