@@ -264,18 +264,29 @@ export function CalendarPage() {
     if (!isStaff || event.kind !== 'training' || !event.teamId) return
     const trainingId = event.raw?.id
     if (!trainingId) return
-    if (!rosterMap[event.teamId]) {
+    // M24: eventi multi-squadra. La rosa da mostrare include i giocatori di
+    // TUTTE le squadre collegate tramite event_teams. Chiave di cache
+    // basata sul set di team per non collidere con la cache "singolo team".
+    const { data: etData } = await supabase.from('event_teams')
+      .select('team_id')
+      .eq('event_id', trainingId)
+      .eq('event_kind', 'training')
+    const teamIds = etData && etData.length > 0
+      ? etData.map(r => r.team_id)
+      : [event.teamId]
+    const rosterKey = teamIds.slice().sort().join(',')
+    if (!rosterMap[rosterKey]) {
       const { data } = await supabase.from('players')
         .select('id, first_name, last_name, position')
-        .eq('team_id', event.teamId).order('last_name')
-      setRosterMap(m => ({ ...m, [event.teamId!]: (data ?? []) as any }))
+        .in('team_id', teamIds).order('last_name')
+      setRosterMap(m => ({ ...m, [rosterKey]: (data ?? []) as any }))
     }
     setAttendanceEvent({
       id: trainingId,
       title: event.title || event.focus || 'Allenamento',
       date: event.date,
       time: event.startTime,
-      teamId: event.teamId,
+      teamId: rosterKey,  // riusa il campo come chiave della cache (anche single-team funziona)
     })
     setAttendanceOpen(true)
   }

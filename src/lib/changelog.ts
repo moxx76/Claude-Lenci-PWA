@@ -3,6 +3,20 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.150',
+    date: '2026-10-14',
+    title: 'Eventi multi-squadra: allenamenti e partite con annate miste',
+    features: [
+      "Quando crei un nuovo allenamento o una nuova partita puoi selezionare più squadre contemporaneamente (es. Pulcini 2016 + Pulcini 2017, Esordienti 2014 + 2015). I chip delle squadre nella finestra di creazione sono ora multi-selezionabili: la prima selezionata è la 'principale', le altre si aggiungono al volo.",
+      "L'evento misto compare automaticamente nel calendario di ciascuna squadra scelta, senza doverlo creare due volte. Modificando l'evento una sola volta, tutte le squadre vedono le modifiche.",
+      "Lista convocati e lista presenze dell'evento misto pescano dai giocatori di TUTTE le squadre selezionate, in un unico elenco: puoi convocare liberamente giocatori di una o dell'altra annata senza passare dal prestito.",
+      "Gli eventi esistenti continuano a funzionare come prima: nessuna conversione obbligatoria. Puoi convertire a 'misto' un allenamento o una partita aggiungendo le altre squadre dalla finestra di modifica.",
+    ],
+    notes: [
+      "Prossimo step quando serve: badge visivo 'misto' nelle card del calendario con l'elenco delle squadre coinvolte, e sincronizzazione dello staff dirigente delle squadre secondarie per convocazioni/distinte.",
+    ],
+  },
+  {
     version: '1.9.149',
     date: '2026-10-14',
     title: 'Fix critico scheda giocatore (parte 2): note e genitore collegato non si cancellano più',

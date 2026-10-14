@@ -48,7 +48,12 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
   const { showToast } = useToast()
   const isEditMode = !!existingEvent
   const [kind, setKind] = useState<EventKind>('training')
-  const [teamId, setTeamId] = useState<string>('')
+  // M24: eventi multi-squadra (annate miste). La prima id dell'array è la
+  // squadra "principale" che resta in trainings.team_id / matches.team_id
+  // per compatibilità con il resto del codice; le altre vengono scritte in
+  // event_teams come secondarie. L'evento appare nei calendari di TUTTE le
+  // squadre selezionate.
+  const [teamIds, setTeamIds] = useState<string[]>([])
   const [eventDate, setEventDate] = useState<string>('')
   const [startTime, setStartTime] = useState<string>('19:00')
   const [endTime, setEndTime] = useState<string>('20:30')
@@ -75,7 +80,23 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
     if (existingEvent) {
       // Modalità modifica: precompila
       setKind(existingEvent.kind)
-      setTeamId(existingEvent.team_id || defaultTeamId || teams[0]?.id || '')
+      const primaryTeam = existingEvent.team_id || defaultTeamId || teams[0]?.id || ''
+      setTeamIds(primaryTeam ? [primaryTeam] : [])
+      // Carica eventuali squadre secondarie da event_teams (eventi multi-squadra M24)
+      if (existingEvent.id) {
+        supabase.from('event_teams')
+          .select('team_id, is_primary')
+          .eq('event_id', existingEvent.id)
+          .eq('event_kind', existingEvent.kind)
+          .then(({ data }) => {
+            if (data && data.length > 1) {
+              // Riordina: primary first, poi le altre
+              const primary = data.find(r => r.is_primary)?.team_id
+              const others = data.filter(r => !r.is_primary).map(r => r.team_id)
+              setTeamIds(primary ? [primary, ...others] : data.map(r => r.team_id))
+            }
+          })
+      }
       if (existingEvent.kind === 'training') {
         setEventDate(existingEvent.training_date || '')
         setStartTime((existingEvent.start_time || '19:00').slice(0, 5))
@@ -103,7 +124,8 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
     } else {
       // Modalità creazione
       setKind('training')
-      setTeamId(defaultTeamId || teams[0]?.id || '')
+      const t = defaultTeamId || teams[0]?.id || ''
+      setTeamIds(t ? [t] : [])
       // A10: data di default = domani civile Italia (non UTC)
       const tomorrow = new Date(Date.now() + 86_400_000)
       setEventDate(dateIT(tomorrow))
@@ -130,7 +152,8 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
   }, [open, existingEvent?.id])
 
   const handleSave = async () => {
-    if (!teamId) { setError('Seleziona la squadra'); return }
+    if (teamIds.length === 0) { setError('Seleziona almeno una squadra'); return }
+    const teamId = teamIds[0]  // primary = prima selezionata, resta in trainings.team_id/matches.team_id
     if (!eventDate) { setError('La data è obbligatoria'); return }
     if (kind === 'match' && !opponent.trim()) { setError('L\'avversario è obbligatorio'); return }
     if (!isEditMode && repeatWeekly) {
@@ -173,18 +196,23 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
           program: program || null,
           notes: notes || null,
         }
+        let createdIds: string[] = []
         if (isEditMode && existingEvent!.kind === 'training') {
           const { error: err } = await supabase.from('trainings').update({ ...basePayload, training_date: eventDate }).eq('id', existingEvent!.id)
           if (err) throw err
+          createdIds = [existingEvent!.id]
         } else {
           const rows = dates.map(d => ({
             ...basePayload,
             training_date: d,
             recurrence_group_id: recurrenceGroupId,
           }))
-          const { error: err } = await supabase.from('trainings').insert(rows)
+          const { data: ins, error: err } = await supabase.from('trainings').insert(rows).select('id')
           if (err) throw err
+          createdIds = (ins || []).map(r => r.id)
         }
+        // M24: sincronizza event_teams per ogni evento appena scritto
+        await syncEventTeams(createdIds, 'training', teamIds)
       } else {
         // Match: costruisco data locale → ISO
         const buildIso = (dateStr: string): string => {
@@ -201,11 +229,13 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
           location_address: locationAddress.trim() || null,
           notes: notes || null,
         }
+        let createdIds: string[] = []
         if (isEditMode && existingEvent!.kind === 'match') {
           const { error: err } = await supabase.from('matches')
             .update({ ...basePayload, match_date: buildIso(eventDate) })
             .eq('id', existingEvent!.id)
           if (err) throw err
+          createdIds = [existingEvent!.id]
         } else {
           const rows = dates.map(d => ({
             ...basePayload,
@@ -213,9 +243,12 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
             status: 'scheduled',
             recurrence_group_id: recurrenceGroupId,
           }))
-          const { error: err } = await supabase.from('matches').insert(rows)
+          const { data: ins, error: err } = await supabase.from('matches').insert(rows).select('id')
           if (err) throw err
+          createdIds = (ins || []).map(r => r.id)
         }
+        // M24: sincronizza event_teams per ogni match appena scritto
+        await syncEventTeams(createdIds, 'match', teamIds)
       }
       onSaved?.()
       const count = dates.length
@@ -304,28 +337,58 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
           </div>
         )}
 
-        {/* Team select */}
-        <Field label="Squadra *">
+        {/* Team select: multi-selezionabile (annate miste, M24). La prima
+            squadra selezionata è la "principale" (riceve l'id in trainings/
+            matches, è il contesto di default per convocazioni/report). Le
+            altre fanno comparire l'evento nel loro calendario e permettono
+            di convocare i loro giocatori. */}
+        <Field label={teamIds.length > 1 ? `Squadre * (${teamIds.length} selezionate)` : 'Squadra *'}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {teams.map(t => {
-              const active = teamId === t.id
+              const idx = teamIds.indexOf(t.id)
+              const active = idx >= 0
+              const isPrimary = idx === 0
               return (
                 <button
                   key={t.id}
-                  onClick={() => setTeamId(t.id)}
+                  onClick={() => {
+                    setTeamIds(prev => {
+                      if (prev.includes(t.id)) {
+                        // Rimuovi — se era la primary (indice 0) e ne restano, la prossima diventa primary
+                        const next = prev.filter(id => id !== t.id)
+                        return next
+                      }
+                      // Aggiungi in coda (se era vuoto, diventa primary)
+                      return [...prev, t.id]
+                    })
+                  }}
                   style={{
                     padding: '8px 14px', borderRadius: 999,
                     border: active ? `2px solid ${t.color || '#005f98'}` : '1px solid #c0c7d2',
                     background: active ? (t.color || '#005f98') : '#fff',
                     color: active ? '#fff' : '#404751',
                     fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    position: 'relative',
                   }}
                 >
                   {t.name}
+                  {active && isPrimary && teamIds.length > 1 && (
+                    <span style={{
+                      marginLeft: 6, fontSize: 9, fontWeight: 800,
+                      background: 'rgba(255,255,255,0.3)', padding: '1px 5px',
+                      borderRadius: 4, textTransform: 'uppercase', letterSpacing: 0.3,
+                    }}>principale</span>
+                  )}
                 </button>
               )
             })}
           </div>
+          {teamIds.length > 1 && (
+            <div style={{ marginTop: 6, fontSize: 10.5, color: '#707882', lineHeight: 1.4 }}>
+              L'evento comparirà nel calendario di tutte le squadre selezionate.
+              Convocazioni e presenze pescheranno da tutti i giocatori delle squadre scelte.
+            </div>
+          )}
         </Field>
 
         {/* Date + times */}
@@ -653,8 +716,8 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
           onClose={() => setShowComposer(false)}
           trainingId={existingEvent.id}
           trainingDate={existingEvent.training_date}
-          teamName={teams.find(t => t.id === teamId)?.name}
-          teamAgeRange={teams.find(t => t.id === teamId)?.age_range || undefined}
+          teamName={teams.find(t => t.id === teamIds[0])?.name}
+          teamAgeRange={teams.find(t => t.id === teamIds[0])?.age_range || undefined}
           onSaved={() => {
             setShowComposer(false)
             onSaved?.()
@@ -663,6 +726,36 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
       )}
     </BottomSheet>
   )
+}
+
+/**
+ * M24: sincronizza la tabella event_teams per uno o più eventi appena
+ * scritti. Cancella le righe esistenti dell'evento, reinserisce con
+ * is_primary=true sulla prima id dell'array e false sulle altre.
+ * Best-effort: un errore qui non annulla il salvataggio dell'evento,
+ * perché trainings.team_id / matches.team_id (la squadra principale) è
+ * già scritto e l'evento resta visibile nel calendario della principale.
+ * In ritorno non c'è nulla da assertare: la UI si refresha dal parent.
+ */
+async function syncEventTeams(eventIds: string[], eventKind: 'training' | 'match', teamIds: string[]) {
+  if (eventIds.length === 0 || teamIds.length === 0) return
+  try {
+    // Cancella righe pregresse per questi eventi (idempotente anche in edit)
+    await supabase.from('event_teams').delete()
+      .in('event_id', eventIds)
+      .eq('event_kind', eventKind)
+    // Costruisce le righe: primary = teamIds[0]
+    const rows: Array<{ event_id: string; event_kind: string; team_id: string; is_primary: boolean }> = []
+    for (const eid of eventIds) {
+      teamIds.forEach((tid, idx) => {
+        rows.push({ event_id: eid, event_kind: eventKind, team_id: tid, is_primary: idx === 0 })
+      })
+    }
+    await supabase.from('event_teams').insert(rows)
+  } catch (e) {
+    // Non blocchiamo il save dell'evento: l'evento esiste già con la primary.
+    console.warn('syncEventTeams failed', e)
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

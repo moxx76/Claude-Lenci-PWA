@@ -71,13 +71,32 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
       const teamsMap = new Map<string, Team>((teamsData ?? []).map(t => [t.id, t as Team]))
       setTeams(sortTeamsByAge((teamsData ?? []) as Team[]))
 
+      // M24: se filtriamo per team, l'evento può essere agganciato a quel team
+      // anche come squadra SECONDARIA (eventi multi-squadra) tramite event_teams.
+      // Preleviamo gli id ammessi da event_teams e filtriamo per quelli invece
+      // che per team_id diretto. Grazie al backfill, questo include anche tutti
+      // gli eventi mono-squadra (hanno una riga event_teams primary).
+      let trainingIdsFilter: string[] | null = null
+      let matchIdsFilter: string[] | null = null
+      if (teamId) {
+        const { data: etData } = await supabase.from('event_teams')
+          .select('event_id, event_kind')
+          .eq('team_id', teamId)
+        if (etData) {
+          trainingIdsFilter = etData.filter(r => r.event_kind === 'training').map(r => r.event_id)
+          matchIdsFilter = etData.filter(r => r.event_kind === 'match').map(r => r.event_id)
+        }
+      }
+
       // 2. Trainings (+ conteggio esercizi composti per capire se c'è un programma composto)
       let trainingsQuery = supabase
         .from('trainings')
         .select('*, training_session_exercises(count)')
         .gte('training_date', from)
       if (to) trainingsQuery = trainingsQuery.lte('training_date', to)
-      if (teamId) trainingsQuery = trainingsQuery.eq('team_id', teamId)
+      if (trainingIdsFilter !== null) {
+        trainingsQuery = trainingsQuery.in('id', trainingIdsFilter.length > 0 ? trainingIdsFilter : ['00000000-0000-0000-0000-000000000000'])
+      }
       trainingsQuery = trainingsQuery.order('training_date').order('start_time').limit(limit)
 
       // 3. Matches
@@ -86,7 +105,9 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
         .select('*')
         .gte('match_date', `${from}T00:00:00`)
       if (to) matchesQuery = matchesQuery.lte('match_date', `${to}T23:59:59`)
-      if (teamId) matchesQuery = matchesQuery.eq('team_id', teamId)
+      if (matchIdsFilter !== null) {
+        matchesQuery = matchesQuery.in('id', matchIdsFilter.length > 0 ? matchIdsFilter : ['00000000-0000-0000-0000-000000000000'])
+      }
       matchesQuery = matchesQuery.order('match_date').limit(limit)
 
       // 4. Marketing pubblicati (RLS filtra già per audience)

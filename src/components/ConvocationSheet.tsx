@@ -100,11 +100,23 @@ export function ConvocationSheet({ open, onClose, match, onSaved, onOpenDistinta
   const load = async () => {
     if (!match) return
     setLoading(true)
+    // M24: eventi multi-squadra → la rosa da convocare include i giocatori
+    // di TUTTE le squadre collegate all'evento tramite event_teams, non
+    // solo quelli della squadra "principale" (match.team_id). Se l'evento è
+    // mono-squadra, event_teams contiene solo quella (grazie al backfill
+    // M24) e il comportamento è identico a prima.
+    const { data: etData } = await supabase.from('event_teams')
+      .select('team_id')
+      .eq('event_id', match.id)
+      .eq('event_kind', 'match')
+    const teamIds: string[] = etData && etData.length > 0
+      ? etData.map(r => r.team_id)
+      : [match.team_id] // fallback difensivo se event_teams non ha righe
     // Carica rosa, convocazioni esistenti, staff (coach + dirigente della squadra), risposte giocatori
     const [playersRes, convRes, teamRes, respRes] = await Promise.all([
       supabase.from('players')
         .select('id,first_name,last_name,birth_date,position,jersey_number,card_number,fiscal_code,medical_expiry')
-        .eq('team_id', match.team_id)
+        .in('team_id', teamIds)
         .order('jersey_number', { nullsFirst: false })
         .order('last_name'),
       supabase.from('convocations')
