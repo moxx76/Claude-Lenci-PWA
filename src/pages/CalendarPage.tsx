@@ -1310,6 +1310,29 @@ function EventCard({ event, showTeamTag, isPast, isStaff, attBreakdown, matchBre
             {event.teamName}
           </span>
         )}
+        {/* M24: badge "MISTO" + chip delle squadre secondarie */}
+        {event.extraTeams && event.extraTeams.length > 0 && (
+          <>
+            <span style={{
+              fontSize: 9, fontWeight: 800, color: '#6b1b7a',
+              background: '#f3e5f5', padding: '2px 7px', borderRadius: 999,
+              textTransform: 'uppercase', letterSpacing: 0.4,
+              border: '1px solid #e1bee7',
+            }} title="Evento condiviso tra più squadre (annate miste)">
+              + {event.extraTeams.length} MISTO
+            </span>
+            {event.extraTeams.map(t => (
+              <span key={t.id} style={{
+                fontSize: 10, fontWeight: 700, color: '#fff',
+                background: t.color || '#9c27b0',
+                padding: '2px 8px', borderRadius: 999,
+                opacity: 0.9,
+              }}>
+                {t.name}
+              </span>
+            ))}
+          </>
+        )}
       </div>
 
       <h3 style={{ fontSize: 14, fontWeight: 700, color: '#181c20', margin: '0 0 4px', paddingRight: editable ? 28 : 0, position: 'relative' }}>

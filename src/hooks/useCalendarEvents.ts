@@ -25,6 +25,10 @@ export interface CalendarEvent {
   notes: string | null
   marketingCategory: string | null
   raw: any
+  // M24: eventi multi-squadra (annate miste). extraTeams contiene le squadre
+  // SECONDARIE collegate all'evento tramite event_teams (la principale resta
+  // in teamName/teamId). Vuoto = evento mono-squadra, come storicamente.
+  extraTeams?: Array<{ id: string; name: string; color: string | null }>
 }
 
 interface Team {
@@ -157,6 +161,28 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
 
       const norm: CalendarEvent[] = []
 
+      // M24: carica event_teams per TUTTI gli id training+match caricati, in
+      // una sola query, così possiamo arricchire ogni card con l'elenco delle
+      // squadre secondarie (badge "misto" + chip delle altre squadre).
+      const trIdsAll = (trainingsRes.data ?? []).map((r: any) => r.id as string)
+      const mtIdsAll = (matchesRes.data ?? []).map((r: any) => r.id as string)
+      const extraTrainingTeams = new Map<string, Array<{ id: string; name: string; color: string | null }>>()
+      const extraMatchTeams = new Map<string, Array<{ id: string; name: string; color: string | null }>>()
+      if (trIdsAll.length > 0 || mtIdsAll.length > 0) {
+        const { data: etRows } = await supabase.from('event_teams')
+          .select('event_id, event_kind, team_id, is_primary')
+          .in('event_id', [...trIdsAll, ...mtIdsAll])
+        for (const row of (etRows ?? [])) {
+          if (row.is_primary) continue
+          const team = teamsMap.get(row.team_id)
+          if (!team) continue
+          const target = row.event_kind === 'training' ? extraTrainingTeams : extraMatchTeams
+          const arr = target.get(row.event_id) ?? []
+          arr.push({ id: team.id, name: team.name, color: team.color })
+          target.set(row.event_id, arr)
+        }
+      }
+
       for (const t of (trainingsRes.data ?? []) as any[]) {
         const team = t.team_id ? teamsMap.get(t.team_id) : null
         norm.push({
@@ -179,6 +205,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
           notes: t.notes,
           marketingCategory: null,
           raw: t,
+          extraTeams: extraTrainingTeams.get(t.id),
         })
       }
 
@@ -213,6 +240,7 @@ export function useCalendarEvents(options: UseCalendarEventsOptions = {}) {
           notes: m.notes,
           marketingCategory: null,
           raw: m,
+          extraTeams: extraMatchTeams.get(m.id),
         })
       }
 

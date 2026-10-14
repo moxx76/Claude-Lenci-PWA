@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.151',
+    date: '2026-10-14',
+    title: 'Eventi misti: badge e nomi squadre a colpo d\'occhio nel calendario',
+    features: [
+      "Sulle card del calendario, gli allenamenti e le partite con più squadre collegate ora mostrano un pill viola 'MISTO' con il numero di squadre aggiuntive e, accanto, un chip con il nome e il colore di ciascuna squadra secondaria. Si capisce subito a colpo d'occhio quando un allenamento è condiviso fra due annate, senza dover aprire il dettaglio.",
+    ],
+  },
+  {
     version: '1.9.150',
     date: '2026-10-14',
     title: 'Eventi multi-squadra: allenamenti e partite con annate miste',
