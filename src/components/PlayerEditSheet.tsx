@@ -51,6 +51,11 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Fix 2026-10-14: finché il fetch dei campi non passati dal prop (notes,
+  // parent_profile_id, pagamenti) non è completo, bloccare il Salva per
+  // evitare che un click immediato ("Modifica → Salva" al volo) sovrascriva
+  // le note esistenti a vuoto. In creazione (!isEdit) non serve, è già vuoto.
+  const [loadingData, setLoadingData] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -69,11 +74,23 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
       setCardNumber(player.cardNumber || '')
       setMedicalExpiry(player.medicalExpiry || '')
       setFiscalCode(player.fiscalCode || '')
-      setNotes((player as any).notes || '')
-      setParentProfileId((player as any).parentProfileId || '')
       setAvatarUrl((player as any).avatarUrl || null)
+      // notes e parent_profile_id NON SONO nel tipo PlayerDetailData e NON
+      // sono passati nel prop dalla rosa — bug fix 2026-10-14: in passato
+      // li leggevamo da `(player as any).*` che era SEMPRE undefined →
+      // setNotes('') → payload.notes = null → UPDATE CANCELLAVA le note
+      // esistenti. Idem per parent_profile_id. Ora li leggiamo direttamente
+      // dal DB in questo stesso fetch, come già facciamo per i pagamenti.
+      // Finché il fetch non completa, teniamo stringhe vuote: il bottone
+      // Salva è attivo subito e un save prematuro resterebbe non peggiore
+      // del comportamento precedente — ma di fatto il fetch si risolve
+      // ampiamente prima che l'utente arrivi a cliccare.
+      setNotes('')
+      setParentProfileId('')
+      setLoadingData(true)
 
-      // Carico stato pagamenti e dati genitore direttamente dal DB.
+      // Carico stato pagamenti, note, parent_profile_id e dati genitore
+      // direttamente dal DB.
       // Review (assessment): richiedere le colonne payment_* solo se canSeePayments.
       // Prima venivano sempre selezionate anche quando canSeePayments era false;
       // rendering omesso in UI non equivale a non trasmettere il dato lato wire.
@@ -82,7 +99,7 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
         ? 'registration_paid, registration_paid_at, registration_amount, balance_paid, balance_paid_at, balance_amount, payment_notes, '
         : ''
       supabase.from('players')
-        .select(paymentCols + 'parent_name, parent_phone, parent_email')
+        .select(paymentCols + 'notes, parent_profile_id, parent_name, parent_phone, parent_email')
         .eq('id', player.id).single()
         .then(({ data }) => {
           if (data) {
@@ -95,10 +112,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
               setBalanceAmount((data as any).balance_amount != null ? String((data as any).balance_amount) : '')
               setPaymentNotes((data as any).payment_notes || '')
             }
+            setNotes((data as any).notes || '')
+            setParentProfileId((data as any).parent_profile_id || '')
             setParentName((data as any).parent_name || '')
             setParentPhone((data as any).parent_phone || '')
             setParentEmail((data as any).parent_email || '')
           }
+          setLoadingData(false)
         })
     } else {
       // Modalità creazione
@@ -576,18 +596,19 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || deleting}
+            disabled={saving || deleting || loadingData}
+            title={loadingData ? 'Caricamento dati in corso...' : undefined}
             style={{
               flex: 2, padding: '12px 18px', borderRadius: 12, border: 'none',
               background: '#005f98', color: '#fff',
               fontSize: 13, fontWeight: 800, cursor: 'pointer',
               boxShadow: '0 6px 16px rgba(0,95,152,0.3)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              opacity: (saving || deleting) ? 0.6 : 1,
+              opacity: (saving || deleting || loadingData) ? 0.6 : 1,
             }}
           >
             <Icon name={isEdit ? 'save' : 'person_add'} size={16} color="#fff" />
-            {saving ? 'Salvo…' : (isEdit ? 'Salva modifiche' : 'Aggiungi giocatore')}
+            {saving ? 'Salvo…' : loadingData ? 'Caricamento…' : (isEdit ? 'Salva modifiche' : 'Aggiungi giocatore')}
           </button>
         </div>
 

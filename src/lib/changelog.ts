@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.149',
+    date: '2026-10-14',
+    title: 'Fix critico scheda giocatore (parte 2): note e genitore collegato non si cancellano più',
+    fixes: [
+      "Correzione del bug segnalato ancora dopo la 1.9.148: nome, cognome, maglia e visita medica si salvavano, ma le note libere e il genitore collegato continuavano a sparire ad ogni salvataggio. Causa: lo sheet di modifica leggeva questi due campi da un oggetto in memoria che non li conteneva, quindi li interpretava come vuoti e li inviava come NULL al database, cancellando il valore precedente ad ogni Save. Ora note e genitore collegato vengono riletti direttamente dal database all'apertura dello sheet, come già si faceva per i pagamenti. Il pulsante Salva è temporaneamente disabilitato (etichetta 'Caricamento…') nel breve istante fra apertura dello sheet e fine fetch per evitare qualsiasi race condition su un click immediato.",
+    ],
+  },
+  {
     version: '1.9.148',
     date: '2026-10-13',
     title: 'Fix critico scheda giocatore: dopo salva, dati freschi subito visibili',
