@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.152',
+    date: '2026-10-15',
+    title: 'Vista giornalisti: programma gare del weekend',
+    features: [
+      "Nella homepage della vista giornalisti compare in alto il pannello 'Programma gare — weekend' con tutte le partite di sabato e domenica di tutte le squadre della società: ora, categoria, home/away, avversario, campo e competizione. Il nome del campo è un link a Google Maps per aprire la navigazione.",
+      "Il range coperto è il weekend corrente/prossimo: dal lunedì al sabato mostra sabato+domenica appena successivi; se oggi è domenica, mostra solo oggi. Nascoste le partite già giocate.",
+    ],
+  },
+  {
     version: '1.9.151',
     date: '2026-10-14',
     title: 'Eventi misti: badge e nomi squadre a colpo d\'occhio nel calendario',

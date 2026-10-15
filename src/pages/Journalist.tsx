@@ -58,6 +58,20 @@ interface PlayerLite {
   position: string | null
 }
 
+interface UpcomingMatch {
+  id: string
+  team_id: string
+  team_name: string
+  team_category: string | null
+  team_color: string | null
+  match_date: string
+  opponent: string
+  venue: 'home' | 'away'
+  competition: string | null
+  location: string | null
+  location_address: string | null
+}
+
 export function JournalistPage() {
   const [summaries, setSummaries] = useState<TeamSummary[]>([])
   const [loadingSummaries, setLoadingSummaries] = useState(true)
@@ -65,6 +79,57 @@ export function JournalistPage() {
   const [matches, setMatches] = useState<MatchRow[]>([])
   const [loading, setLoading] = useState(false)
   const [openMatchId, setOpenMatchId] = useState<string | null>(null)
+  // v1.9.152: planning gare prossimi 7 giorni per i giornalisti
+  const [upcoming, setUpcoming] = useState<UpcomingMatch[]>([])
+  const [loadingUpcoming, setLoadingUpcoming] = useState(true)
+
+  // Carica partite scheduled del WEEKEND prossimo (sabato + domenica).
+  // v1.9.152: solo sab/dom per vista giornalisti — il weekend è quando serve.
+  // Logica:
+  //  - oggi tra lun e sab (incluso) → sab prossimo + dom prossima
+  //  - oggi è domenica → solo oggi
+  //  - lower bound = NOW per nascondere partite già giocate nel weekend in corso
+  useEffect(() => {
+    (async () => {
+      setLoadingUpcoming(true)
+      const today = new Date()
+      const dow = today.getDay()  // 0=dom, 6=sab
+      let saturday: Date
+      let endExclusive: Date
+      if (dow === 0) {
+        // domenica: solo oggi
+        saturday = new Date(today); saturday.setHours(0, 0, 0, 0)
+        endExclusive = new Date(saturday); endExclusive.setDate(endExclusive.getDate() + 1)
+      } else {
+        const daysToSat = (6 - dow + 7) % 7  // 0..5 (lun→5, mar→4, ..., sab→0)
+        saturday = new Date(today); saturday.setDate(today.getDate() + daysToSat); saturday.setHours(0, 0, 0, 0)
+        endExclusive = new Date(saturday); endExclusive.setDate(saturday.getDate() + 2)
+      }
+      const fromDate = saturday < today ? today : saturday
+      const { data } = await supabase
+        .from('matches')
+        .select('id, team_id, match_date, opponent, venue, competition, location, location_address, team:teams(name, category, color)')
+        .eq('status', 'scheduled')
+        .gte('match_date', fromDate.toISOString())
+        .lt('match_date', endExclusive.toISOString())
+        .order('match_date', { ascending: true })
+      const rows: UpcomingMatch[] = ((data ?? []) as any[]).map(m => ({
+        id: m.id,
+        team_id: m.team_id,
+        team_name: m.team?.name ?? '—',
+        team_category: m.team?.category ?? null,
+        team_color: m.team?.color ?? null,
+        match_date: m.match_date,
+        opponent: m.opponent,
+        venue: m.venue,
+        competition: m.competition,
+        location: m.location,
+        location_address: m.location_address,
+      }))
+      setUpcoming(rows)
+      setLoadingUpcoming(false)
+    })()
+  }, [])
 
   // Homepage: carico tutte le squadre + calcolo n. partite pubblicate + ultima
   useEffect(() => {
@@ -283,6 +348,9 @@ export function JournalistPage() {
             distinta e marcatori.
           </div>
         </div>
+
+        {/* v1.9.152: Programma gare prossimi 7 giorni (planning weekend + settimana) */}
+        <UpcomingPanel upcoming={upcoming} loading={loadingUpcoming} />
 
         {loadingSummaries ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#707882', fontSize: 13 }}>
@@ -1004,6 +1072,154 @@ function ScorerRow({ name, total, penalties, minutes, suffix, italic }: {
         {total > 1 ? `×${total}` : ''}
         {penalties ? ` (${penalties} rig.)` : ''}
       </span>
+    </div>
+  )
+}
+
+/**
+ * v1.9.152: Pannello programma gare prossimi 7 giorni per i giornalisti.
+ * Raggruppa per data (giorno settimana + data), mostra categoria/avversario/
+ * ora/campo. Tap sull'indirizzo apre Google Maps.
+ */
+function UpcomingPanel({ upcoming, loading }: { upcoming: UpcomingMatch[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div style={{ padding: '14px', background: '#f6f7fb', borderRadius: 12, marginBottom: 16, fontSize: 12, color: '#707882' }}>
+        Caricamento programma gare…
+      </div>
+    )
+  }
+  if (upcoming.length === 0) {
+    return (
+      <div style={{
+        padding: '14px', background: '#fff', borderRadius: 12, marginBottom: 16,
+        border: '1px dashed #d4dae3', fontSize: 12, color: '#707882', textAlign: 'center',
+      }}>
+        Nessuna partita in programma nel weekend.
+      </div>
+    )
+  }
+  // Raggruppa per data YYYY-MM-DD in fuso orario Europe/Rome
+  const groups = new Map<string, UpcomingMatch[]>()
+  for (const m of upcoming) {
+    const d = new Date(m.match_date)
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const arr = groups.get(key) ?? []
+    arr.push(m)
+    groups.set(key, arr)
+  }
+  const sortedDates = [...groups.keys()].sort()
+  const WEEKDAYS = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab']
+  const MONTHS = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic']
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #005f98 0%, #004a78 100%)',
+      borderRadius: 14, padding: '14px 14px 10px',
+      marginBottom: 18, color: '#fff',
+      boxShadow: '0 6px 20px rgba(0,95,152,0.25)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <Icon name="event" size={18} color="#fff" />
+        <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.3 }}>
+          Programma gare — weekend
+        </div>
+        <span style={{
+          marginLeft: 'auto', fontSize: 10, fontWeight: 800,
+          background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: 999,
+        }}>
+          {upcoming.length} {upcoming.length === 1 ? 'gara' : 'gare'}
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {sortedDates.map(dateKey => {
+          const [yy, mm, dd] = dateKey.split('-').map(Number)
+          const dateObj = new Date(yy, mm - 1, dd)
+          const dayLabel = WEEKDAYS[dateObj.getDay()]
+          const monthLabel = MONTHS[dateObj.getMonth()]
+          const matches = groups.get(dateKey) ?? []
+          return (
+            <div key={dateKey}>
+              <div style={{
+                fontSize: 10, fontWeight: 800, textTransform: 'uppercase',
+                letterSpacing: 0.5, color: 'rgba(255,255,255,0.75)',
+                marginBottom: 4, paddingLeft: 2,
+              }}>
+                {dayLabel} {dd} {monthLabel}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {matches.map(m => {
+                  const d = new Date(m.match_date)
+                  const hh = String(d.getHours()).padStart(2, '0')
+                  const mn = String(d.getMinutes()).padStart(2, '0')
+                  const mapsUrl = m.location_address
+                    ? `https://maps.google.com/?q=${encodeURIComponent(m.location_address)}`
+                    : m.location
+                      ? `https://maps.google.com/?q=${encodeURIComponent(m.location)}`
+                      : null
+                  return (
+                    <div key={m.id} style={{
+                      background: 'rgba(255,255,255,0.96)',
+                      borderRadius: 10, padding: '10px 12px',
+                      display: 'grid',
+                      gridTemplateColumns: '58px 1fr',
+                      gap: 10, color: '#181c20',
+                      borderLeft: `4px solid ${m.team_color || '#005f98'}`,
+                    }}>
+                      <div style={{
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        background: '#f6f7fb', borderRadius: 8, padding: '6px 0',
+                      }}>
+                        <div style={{ fontFamily: 'Anybody', fontWeight: 800, fontSize: 15, color: '#005f98' }}>
+                          {hh}:{mn}
+                        </div>
+                        <div style={{
+                          fontSize: 9, fontWeight: 800, color: m.venue === 'home' ? '#1b5e20' : '#7c4700',
+                          textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2,
+                        }}>
+                          {m.venue === 'home' ? '🏠 CASA' : '✈ FUORI'}
+                        </div>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 10, fontWeight: 700, color: '#fff',
+                          background: m.team_color || '#005f98',
+                          display: 'inline-block', padding: '2px 7px',
+                          borderRadius: 999, marginBottom: 3,
+                        }}>
+                          {m.team_name}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.25 }}>
+                          {m.venue === 'home' ? 'vs ' : '@ '}{m.opponent}
+                        </div>
+                        {m.competition && (
+                          <div style={{ fontSize: 10.5, color: '#707882', marginTop: 2, lineHeight: 1.3 }}>
+                            {m.competition}
+                          </div>
+                        )}
+                        {m.location && (
+                          <div style={{ fontSize: 11, color: '#4b5563', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Icon name="place" size={12} color="#005f98" />
+                            {mapsUrl ? (
+                              <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ color: '#005f98', textDecoration: 'underline' }}>
+                                {m.location}{m.location_address ? ` — ${m.location_address}` : ''}
+                              </a>
+                            ) : (
+                              <span>{m.location}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
