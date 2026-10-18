@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.154',
+    date: '2026-10-18',
+    title: 'Report post-gara: i gol subiti aggiornano automaticamente il risultato',
+    fixes: [
+      "Nel report post-gara, i minuti dei gol subiti aggiunti nel campo 'Minuti gol subiti' ora aggiornano automaticamente il punteggio avversario. Prima succedeva solo per i nostri gol (dalla somma marcatori); i gol subiti restavano fermi a 0 anche inserendo tutti i minuti, costringendo a modificare manualmente il numero. Il comportamento è ora simmetrico: aggiungi un minuto → +1 ai loro, togli un minuto → -1. Modifica manuale del numero disattiva l'auto-sync e lo rispetta.",
+    ],
+  },
+  {
     version: '1.9.153',
     date: '2026-10-18',
     title: 'Report post-gara: supporto rigori per gare pareggiate',

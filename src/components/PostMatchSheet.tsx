@@ -133,6 +133,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   // Auto-sincronizzazione punteggio "nostro" dalla somma dei marcatori.
   // Si disattiva quando l'utente modifica manualmente ourScore; si riattiva col bottone "usa somma".
   const [autoScore, setAutoScore] = useState(true)
+  // Fix 2026-10-18: pattern simmetrico a autoScore ma per gol subiti. Se attivo,
+  // theirScore segue il numero di minuti inseriti in opponent_goal_minutes.
+  // Prima: utente aggiungeva "35'" come gol subito ma theirScore restava 0 →
+  // il risultato finale non rifletteva il gol dell'avversario.
+  const [autoTheirScore, setAutoTheirScore] = useState(true)
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -206,6 +211,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
 
     // Carico autogol avversari + gol subiti + modulo effettivo + lineup_completed_at in query separata resiliente
     // (le colonne potrebbero non esistere se le migration v1.9.55/v1.9.59/v1.9.61/v1.9.64 non sono state applicate).
+    let loadedOpponentGoalMinutesCount = 0  // serve dopo per decidere l'autoTheirScore
     try {
       const { data: oogData } = await supabase.from('matches')
         .select('opponent_own_goals, opponent_own_goal_minutes, opponent_goal_minutes, effective_formation, formation_change_minute, lineup_completed_at')
@@ -215,6 +221,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
       setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
       setOpponentGoalMinutes(oogRow?.opponent_goal_minutes ?? [])
+      loadedOpponentGoalMinutesCount = (oogRow?.opponent_goal_minutes ?? []).length
       setEffectiveFormation(oogRow?.effective_formation ?? '')
       setFormationChangeMinute(oogRow?.formation_change_minute != null ? String(oogRow.formation_change_minute) : '')
       setLineupCompletedAt(oogRow?.lineup_completed_at ?? null)
@@ -283,10 +290,16 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     // Score
     // Il nostro score è home_score se giochiamo in casa, altrimenti away_score
     const isHome = match.venue === 'home'
+    const dbTheirScore = isHome ? (match.away_score ?? 0) : (match.home_score ?? 0)
     setOurScore(String(isHome ? (match.home_score ?? 0) : (match.away_score ?? 0)))
-    setTheirScore(String(isHome ? (match.away_score ?? 0) : (match.home_score ?? 0)))
+    setTheirScore(String(dbTheirScore))
     // Auto-sync attivo di default all'apertura (verrà disattivato al primo edit manuale)
     setAutoScore(true)
+    // Auto-sync gol subiti: attivo se il numero in DB corrisponde al numero di
+    // minuti già registrati — altrimenti l'utente aveva messo manualmente un
+    // numero diverso (es. 3 gol subiti ma solo 2 minuti ricordati) e vogliamo
+    // rispettarlo. Se non ci sono ancora minuti e theirScore è 0, resta auto.
+    setAutoTheirScore(dbTheirScore === loadedOpponentGoalMinutesCount)
     // M27: lotteria rigori — se almeno uno dei due shootout_* è valorizzato, la gara è finita ai rigori
     const sh = match.shootout_home_score
     const sa = match.shootout_away_score
@@ -524,6 +537,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   useEffect(() => {
     if (autoScore) setOurScore(String(totalGoals))
   }, [totalGoals, autoScore])
+  // Auto-sync gol subiti: se autoTheirScore attivo, theirScore segue il
+  // numero di minuti gol subiti inseriti (fix 2026-10-18).
+  useEffect(() => {
+    if (autoTheirScore) setTheirScore(String(opponentGoalMinutes.length))
+  }, [opponentGoalMinutes, autoTheirScore])
 
   const handleSave = async () => {
     if (!match) return
@@ -669,8 +687,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
             <span style={{ fontFamily: 'Anybody', fontSize: 22, fontWeight: 800, opacity: 0.6 }}>–</span>
             <input
               type="number" min={0} max={99} value={theirScore}
-              onChange={e => setTheirScore(e.target.value)}
+              onChange={e => { setTheirScore(e.target.value); setAutoTheirScore(false) }}
               style={scoreInputStyle}
+              title={autoTheirScore ? 'Sincronizzato automaticamente dal numero di minuti gol subiti' : 'Modificato manualmente'}
             />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, opacity: 0.85 }}>Loro</div>
