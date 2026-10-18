@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { BottomSheet } from './BottomSheet'
 import { Icon } from './Icon'
+import { formatMatchScore, matchOutcome } from '../lib/matchScore'
 
 interface Props {
   open: boolean
@@ -33,6 +34,10 @@ interface MatchRow {
   competition: string | null
   home_score: number | null
   away_score: number | null
+  // M27/M29: campi aggiuntivi per rigori e supplementari (necessari per esito e display corretto)
+  shootout_home_score?: number | null
+  shootout_away_score?: number | null
+  extra_time_minutes?: number | null
   status: string
   report_completed_at: string | null
   team_id: string
@@ -58,7 +63,7 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
         const nowIso = new Date().toISOString()
         let q = supabase
           .from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, status, report_completed_at, team_id, team:teams(name, color), match_player_stats(goals, penalties_scored, player:players(first_name, last_name))')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, status, report_completed_at, team_id, team:teams(name, color), match_player_stats(goals, penalties_scored, player:players(first_name, last_name))')
           .order('match_date', { ascending: false })
           .limit(200)
         if (teamId) q = q.eq('team_id', teamId)
@@ -69,6 +74,8 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
         const list = (data || []) as unknown as Array<{
           id: string; match_date: string; opponent: string; venue: 'home' | 'away';
           competition: string | null; home_score: number | null; away_score: number | null;
+          shootout_home_score?: number | null; shootout_away_score?: number | null;
+          extra_time_minutes?: number | null;
           status: string; report_completed_at: string | null; team_id: string;
           team?: { name: string; color: string | null } | { name: string; color: string | null }[] | null;
           match_player_stats?: Array<{
@@ -104,6 +111,9 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
               competition: m.competition,
               home_score: m.home_score,
               away_score: m.away_score,
+              shootout_home_score: m.shootout_home_score ?? null,
+              shootout_away_score: m.shootout_away_score ?? null,
+              extra_time_minutes: m.extra_time_minutes ?? null,
               status: m.status,
               report_completed_at: m.report_completed_at,
               team_id: m.team_id,
@@ -131,7 +141,10 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
   }
   const isPast = (iso: string) => new Date(iso) < new Date()
 
-  // Etichetta risultato + colore (dal punto di vista della NOSTRA squadra)
+  // Etichetta risultato + colore (dal punto di vista della NOSTRA squadra).
+  // M27/M29: considera rigori e tempi supplementari sia nel display che nel colore outcome.
+  // Esempio: 1-1 ai regolamentari, persa 4-5 ai rigori → "1-1 (4-5 d.c.r.)" in rosso (persa),
+  // NON più in viola (pareggio).
   const resultLabel = (m: MatchRow): { text: string; bg: string; color: string; isPreview?: boolean } | null => {
     // Se abbiamo marcatori registrati ma il report non è stato salvato ancora → mostro anticipazione
     const hasSavedScore = m.home_score != null && m.away_score != null
@@ -146,11 +159,18 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
       return null
     }
 
-    const ourScore = m.venue === 'home' ? m.home_score! : m.away_score!
-    const theirScore = m.venue === 'home' ? m.away_score! : m.home_score!
-    const label = `${ourScore}–${theirScore}`
-    if (ourScore > theirScore) return { text: label, bg: '#dcf1e2', color: '#006e25' }
-    if (ourScore < theirScore) return { text: label, bg: '#ffe4e4', color: '#93000a' }
+    const scoreInput = {
+      venue: m.venue,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+      shootoutHome: m.shootout_home_score ?? null,
+      shootoutAway: m.shootout_away_score ?? null,
+      extraTimeMinutes: m.extra_time_minutes ?? null,
+    }
+    const label = formatMatchScore(scoreInput)
+    const outcome = matchOutcome(scoreInput)
+    if (outcome === 'win')  return { text: label, bg: '#dcf1e2', color: '#006e25' }
+    if (outcome === 'loss') return { text: label, bg: '#ffe4e4', color: '#93000a' }
     return { text: label, bg: '#f0e6ff', color: '#5c2ba8' }
   }
 
@@ -198,11 +218,18 @@ export function TeamMatchHistorySheet({ open, onClose, teamId, teamName, onOpenR
           const visibleRows = resultFilter
             ? rows.filter(m => {
                 if (m.home_score == null || m.away_score == null) return false
-                const our = m.venue === 'home' ? m.home_score! : m.away_score!
-                const their = m.venue === 'home' ? m.away_score! : m.home_score!
-                if (resultFilter === 'won') return our > their
-                if (resultFilter === 'lost') return our < their
-                if (resultFilter === 'drawn') return our === their
+                // M27: usa matchOutcome che tiene conto dei rigori per decidere l'esito reale
+                const outcome = matchOutcome({
+                  venue: m.venue,
+                  homeScore: m.home_score,
+                  awayScore: m.away_score,
+                  shootoutHome: m.shootout_home_score ?? null,
+                  shootoutAway: m.shootout_away_score ?? null,
+                  extraTimeMinutes: m.extra_time_minutes ?? null,
+                })
+                if (resultFilter === 'won') return outcome === 'win'
+                if (resultFilter === 'lost') return outcome === 'loss'
+                if (resultFilter === 'drawn') return outcome === 'draw'
                 return true
               })
             : rows

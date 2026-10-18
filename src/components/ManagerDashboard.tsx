@@ -9,6 +9,7 @@ import { DistintaTatticaSheet, type DistintaTatticaData } from './DistintaTattic
 import { PitchView, type PitchPlayer } from './PitchView'
 import { MatchTimeline, type TimelineEvent } from './MatchTimeline'
 import { makeMatchDuration, type MatchDuration } from '../lib/matchDuration'
+import { formatMatchScore, matchOutcome } from '../lib/matchScore'
 import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { ProposeAnnouncementSheet } from './ProposeAnnouncementSheet'
 import { AttendanceSheet } from './AttendanceSheet'
@@ -42,6 +43,10 @@ interface MatchWithConv {
   status: string
   home_score: number | null
   away_score: number | null
+  // M27/M29: campi per esito corretto con rigori e supplementari
+  shootout_home_score?: number | null
+  shootout_away_score?: number | null
+  extra_time_minutes?: number | null
   convocated_count: number
   stats_count: number
   formation: string | null
@@ -144,12 +149,12 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
 
       const [upcomingRes, pastRes, rosterRes, annRes, trainRes, rosterFullRes, teamDurRes] = await Promise.all([
         supabase.from('matches')
-          .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
+          .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, formation, lineup_completed_at')
         .eq('team_id', teamId)
         .gte('match_date', today)
         .order('match_date').limit(20),
       supabase.from('matches')
-        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, formation, lineup_completed_at')
+        .select('id, opponent, match_date, venue, competition, location, location_address, kickoff_field, shirt_color_home, shirt_color_gk, meeting_time, status, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, formation, lineup_completed_at')
         .eq('team_id', teamId)
         .lt('match_date', today)
         .order('match_date', { ascending: false }).limit(10),
@@ -529,6 +534,10 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       team_color: currentTeam?.color,
       home_score: m.home_score,
       away_score: m.away_score,
+      // M27/M29: rigori e supplementari — necessari per riaprire correttamente il report
+      shootout_home_score: m.shootout_home_score ?? null,
+      shootout_away_score: m.shootout_away_score ?? null,
+      extra_time_minutes: m.extra_time_minutes ?? null,
       // Durata partita: la Timeline nel RecapExport si scala su questi valori
       // (fallback 2×45 dentro makeMatchDuration se qui sono null)
       team_match_periods_count: teamMatchDuration?.periodsCount ?? null,
@@ -1171,11 +1180,21 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor, matchDur
   const hasScore = match.home_score != null && match.away_score != null
   const hasLineup = match.lineup_completed_at && match.lineup_starters.length > 0
   const hasTimeline = match.timeline_events.length > 0 || match.timeline_yellow_count > 0
-  const ourScore = isHome ? match.home_score : match.away_score
-  const theirScore = isHome ? match.away_score : match.home_score
-  const resultColor = hasScore && ourScore! > theirScore! ? '#006e25'
-                    : hasScore && ourScore! < theirScore! ? '#93000a'
-                    : hasScore ? '#8e6300' : '#707882'
+  // M27/M29: usa helper centralizzati così esito + display tengono conto di rigori/supplementari.
+  // Prima la card mostrava "1-1" giallo (pareggio) anche per gare poi perse ai rigori.
+  const scoreInput = {
+    venue: match.venue,
+    homeScore: match.home_score,
+    awayScore: match.away_score,
+    shootoutHome: match.shootout_home_score ?? null,
+    shootoutAway: match.shootout_away_score ?? null,
+    extraTimeMinutes: match.extra_time_minutes ?? null,
+  }
+  const outcome = hasScore ? matchOutcome(scoreInput) : null
+  const resultColor = outcome === 'win' ? '#006e25'
+                    : outcome === 'loss' ? '#93000a'
+                    : outcome === 'draw' ? '#8e6300' : '#707882'
+  const scoreText = hasScore ? formatMatchScore(scoreInput) : ''
 
   return (
     <div style={{
@@ -1214,7 +1233,7 @@ function PastMatchRow({ match, onOpenDistinta, onOpenReport, teamColor, matchDur
             fontFamily: 'Anybody', fontWeight: 800, fontSize: 16,
             color: resultColor, minWidth: 44, textAlign: 'right',
           }}>
-            {ourScore}-{theirScore}
+            {scoreText}
           </div>
         ) : (
           <span style={{

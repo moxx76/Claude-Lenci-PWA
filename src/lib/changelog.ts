@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.157',
+    date: '2026-10-18',
+    title: 'Fix: card storico, dashboard allenatore, referti e scheda giocatore ora riconoscono rigori e supplementari',
+    fixes: [
+      "Lo storico partite della squadra mostrava 1-1 in viola (pareggio) anche per le gare poi perse (o vinte) ai calci di rigore. Ora la card mostra correttamente '1-1 (4-5 d.c.r.)' colorata di rosso quando la gara è persa ai rigori — e di verde quando vinta. Il filtro 'solo vinte/pareggiate/perse' tiene conto dell'esito reale, non solo dei regolamentari. Lo stesso fix è stato applicato alla dashboard allenatore (card compatte sotto il calendario) e alla pagina Referti.",
+      "Nella scheda giocatore, nella lista 'Partita per partita' il risultato della semifinale ora riporta anche il suffisso rigori/supplementari (prima mostrava solo i regolamentari).",
+    ],
+    notes: [
+      "Era un fix cruciale per il torneo pre-campionato U14: la semifinale persa ai rigori contro il Crocetta ora risulta correttamente nelle statistiche squadra. Formato esteso ovunque: '3-2' (regolamentare), '3-2 dts' (ai supplementari), '2-2 dts (5-4 d.c.r.)' (ai rigori dopo supplementari).",
+    ],
+  },
+  {
     version: '1.9.156',
     date: '2026-10-18',
     title: 'Report post-gara: tempi supplementari con gol oltre il 90′',

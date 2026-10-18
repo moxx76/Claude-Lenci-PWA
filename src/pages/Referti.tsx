@@ -21,6 +21,7 @@ import { useMyTeam } from '../hooks/useMyTeam'
 import { isAdmin } from '../lib/types'
 import { PostMatchSheet, type PostMatchData } from '../components/PostMatchSheet'
 import { Icon } from '../components/Icon'
+import { formatMatchScore, matchOutcome } from '../lib/matchScore'
 
 /**
  * Elenco squadre "visibili": per un admin sono TUTTE le squadre del club Lenci
@@ -51,6 +52,10 @@ interface RefertoRow {
   team_match_period_duration_min: number | null
   home_score: number | null
   away_score: number | null
+  // M27/M29: campi per esito corretto con rigori e supplementari
+  shootout_home_score: number | null
+  shootout_away_score: number | null
+  extra_time_minutes: number | null
   stats_count: number    // count(match_player_stats) per la partita
   conv_count: number     // count(convocations accepted) per la partita
   exclude_from_stats: boolean  // se true, la partita è esclusa dalle statistiche giocatori
@@ -110,7 +115,7 @@ export function Referti() {
         // Per coach: filtro .in('team_id', myTeamIds)
         let query = supabase
           .from('matches')
-          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, exclude_from_stats, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
+          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, exclude_from_stats, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
           .lt('match_date', new Date().toISOString())
           .order('match_date', { ascending: false })
           .limit(200)
@@ -157,6 +162,9 @@ export function Referti() {
             team_match_period_duration_min: t?.match_period_duration_min ?? null,
             home_score: m.home_score,
             away_score: m.away_score,
+            shootout_home_score: (m as any).shootout_home_score ?? null,
+            shootout_away_score: (m as any).shootout_away_score ?? null,
+            extra_time_minutes: (m as any).extra_time_minutes ?? null,
             stats_count: statsCounts[m.id] ?? 0,
             conv_count: convCounts[m.id] ?? 0,
             exclude_from_stats: !!m.exclude_from_stats,
@@ -245,6 +253,10 @@ export function Referti() {
       team_color: r.team_color,
       home_score: r.home_score,
       away_score: r.away_score,
+      // M27/M29: rigori + supplementari — necessari per riaprire correttamente il report
+      shootout_home_score: r.shootout_home_score,
+      shootout_away_score: r.shootout_away_score,
+      extra_time_minutes: r.extra_time_minutes,
       // Passo i campi durata così la Timeline nel recap si scala correttamente per la categoria
       team_match_periods_count: r.team_match_periods_count,
       team_match_period_duration_min: r.team_match_period_duration_min,
@@ -404,12 +416,20 @@ function RefertoCard({ row, onOpen, onToggleExclude }: {
   const colorBadge = isExcluded ? '#5c6773' : (isCompilato ? '#005520' : '#8e6300')
   const labelBadge = isExcluded ? '🚫 Esclusa da stats' : (isCompilato ? '✅ Compilato' : '⚠️ Da compilare')
 
-  // Risultato per Lenci: se casa, home_score è nostro; se trasferta, away_score è nostro
-  const ourScore = hasScore ? (row.venue === 'home' ? row.home_score : row.away_score) : null
-  const theirScore = hasScore ? (row.venue === 'home' ? row.away_score : row.home_score) : null
-  const esito = hasScore && ourScore != null && theirScore != null
-    ? (ourScore > theirScore ? 'W' : ourScore < theirScore ? 'L' : 'D')
-    : null
+  // M27/M29: helper centralizzati — l'esito e il display tengono conto di rigori/supplementari
+  const scoreInput = {
+    venue: row.venue,
+    homeScore: row.home_score,
+    awayScore: row.away_score,
+    shootoutHome: row.shootout_home_score ?? null,
+    shootoutAway: row.shootout_away_score ?? null,
+    extraTimeMinutes: row.extra_time_minutes ?? null,
+  }
+  const scoreText = hasScore ? formatMatchScore(scoreInput) : ''
+  const outcome = hasScore ? matchOutcome(scoreInput) : null
+  const esito: 'W' | 'L' | 'D' | null = outcome === 'win' ? 'W'
+                                       : outcome === 'loss' ? 'L'
+                                       : outcome === 'draw' ? 'D' : null
 
   // Il card diventa un <div> (non <button>) perché deve contenere DUE aree cliccabili
   // separate: il click principale che apre il referto, e il toggle escludi. Button-in-button
@@ -474,7 +494,7 @@ function RefertoCard({ row, onOpen, onToggleExclude }: {
                 fontSize: 22, fontWeight: 900, color: '#1a1a1a',
                 lineHeight: 1, fontVariantNumeric: 'tabular-nums',
               }}>
-                {ourScore}-{theirScore}
+                {scoreText}
               </div>
               {esito && (
                 <div style={{

@@ -7,6 +7,7 @@ import { useAuth } from '../store/auth'
 import { PlayerEditSheet } from './PlayerEditSheet'
 import { PlayerAssessmentSheet } from './PlayerAssessmentSheet'
 import { todayIT } from '../lib/dateIT'
+import { formatMatchScore } from '../lib/matchScore'
 
 export interface PlayerDetailData {
   id: string
@@ -66,6 +67,10 @@ interface PlayerMatchStatEntry {
   venue: 'home' | 'away' | null
   home_score: number | null
   away_score: number | null
+  // M27/M29: rigori + supplementari per display corretto nella scheda giocatore
+  shootout_home_score?: number | null
+  shootout_away_score?: number | null
+  extra_time_minutes?: number | null
   was_starter: boolean
   minute_in: number | null    // 0 = titolare, N = subentrato al min N, null = non giocato
   minute_out: number | null   // N = uscito al min N, null = fino alla fine (o non giocato)
@@ -151,7 +156,7 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
     setLoadingGoals(true)
     const { data } = await supabase
       .from('match_player_stats')
-      .select('goals, penalties_scored, assists, was_starter, minute_in, minute_out, match:matches!inner(id, match_date, opponent, venue, home_score, away_score, exclude_from_stats, team:teams(match_periods_count, match_period_duration_min))')
+      .select('goals, penalties_scored, assists, was_starter, minute_in, minute_out, match:matches!inner(id, match_date, opponent, venue, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, exclude_from_stats, team:teams(match_periods_count, match_period_duration_min))')
       .eq('player_id', player.id)
       .eq('match.exclude_from_stats', false)
     const rows: PlayerMatchStatEntry[] = (data ?? [])
@@ -194,6 +199,9 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
           venue: m.venue,
           home_score: m.home_score,
           away_score: m.away_score,
+          shootout_home_score: (m as any).shootout_home_score ?? null,
+          shootout_away_score: (m as any).shootout_away_score ?? null,
+          extra_time_minutes: (m as any).extra_time_minutes ?? null,
           was_starter: wasStarter,
           minute_in: mIn,
           minute_out: mOut,
@@ -402,12 +410,17 @@ export function PlayerDetailSheet({ open, onClose, player, canEdit = false, onUp
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {goals.map(g => {
                       const dateStr = formatDate(g.match_date)
-                      const scoreStr = (g.home_score != null && g.away_score != null)
-                        ? (g.venue === 'home'
-                            ? `${g.home_score}-${g.away_score}`
-                            : g.venue === 'away'
-                              ? `${g.away_score}-${g.home_score}`
-                              : `${g.home_score}-${g.away_score}`)
+                      // M27/M29: usa helper centralizzato così "1-1 (4-5 d.c.r.)" e "3-2 dts"
+                      // appaiono corretti anche nella lista partite della scheda giocatore
+                      const scoreStr = (g.home_score != null && g.away_score != null && g.venue)
+                        ? formatMatchScore({
+                            venue: g.venue,
+                            homeScore: g.home_score,
+                            awayScore: g.away_score,
+                            shootoutHome: g.shootout_home_score ?? null,
+                            shootoutAway: g.shootout_away_score ?? null,
+                            extraTimeMinutes: g.extra_time_minutes ?? null,
+                          })
                         : null
                       const netGoals = g.goals + g.penalties_scored
                       // Tag ruolo nella partita: TIT (titolare) / SUB (subentrato)
