@@ -130,6 +130,8 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [hadShootout, setHadShootout] = useState<boolean>(false)
   const [ourShootoutScore, setOurShootoutScore] = useState<string>('0')
   const [theirShootoutScore, setTheirShootoutScore] = useState<string>('0')
+  // M28: sequenza dei nostri tiri alla lotteria (chi ha calciato, in che ordine, segnato o sbagliato)
+  const [shootoutKicks, setShootoutKicks] = useState<Array<{ player_id: string | null; scored: boolean }>>([])
   // Auto-sincronizzazione punteggio "nostro" dalla somma dei marcatori.
   // Si disattiva quando l'utente modifica manualmente ourScore; si riattiva col bottone "usa somma".
   const [autoScore, setAutoScore] = useState(true)
@@ -307,6 +309,16 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setHadShootout(hasShootout)
     setOurShootoutScore(String(isHome ? (sh ?? 0) : (sa ?? 0)))
     setTheirShootoutScore(String(isHome ? (sa ?? 0) : (sh ?? 0)))
+    // M28: sequenza nostri tiri
+    try {
+      const { data: kicksData } = await supabase.from('match_shootout_kicks')
+        .select('player_id, scored, kick_order')
+        .eq('match_id', match.id)
+        .order('kick_order', { ascending: true })
+      setShootoutKicks((kicksData ?? []).map(k => ({ player_id: k.player_id, scored: !!k.scored })))
+    } catch {
+      setShootoutKicks([])
+    }
 
     // Check bozza in localStorage per questo match
     if (draftKey) {
@@ -603,6 +615,23 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         console.warn('[PostMatchSheet] opponent_own_goals/opponent_goal_minutes/captain_change_minute/effective_formation non salvati (migration mancante?)', err)
       }
 
+      // M28: sync sequenza rigori nostri (match_shootout_kicks).
+      // Delete-then-insert idempotente: se la lotteria non c'è stata, pulisce.
+      try {
+        await supabase.from('match_shootout_kicks').delete().eq('match_id', match.id)
+        if (hadShootout && shootoutKicks.length > 0) {
+          const kickRows = shootoutKicks.map((k, idx) => ({
+            match_id: match.id,
+            kick_order: idx + 1,
+            player_id: k.player_id,
+            scored: k.scored,
+          }))
+          await supabase.from('match_shootout_kicks').insert(kickRows)
+        }
+      } catch (err) {
+        console.warn('[PostMatchSheet] match_shootout_kicks non salvati (M28 non applicata?)', err)
+      }
+
       // 2. A03: match_player_stats sostituite atomicamente via RPC.
       // Prima erano delete + insert separati; se l'insert falliva, le stats
       // precedenti erano già perse (dato operatore). replace_match_player_stats
@@ -754,34 +783,128 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               <span style={{ fontWeight: 700 }}>Finita ai calci di rigore</span>
             </label>
             {hadShootout && (
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                gap: 8, marginTop: 8,
-              }}>
-                <span style={{ fontSize: 11, opacity: 0.85 }}>Rigori Noi</span>
-                <input
-                  type="number" min={0} max={30} value={ourShootoutScore}
-                  onChange={e => setOurShootoutScore(e.target.value)}
-                  style={{
-                    width: 52, textAlign: 'center',
-                    padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
-                    background: 'rgba(255,255,255,0.9)', color: '#181c20',
-                    fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
-                  }}
-                />
-                <span style={{ fontFamily: 'Anybody', fontSize: 16, opacity: 0.7 }}>–</span>
-                <input
-                  type="number" min={0} max={30} value={theirShootoutScore}
-                  onChange={e => setTheirShootoutScore(e.target.value)}
-                  style={{
-                    width: 52, textAlign: 'center',
-                    padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
-                    background: 'rgba(255,255,255,0.9)', color: '#181c20',
-                    fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
-                  }}
-                />
-                <span style={{ fontSize: 11, opacity: 0.85 }}>Loro</span>
-              </div>
+              <>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, marginTop: 8,
+                }}>
+                  <span style={{ fontSize: 11, opacity: 0.85 }}>Rigori Noi</span>
+                  <input
+                    type="number" min={0} max={30} value={ourShootoutScore}
+                    onChange={e => setOurShootoutScore(e.target.value)}
+                    style={{
+                      width: 52, textAlign: 'center',
+                      padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+                      background: 'rgba(255,255,255,0.9)', color: '#181c20',
+                      fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
+                    }}
+                  />
+                  <span style={{ fontFamily: 'Anybody', fontSize: 16, opacity: 0.7 }}>–</span>
+                  <input
+                    type="number" min={0} max={30} value={theirShootoutScore}
+                    onChange={e => setTheirShootoutScore(e.target.value)}
+                    style={{
+                      width: 52, textAlign: 'center',
+                      padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+                      background: 'rgba(255,255,255,0.9)', color: '#181c20',
+                      fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
+                    }}
+                  />
+                  <span style={{ fontSize: 11, opacity: 0.85 }}>Loro</span>
+                </div>
+
+                {/* M28: sequenza dei NOSTRI tiri alla lotteria */}
+                <div style={{
+                  marginTop: 10, padding: '8px 10px',
+                  background: 'rgba(0,0,0,0.15)', borderRadius: 8,
+                }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6, opacity: 0.9 }}>
+                    Sequenza nostri rigori
+                    {shootoutKicks.length > 0 && (
+                      <span style={{ marginLeft: 6, opacity: 0.75 }}>
+                        · {shootoutKicks.filter(k => k.scored).length} segnati / {shootoutKicks.length} tirati
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {shootoutKicks.map((k, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '4px 6px', borderRadius: 6,
+                        background: 'rgba(255,255,255,0.08)',
+                      }}>
+                        <span style={{
+                          minWidth: 22, textAlign: 'center',
+                          fontWeight: 800, fontSize: 12, opacity: 0.9,
+                        }}>{idx + 1}.</span>
+                        <select
+                          value={k.player_id ?? ''}
+                          onChange={e => {
+                            const v = e.target.value || null
+                            setShootoutKicks(prev => prev.map((it, i) => i === idx ? { ...it, player_id: v } : it))
+                          }}
+                          style={{
+                            flex: 1, minWidth: 0,
+                            padding: '4px 6px', borderRadius: 6,
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            background: 'rgba(255,255,255,0.95)', color: '#181c20',
+                            fontSize: 11.5, fontFamily: 'inherit',
+                          }}
+                        >
+                          <option value="">— tiratore —</option>
+                          {players.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.jersey_number != null ? `#${p.jersey_number} ` : ''}
+                              {p.last_name} {p.first_name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => setShootoutKicks(prev => prev.map((it, i) => i === idx ? { ...it, scored: true } : it))}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, border: 'none',
+                            background: k.scored ? '#2e7d32' : 'rgba(255,255,255,0.15)',
+                            color: k.scored ? '#fff' : 'rgba(255,255,255,0.75)',
+                            fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                          }}
+                          title="Segnato"
+                        >✓ GOL</button>
+                        <button
+                          onClick={() => setShootoutKicks(prev => prev.map((it, i) => i === idx ? { ...it, scored: false } : it))}
+                          style={{
+                            padding: '4px 10px', borderRadius: 6, border: 'none',
+                            background: !k.scored ? '#c62828' : 'rgba(255,255,255,0.15)',
+                            color: !k.scored ? '#fff' : 'rgba(255,255,255,0.75)',
+                            fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                          }}
+                          title="Sbagliato"
+                        >✗ ERR</button>
+                        <button
+                          onClick={() => setShootoutKicks(prev => prev.filter((_, i) => i !== idx))}
+                          style={{
+                            padding: '4px 6px', borderRadius: 6, border: 'none',
+                            background: 'transparent', color: 'rgba(255,255,255,0.6)',
+                            fontSize: 14, cursor: 'pointer',
+                          }}
+                          title="Rimuovi tiro"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShootoutKicks(prev => [...prev, { player_id: null, scored: true }])}
+                    style={{
+                      marginTop: 6, padding: '6px 10px', borderRadius: 6,
+                      border: '1px dashed rgba(255,255,255,0.5)',
+                      background: 'transparent', color: '#fff',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    <Icon name="add" size={14} color="#fff" /> Aggiungi tiro
+                  </button>
+                </div>
+              </>
             )}
           </div>
 

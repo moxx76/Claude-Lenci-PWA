@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.155',
+    date: '2026-10-18',
+    title: 'Report post-gara: sequenza dei nostri rigori ai calci di rigore',
+    features: [
+      "Quando la gara è stata decisa ai calci di rigore (toggle 'Finita ai calci di rigore'), nel report post-partita compare la sezione 'Sequenza nostri rigori'. Per ogni rigore battuto dai nostri si registra: numero d'ordine (1°, 2°, 3°…), tiratore scelto dall'elenco squadra con numero di maglia, esito ✓ GOL / ✗ ERR. Si aggiungono tiri con 'Aggiungi tiro' e si rimuovono con la X. Rimane il contatore sintetico '3 segnati / 5 tirati' nell'intestazione, utile a colpo d'occhio.",
+      "La sequenza viene salvata in modo idempotente: a ogni salvataggio del report la lista precedente viene sostituita integralmente, così si può correggere liberamente l'ordine o cambiare i tiratori senza duplicare righe. Alla riapertura del report la sequenza riappare esattamente come salvata.",
+    ],
+    notes: [
+      "Per ora si registrano SOLO i nostri rigori (chi ha tirato e se ha segnato) — i rigori avversari restano aggregati nel punteggio '5-3 d.c.r.'. Prossimi step quando serve: statistiche individuali rigori nella scheda giocatore e nel pannello della squadra.",
+    ],
+  },
+  {
     version: '1.9.154',
     date: '2026-10-18',
     title: 'Report post-gara: i gol subiti aggiornano automaticamente il risultato',
