@@ -25,6 +25,8 @@ export interface PostMatchData {
   away_score: number | null
   shootout_home_score?: number | null
   shootout_away_score?: number | null
+  /** M29: minuti totali di supplementari giocati (null/0 = non giocati). */
+  extra_time_minutes?: number | null
   team_match_periods_count?: number | null
   team_match_period_duration_min?: number | null
 }
@@ -132,6 +134,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [theirShootoutScore, setTheirShootoutScore] = useState<string>('0')
   // M28: sequenza dei nostri tiri alla lotteria (chi ha calciato, in che ordine, segnato o sbagliato)
   const [shootoutKicks, setShootoutKicks] = useState<Array<{ player_id: string | null; scored: boolean }>>([])
+  // M29: tempi supplementari (durata totale in minuti). hadExtraTime è il toggle UI;
+  // extraTimeMinutes memorizza i minuti scelti (default 30 = 2x15). Se hadExtraTime è false,
+  // il valore salvato in DB è null (= non giocati).
+  const [hadExtraTime, setHadExtraTime] = useState<boolean>(false)
+  const [extraTimeMinutes, setExtraTimeMinutes] = useState<string>('30')
   // Auto-sincronizzazione punteggio "nostro" dalla somma dei marcatori.
   // Si disattiva quando l'utente modifica manualmente ourScore; si riattiva col bottone "usa somma".
   const [autoScore, setAutoScore] = useState(true)
@@ -319,6 +326,11 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     } catch {
       setShootoutKicks([])
     }
+    // M29: tempi supplementari — hadExtraTime = true solo se extra_time_minutes > 0
+    const dbExtra = match.extra_time_minutes
+    const hasExtra = dbExtra != null && dbExtra > 0
+    setHadExtraTime(hasExtra)
+    setExtraTimeMinutes(hasExtra ? String(dbExtra) : '30')
 
     // Check bozza in localStorage per questo match
     if (draftKey) {
@@ -572,11 +584,18 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       const tShoot = parseInt(theirShootoutScore, 10) || 0
       const shootoutHome = hadShootout ? (isHome ? oShoot : tShoot) : null
       const shootoutAway = hadShootout ? (isHome ? tShoot : oShoot) : null
-      await supabase.from('matches').update({
+      // M29: tempi supplementari — null se toggle off, altrimenti il valore scelto (default 30)
+      const extraParsed = parseInt(extraTimeMinutes, 10)
+      const extraSafe = Number.isFinite(extraParsed) && extraParsed > 0 && extraParsed <= 60 ? extraParsed : 30
+      const extraTimeToSave = hadExtraTime ? extraSafe : null
+      // Tentativo primario con extra_time_minutes; se la colonna non esiste ancora (M29 non applicata),
+      // riproviamo senza quel campo. Pattern già usato per shootout_* in M27.
+      const basePayload: Record<string, any> = {
         home_score: isHome ? oScore : tScore,
         away_score: isHome ? tScore : oScore,
         shootout_home_score: shootoutHome,
         shootout_away_score: shootoutAway,
+        extra_time_minutes: extraTimeToSave,
         status: 'completed',
         formation: formation.trim() || null,
         report_positive: reportPositive.trim() || null,
@@ -587,7 +606,19 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         published_for_journalists: publishedForJournalists,
         report_completed_at: hasReport ? new Date().toISOString() : null,
         report_completed_by: hasReport ? uid : null,
-      }).eq('id', match.id)
+      }
+      let mainUpdErr: any = null
+      {
+        const { error } = await supabase.from('matches').update(basePayload).eq('id', match.id)
+        mainUpdErr = error
+      }
+      if (mainUpdErr && String(mainUpdErr.message || '').toLowerCase().includes('extra_time_minutes')) {
+        // Retrocompat: colonna non ancora presente, retry senza il campo
+        const { extra_time_minutes: _omit, ...fallback } = basePayload
+        void _omit
+        await supabase.from('matches').update(fallback).eq('id', match.id)
+        console.warn('[PostMatchSheet] M29 non ancora applicata, salvato senza extra_time_minutes')
+      }
 
       // 1b. Autogol avversari a favore Lenci + captain_change_minute: UPDATE separato in try/catch
       // (colonne aggiunte con le migration v1.9.55 / v1.9.58: se il DB non le ha ancora
@@ -763,6 +794,67 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                   </button>
                 )}
               </>
+            )}
+          </div>
+
+          {/* M29: Tempi supplementari — toggle + durata totale in minuti.
+              Posizionato PRIMA del toggle rigori perché l'ordine cronologico della gara è:
+              90' regolamentari → eventuali supplementari → eventuali rigori.
+              Attivando il toggle, i gol possono essere registrati con minuti > 90. */}
+          <div style={{
+            marginTop: 10, padding: '8px 10px',
+            background: 'rgba(255,255,255,0.1)', borderRadius: 10,
+            fontSize: 11.5,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={hadExtraTime}
+                onChange={e => setHadExtraTime(e.target.checked)}
+                style={{ accentColor: '#fff', transform: 'scale(1.1)' }}
+              />
+              <span style={{ fontWeight: 700 }}>Giocati tempi supplementari</span>
+            </label>
+            {hadExtraTime && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8, marginTop: 8, flexWrap: 'wrap',
+              }}>
+                <span style={{ fontSize: 11, opacity: 0.85 }}>Durata totale</span>
+                <input
+                  type="number" min={5} max={60} step={5}
+                  value={extraTimeMinutes}
+                  onChange={e => setExtraTimeMinutes(e.target.value)}
+                  style={{
+                    width: 64, textAlign: 'center',
+                    padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.9)', color: '#181c20',
+                    fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
+                  }}
+                />
+                <span style={{ fontSize: 11, opacity: 0.85 }}>min &nbsp;·&nbsp;</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[10, 20, 30].map(preset => (
+                    <button
+                      key={preset}
+                      onClick={() => setExtraTimeMinutes(String(preset))}
+                      style={{
+                        padding: '3px 8px', borderRadius: 999,
+                        border: '1px solid rgba(255,255,255,0.35)',
+                        background: String(preset) === extraTimeMinutes ? 'rgba(255,255,255,0.9)' : 'transparent',
+                        color: String(preset) === extraTimeMinutes ? '#181c20' : '#fff',
+                        fontSize: 10.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                      title={preset === 30 ? '2x15 standard FIGC' : preset === 20 ? '2x10 giovanili' : '2x5 pre-campionato'}
+                    >
+                      {preset === 30 ? '2×15' : preset === 20 ? '2×10' : '2×5'}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ width: '100%', fontSize: 10, opacity: 0.75, textAlign: 'center', marginTop: 2 }}>
+                  I gol possono ora essere registrati fino al {90 + (parseInt(extraTimeMinutes, 10) || 30)}′
+                </div>
+              </div>
             )}
           </div>
 

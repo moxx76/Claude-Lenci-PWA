@@ -15,6 +15,8 @@ export interface MatchScoreInput {
   awayScore: number | null | undefined
   shootoutHome?: number | null
   shootoutAway?: number | null
+  /** M29: minuti totali di tempi supplementari giocati (0/null = non giocati). */
+  extraTimeMinutes?: number | null
 }
 
 export function formatMatchScore(m: MatchScoreInput): string {
@@ -25,6 +27,8 @@ export function formatMatchScore(m: MatchScoreInput): string {
   const our = isHome ? h : a
   const their = isHome ? a : h
   let base = `${our}-${their}`
+  const hadExtra = m.extraTimeMinutes != null && m.extraTimeMinutes > 0
+  if (hadExtra) base += ' dts'
   if (m.shootoutHome != null || m.shootoutAway != null) {
     const sh = m.shootoutHome ?? 0
     const sa = m.shootoutAway ?? 0
@@ -44,9 +48,11 @@ export function formatMatchScoreNeutral(
   awayScore: number | null | undefined,
   shootoutHome?: number | null,
   shootoutAway?: number | null,
+  extraTimeMinutes?: number | null,
 ): string {
   if (homeScore == null || awayScore == null) return '—'
   let base = `${homeScore}-${awayScore}`
+  if (extraTimeMinutes != null && extraTimeMinutes > 0) base += ' dts'
   if (shootoutHome != null || shootoutAway != null) {
     base += ` (${shootoutHome ?? 0}-${shootoutAway ?? 0} d.c.r.)`
   }

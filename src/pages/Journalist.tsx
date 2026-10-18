@@ -139,7 +139,7 @@ export function JournalistPage() {
       const [teamsRes, matchesRes] = await Promise.all([
         supabase.from('teams').select('id, name, category, color').order('name'),
         supabase.from('matches')
-          .select('id, team_id, match_date, opponent, venue, home_score, away_score, shootout_home_score, shootout_away_score, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
+          .select('id, team_id, match_date, opponent, venue, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
           .eq('published_for_journalists', true)
           .not('home_score', 'is', null)
           .not('away_score', 'is', null)
@@ -230,6 +230,7 @@ export function JournalistPage() {
             awayScore: last.away_score,
             shootoutHome: (last as any).shootout_home_score ?? null,
             shootoutAway: (last as any).shootout_away_score ?? null,
+            extraTimeMinutes: (last as any).extra_time_minutes ?? null,
           })
           lastClass = matchOutcome({
             venue: last.venue,
@@ -237,6 +238,7 @@ export function JournalistPage() {
             awayScore: last.away_score,
             shootoutHome: (last as any).shootout_home_score ?? null,
             shootoutAway: (last as any).shootout_away_score ?? null,
+            extraTimeMinutes: (last as any).extra_time_minutes ?? null,
           }) as any
           lastScorers = scorersOf(last.match_player_stats || [], last.opponent_own_goal_minutes, last.opponent_own_goals)
         }
@@ -267,7 +269,7 @@ export function JournalistPage() {
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
-        .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, location, formation, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
+        .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, location, formation, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
         .eq('team_id', selectedTeamId)
         .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
@@ -557,6 +559,7 @@ export function JournalistPage() {
                     awayScore: m.away_score,
                     shootoutHome: (m as any).shootout_home_score ?? null,
                     shootoutAway: (m as any).shootout_away_score ?? null,
+                    extraTimeMinutes: (m as any).extra_time_minutes ?? null,
                   })}
                 </div>
                 <Icon name="chevron_right" size={16} color="#c0c7d2" />
@@ -626,7 +629,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     ;(async () => {
       const [mRes, cRes, sRes] = await Promise.all([
         supabase.from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, location, formation, team:teams(match_periods_count, match_period_duration_min)')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, location, formation, team:teams(match_periods_count, match_period_duration_min)')
           .eq('id', matchId).maybeSingle(),
         supabase.from('convocations')
           .select('player_id, is_captain, is_vice_captain, shirt_number_override')
@@ -789,6 +792,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   awayScore: match.away_score,
                   shootoutHome: (match as any).shootout_home_score ?? null,
                   shootoutAway: (match as any).shootout_away_score ?? null,
+                  extraTimeMinutes: (match as any).extra_time_minutes ?? null,
                 })}
               </span>
               {' '}

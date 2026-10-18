@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.156',
+    date: '2026-10-18',
+    title: 'Report post-gara: tempi supplementari con gol oltre il 90′',
+    features: [
+      "Aggiunto il toggle 'Giocati tempi supplementari' nel report post-gara, posizionato prima del toggle rigori (ordine cronologico della gara: 90′ → eventuali supplementari → eventuali rigori). Quando attivato compare un campo 'Durata totale' con default 30 minuti (2×15, standard FIGC) e tre preset rapidi: 2×15, 2×10, 2×5 — utili per i formati ridotti dei giovanili e dei tornei pre-campionato.",
+      "Con il toggle attivo, i minuti dei gol (sia dei nostri marcatori sia dei gol subiti) possono ora essere registrati oltre il 90′ fino al limite scelto (90+30=120′ per il formato standard). Prima il range tecnico ammetteva già fino al 130′, ma mancava la fase 'ufficiale' di gara nel modello dati.",
+      "Il risultato ora si mostra come '3-2 dts' quando c'è stato un supplementare, e '2-2 dts (5-4 d.c.r.)' quando è passato prima dai supplementari e poi dai rigori. Dove non ci sono né supplementari né rigori il formato resta identico a prima (es. '3-1').",
+    ],
+    notes: [
+      "Compatibile all'indietro: le partite esistenti senza supplementari non cambiano aspetto. La UI mostra il toggle anche sulle gare già completate, così si può correggere a posteriori un risultato precedente.",
+    ],
+  },
+  {
     version: '1.9.155',
     date: '2026-10-18',
     title: 'Report post-gara: sequenza dei nostri rigori ai calci di rigore',

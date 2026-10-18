@@ -941,7 +941,7 @@ export function CalendarPage() {
         onOpenReport={async (matchId) => {
           // Fetch match e apri PostMatchSheet
           const { data } = await supabase.from('matches')
-            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
+            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
             .eq('id', matchId).maybeSingle()
           if (data) {
             const teamObj = Array.isArray((data as any).team) ? (data as any).team[0] : (data as any).team
@@ -961,6 +961,8 @@ export function CalendarPage() {
               // M27: lotteria rigori
               shootout_home_score: (data as any).shootout_home_score ?? null,
               shootout_away_score: (data as any).shootout_away_score ?? null,
+              // M29: tempi supplementari
+              extra_time_minutes: (data as any).extra_time_minutes ?? null,
               // Durata partita: la Timeline live nel recap la usa per scalare la barra 0'-N'
               team_match_periods_count: teamObj?.match_periods_count ?? null,
               team_match_period_duration_min: teamObj?.match_period_duration_min ?? null,
