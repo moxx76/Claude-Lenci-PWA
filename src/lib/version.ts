@@ -7,8 +7,8 @@
  *  - MAJOR: breaking change o riscrittura importante
  */
 
-export const APP_VERSION = '1.9.152'
-export const APP_VERSION_DATE = '2026-10-15'
+export const APP_VERSION = '1.9.153'
+export const APP_VERSION_DATE = '2026-10-18'
 
 export interface Release {
   version: string

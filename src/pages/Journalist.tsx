@@ -6,6 +6,7 @@ import { buildTimelineEvents } from '../lib/timelineBuilder'
 import { makeMatchDuration } from '../lib/matchDuration'
 import { BottomSheet } from '../components/BottomSheet'
 import { Icon } from '../components/Icon'
+import { formatMatchScore, matchOutcome } from '../lib/matchScore'
 
 /**
  * Vista dedicata ai giornalisti locali che chiedono distinte e risultati partite.
@@ -138,7 +139,7 @@ export function JournalistPage() {
       const [teamsRes, matchesRes] = await Promise.all([
         supabase.from('teams').select('id, name, category, color').order('name'),
         supabase.from('matches')
-          .select('id, team_id, match_date, opponent, venue, home_score, away_score, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
+          .select('id, team_id, match_date, opponent, venue, home_score, away_score, shootout_home_score, shootout_away_score, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
           .eq('published_for_journalists', true)
           .not('home_score', 'is', null)
           .not('away_score', 'is', null)
@@ -222,10 +223,21 @@ export function JournalistPage() {
         let lastClass: TeamSummary['last_result_class'] = null
         let lastScorers: Scorer[] = []
         if (last) {
-          const our = last.venue === 'home' ? last.home_score : last.away_score
-          const their = last.venue === 'home' ? last.away_score : last.home_score
-          lastResult = last.venue === 'home' ? `${last.home_score}-${last.away_score}` : `${last.away_score}-${last.home_score}`
-          lastClass = our > their ? 'win' : our < their ? 'loss' : 'draw'
+          // M27: usa helper che include "(X-Y d.c.r.)" se la gara è finita ai rigori
+          lastResult = formatMatchScore({
+            venue: last.venue,
+            homeScore: last.home_score,
+            awayScore: last.away_score,
+            shootoutHome: (last as any).shootout_home_score ?? null,
+            shootoutAway: (last as any).shootout_away_score ?? null,
+          })
+          lastClass = matchOutcome({
+            venue: last.venue,
+            homeScore: last.home_score,
+            awayScore: last.away_score,
+            shootoutHome: (last as any).shootout_home_score ?? null,
+            shootoutAway: (last as any).shootout_away_score ?? null,
+          }) as any
           lastScorers = scorersOf(last.match_player_stats || [], last.opponent_own_goal_minutes, last.opponent_own_goals)
         }
         return {
@@ -255,7 +267,7 @@ export function JournalistPage() {
     setLoading(true)
     ;(async () => {
       const { data } = await supabase.from('matches')
-        .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
+        .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, location, formation, match_player_stats(goals, goal_minutes, penalties_scored, penalty_minutes, player:players_public(first_name, last_name))')
         .eq('team_id', selectedTeamId)
         .eq('published_for_journalists', true)
         .not('home_score', 'is', null)
@@ -539,7 +551,13 @@ export function JournalistPage() {
                   minWidth: 62, textAlign: 'center', padding: '8px 10px', borderRadius: 10,
                   background: resBg, color: resColor, fontSize: 16, fontWeight: 900,
                 }}>
-                  {m.venue === 'home' ? `${m.home_score}-${m.away_score}` : `${m.away_score}-${m.home_score}`}
+                  {formatMatchScore({
+                    venue: m.venue,
+                    homeScore: m.home_score,
+                    awayScore: m.away_score,
+                    shootoutHome: (m as any).shootout_home_score ?? null,
+                    shootoutAway: (m as any).shootout_away_score ?? null,
+                  })}
                 </div>
                 <Icon name="chevron_right" size={16} color="#c0c7d2" />
               </button>
@@ -608,7 +626,7 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     ;(async () => {
       const [mRes, cRes, sRes] = await Promise.all([
         supabase.from('matches')
-          .select('id, match_date, opponent, venue, competition, home_score, away_score, location, formation, team:teams(match_periods_count, match_period_duration_min)')
+          .select('id, match_date, opponent, venue, competition, home_score, away_score, shootout_home_score, shootout_away_score, location, formation, team:teams(match_periods_count, match_period_duration_min)')
           .eq('id', matchId).maybeSingle(),
         supabase.from('convocations')
           .select('player_id, is_captain, is_vice_captain, shirt_number_override')
@@ -764,7 +782,15 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
             <div style={{ fontSize: 22, fontWeight: 900 }}>
               {match.venue === 'home' ? 'Lenci Poirino' : match.opponent}
               {' '}
-              <span style={{ fontSize: 26 }}>{match.venue === 'home' ? `${match.home_score}-${match.away_score}` : `${match.away_score}-${match.home_score}`}</span>
+              <span style={{ fontSize: 26 }}>
+                {formatMatchScore({
+                  venue: match.venue,
+                  homeScore: match.home_score,
+                  awayScore: match.away_score,
+                  shootoutHome: (match as any).shootout_home_score ?? null,
+                  shootoutAway: (match as any).shootout_away_score ?? null,
+                })}
+              </span>
               {' '}
               {match.venue === 'home' ? match.opponent : 'Lenci Poirino'}
             </div>

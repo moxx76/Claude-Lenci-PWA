@@ -23,6 +23,8 @@ export interface PostMatchData {
   team_color: string | null
   home_score: number | null
   away_score: number | null
+  shootout_home_score?: number | null
+  shootout_away_score?: number | null
   team_match_periods_count?: number | null
   team_match_period_duration_min?: number | null
 }
@@ -124,6 +126,10 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [clubShortName, setClubShortName] = useState<string | null>(null)
   const [ourScore, setOurScore] = useState<string>('0')
   const [theirScore, setTheirScore] = useState<string>('0')
+  // M27: lotteria rigori per gare pareggiate di tornei/coppe (es. quarti/semifinali)
+  const [hadShootout, setHadShootout] = useState<boolean>(false)
+  const [ourShootoutScore, setOurShootoutScore] = useState<string>('0')
+  const [theirShootoutScore, setTheirShootoutScore] = useState<string>('0')
   // Auto-sincronizzazione punteggio "nostro" dalla somma dei marcatori.
   // Si disattiva quando l'utente modifica manualmente ourScore; si riattiva col bottone "usa somma".
   const [autoScore, setAutoScore] = useState(true)
@@ -281,6 +287,13 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     setTheirScore(String(isHome ? (match.away_score ?? 0) : (match.home_score ?? 0)))
     // Auto-sync attivo di default all'apertura (verrà disattivato al primo edit manuale)
     setAutoScore(true)
+    // M27: lotteria rigori — se almeno uno dei due shootout_* è valorizzato, la gara è finita ai rigori
+    const sh = match.shootout_home_score
+    const sa = match.shootout_away_score
+    const hasShootout = sh != null || sa != null
+    setHadShootout(hasShootout)
+    setOurShootoutScore(String(isHome ? (sh ?? 0) : (sa ?? 0)))
+    setTheirShootoutScore(String(isHome ? (sa ?? 0) : (sh ?? 0)))
 
     // Check bozza in localStorage per questo match
     if (draftKey) {
@@ -523,9 +536,17 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       const hasReport = [formation, reportPositive, reportNegative, reportGeneral, weather, refereeNotes].some(s => s && s.trim())
       const { data: authRes } = await supabase.auth.getUser()
       const uid = authRes?.user?.id ?? null
+      // M27: shootout — se è attivo il flag, mappa ourShootoutScore in home/away in base al venue.
+      // Se il flag è off, azzera entrambi a NULL (gara regolamentare).
+      const oShoot = parseInt(ourShootoutScore, 10) || 0
+      const tShoot = parseInt(theirShootoutScore, 10) || 0
+      const shootoutHome = hadShootout ? (isHome ? oShoot : tShoot) : null
+      const shootoutAway = hadShootout ? (isHome ? tShoot : oShoot) : null
       await supabase.from('matches').update({
         home_score: isHome ? oScore : tScore,
         away_score: isHome ? tScore : oScore,
+        shootout_home_score: shootoutHome,
+        shootout_away_score: shootoutAway,
         status: 'completed',
         formation: formation.trim() || null,
         report_positive: reportPositive.trim() || null,
@@ -694,6 +715,54 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                   </button>
                 )}
               </>
+            )}
+          </div>
+
+          {/* M27: Lotteria rigori (toccare dopo aver inserito il risultato dei tempi regolamentari).
+              Compare come toggle; se attivato, due input compattati per i rigori segnati. */}
+          <div style={{
+            marginTop: 10, padding: '8px 10px',
+            background: 'rgba(255,255,255,0.1)', borderRadius: 10,
+            fontSize: 11.5,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={hadShootout}
+                onChange={e => setHadShootout(e.target.checked)}
+                style={{ accentColor: '#fff', transform: 'scale(1.1)' }}
+              />
+              <span style={{ fontWeight: 700 }}>Finita ai calci di rigore</span>
+            </label>
+            {hadShootout && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8, marginTop: 8,
+              }}>
+                <span style={{ fontSize: 11, opacity: 0.85 }}>Rigori Noi</span>
+                <input
+                  type="number" min={0} max={30} value={ourShootoutScore}
+                  onChange={e => setOurShootoutScore(e.target.value)}
+                  style={{
+                    width: 52, textAlign: 'center',
+                    padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.9)', color: '#181c20',
+                    fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
+                  }}
+                />
+                <span style={{ fontFamily: 'Anybody', fontSize: 16, opacity: 0.7 }}>–</span>
+                <input
+                  type="number" min={0} max={30} value={theirShootoutScore}
+                  onChange={e => setTheirShootoutScore(e.target.value)}
+                  style={{
+                    width: 52, textAlign: 'center',
+                    padding: '4px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.9)', color: '#181c20',
+                    fontSize: 15, fontWeight: 700, fontFamily: 'Anybody',
+                  }}
+                />
+                <span style={{ fontSize: 11, opacity: 0.85 }}>Loro</span>
+              </div>
             )}
           </div>
 

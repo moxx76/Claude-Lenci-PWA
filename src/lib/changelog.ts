@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.153',
+    date: '2026-10-18',
+    title: 'Report post-gara: supporto rigori per gare pareggiate',
+    features: [
+      "Nel report post-partita è ora disponibile una casella 'Finita ai calci di rigore': se attivata, compaiono due input per registrare i rigori segnati da noi e da loro. Serve per quarti/semifinali di torneo o coppe dove il regolamento prevede rigori in caso di parità.",
+      "Il risultato ora si mostra come '1-1 (5-3 d.c.r.)' nella vista giornalisti e nelle liste risultati — regolamentare + rigori. Dove non ci sono rigori, il formato resta identico a prima (es. '3-1').",
+      "L'esito della gara (vinta/pareggiata/persa) sulle card tiene conto dei rigori: se abbiamo pareggiato i tempi regolamentari ma vinto ai rigori, la card è verde (vinta) perché conta la qualificazione.",
+    ],
+    notes: [
+      "La semifinale di oggi vs Crocetta può ora essere registrata correttamente dal report post-gara. Un rilascio successivo estenderà il formato '(X-Y d.c.r.)' anche alle schede giocatore, timeline storica e dashboard.",
+    ],
+  },
+  {
     version: '1.9.152',
     date: '2026-10-15',
     title: 'Vista giornalisti: programma gare del weekend',
