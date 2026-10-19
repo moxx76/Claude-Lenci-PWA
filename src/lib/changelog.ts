@@ -3,6 +3,20 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.160',
+    date: '2026-10-19',
+    title: 'Vista giornalista: sezioni dedicate ai supplementari e alla lotteria rigori',
+    features: [
+      "Nel dettaglio di una partita della vista giornalista compaiono ora due nuove sezioni quando applicabile:",
+      "'Tempi supplementari' (riquadro giallo) — appare se la gara è proseguita oltre il 90′ e indica i minuti totali giocati e che il risultato finale include eventuali gol segnati nei supplementari.",
+      "'Lotteria calci di rigore' — mostra il punteggio dei rigori dal nostro punto di vista, l'esito con colore (verde = qualificati, rosso = eliminati, grigio = parità) e la sequenza completa dei nostri tiratori con esito per ciascuno (✓ GOL / ✗ ERRORE).",
+      "I gol avversari segnati contro di noi (minuti del campo 'Gol subiti') continuano a comparire nella timeline grafica dei 90′ come puntini rossi, come prima.",
+    ],
+    notes: [
+      "I dati sono già salvati in DB; le sezioni compaiono automaticamente sulle partite esistenti dove la lotteria è stata registrata (semifinale U14 vs Crocetta inclusa) senza bisogno di risalvare nulla.",
+    ],
+  },
+  {
     version: '1.9.159',
     date: '2026-10-19',
     title: 'Recap WhatsApp e locandina post-partita: supplementari, rigori e gol avversari',

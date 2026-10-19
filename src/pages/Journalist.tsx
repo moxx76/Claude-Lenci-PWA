@@ -622,6 +622,9 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
   const [stats, setStats] = useState<Stats[]>([])
   const [players, setPlayers] = useState<Record<string, PlayerLite>>({})
   const [loading, setLoading] = useState(true)
+  // M28: sequenza dei nostri tiratori nella lotteria rigori (visibile nella vista giornalista
+  // quando la gara è finita ai rigori)
+  const [shootoutKicks, setShootoutKicks] = useState<Array<{ player_id: string | null; scored: boolean; kick_order: number }>>([])
 
   useEffect(() => {
     if (!matchId) return
@@ -662,6 +665,22 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
       setMatch(matchRow)
       setConvocs((cRes.data ?? []) as Convoc[])
       setStats((sRes.data ?? []) as Stats[])
+
+      // M28: fetch sequenza nostri rigori (resiliente: se la tabella non c'è ancora o
+      // la gara non è andata ai rigori, non è un errore)
+      try {
+        const { data: kicksData } = await supabase.from('match_shootout_kicks')
+          .select('player_id, scored, kick_order')
+          .eq('match_id', matchId)
+          .order('kick_order', { ascending: true })
+        setShootoutKicks((kicksData ?? []).map(k => ({
+          player_id: k.player_id,
+          scored: !!k.scored,
+          kick_order: k.kick_order,
+        })))
+      } catch {
+        setShootoutKicks([])
+      }
 
       // Carico i dati anagrafici NON sensibili dei giocatori coinvolti (vista limitata)
       const pIds = Array.from(new Set([
@@ -870,6 +889,79 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
               ))}
             </Section>
           )}
+
+          {/* M29: Tempi supplementari — mostra solo se giocati */}
+          {match && ((match as any).extra_time_minutes ?? null) != null && ((match as any).extra_time_minutes ?? 0) > 0 && (
+            <Section title="Tempi supplementari" icon="hourglass_bottom" empty="">
+              <div style={{
+                padding: '10px 12px',
+                background: '#fff5e6', border: '1px solid #ffd98f', borderRadius: 8,
+                fontSize: 13, color: '#5c3f00', fontWeight: 600,
+              }}>
+                Gara proseguita ai tempi supplementari ({(match as any).extra_time_minutes}′ totali).
+                {' '}Il risultato finale include eventuali gol segnati oltre il 90′.
+              </div>
+            </Section>
+          )}
+
+          {/* M27 + M28: Lotteria calci di rigore — punteggio + sequenza nostri tiratori */}
+          {match && (((match as any).shootout_home_score ?? null) != null || ((match as any).shootout_away_score ?? null) != null) && (() => {
+            const sh = (match as any).shootout_home_score ?? 0
+            const sa = (match as any).shootout_away_score ?? 0
+            const isHome = match.venue === 'home'
+            const ourShoot = isHome ? sh : sa
+            const theirShoot = isHome ? sa : sh
+            const outcome = ourShoot > theirShoot ? 'win' : ourShoot < theirShoot ? 'loss' : 'draw'
+            const outcomeColor = outcome === 'win' ? '#006e25' : outcome === 'loss' ? '#8e0000' : '#404751'
+            const outcomeLabel = outcome === 'win' ? 'Qualificati ai rigori' : outcome === 'loss' ? 'Eliminati ai rigori' : 'Parità ai rigori'
+            return (
+              <Section title="Lotteria calci di rigore" icon="sports_soccer" empty="">
+                <div style={{
+                  padding: '10px 12px', borderRadius: 8,
+                  background: outcome === 'win' ? '#dcf1e2' : outcome === 'loss' ? '#ffe4e4' : '#f1f3fa',
+                  border: `1px solid ${outcome === 'win' ? '#80c796' : outcome === 'loss' ? '#f0a0a0' : '#cfd4de'}`,
+                  marginBottom: shootoutKicks.length > 0 ? 8 : 0,
+                }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: outcomeColor, marginBottom: 2 }}>
+                    Lenci Poirino {ourShoot} – {theirShoot} {match.opponent}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: outcomeColor, fontWeight: 700 }}>
+                    {outcomeLabel}
+                  </div>
+                </div>
+                {shootoutKicks.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#404751', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                      Sequenza nostri tiratori
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {shootoutKicks.map(k => (
+                        <div key={k.kick_order} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '5px 8px', borderRadius: 6,
+                          background: k.scored ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)',
+                          border: `1px solid ${k.scored ? '#80c796' : '#f0a0a0'}`,
+                        }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#404751', minWidth: 22 }}>
+                            {k.kick_order}°
+                          </span>
+                          <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>
+                            {k.player_id ? nome(k.player_id) : <span style={{ color: '#8993a3', fontStyle: 'italic' }}>— tiratore non indicato</span>}
+                          </span>
+                          <span style={{
+                            fontSize: 11, fontWeight: 800,
+                            color: k.scored ? '#006e25' : '#8e0000',
+                          }}>
+                            {k.scored ? '✓ GOL' : '✗ ERRORE'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Section>
+            )
+          })()}
 
           {/* Distinta - Campo grafico */}
           {starters.length > 0 && match?.formation && (() => {
