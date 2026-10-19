@@ -84,6 +84,8 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
   // Durata partita configurata sulla squadra (es. U14 = 2×35). Usata per scalare la MatchTimeline
   // e per popolare i campi durata di PostMatchData quando si apre il post-partita.
   const [teamMatchDuration, setTeamMatchDuration] = useState<MatchDuration | undefined>(undefined)
+  // M30: durata default supplementari per la squadra (null = non impostato)
+  const [teamExtraTimeMinutes, setTeamExtraTimeMinutes] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [rosterCount, setRosterCount] = useState(0)
   const [rosterWithoutCard, setRosterWithoutCard] = useState(0)
@@ -176,18 +178,20 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
         .order('last_name'),
       // Durata partita configurata per la squadra (per la Timeline eventi 0'-N')
       supabase.from('teams')
-        .select('match_periods_count, match_period_duration_min')
+        .select('match_periods_count, match_period_duration_min, extra_time_minutes')
         .eq('id', teamId)
         .maybeSingle(),
     ])
 
     // Popolo la durata partita (fallback 2×45 se colonna mancante o query fallita)
-    const teamDurRow = (teamDurRes.data as { match_periods_count?: number | null; match_period_duration_min?: number | null } | null) ?? null
+    const teamDurRow = (teamDurRes.data as { match_periods_count?: number | null; match_period_duration_min?: number | null; extra_time_minutes?: number | null } | null) ?? null
     const currentTeamDuration = makeMatchDuration(
       teamDurRow?.match_periods_count ?? 2,
       teamDurRow?.match_period_duration_min ?? 45,
     )
     setTeamMatchDuration(currentTeamDuration)
+    // M30: default supplementari per la squadra
+    setTeamExtraTimeMinutes(teamDurRow?.extra_time_minutes ?? null)
 
     // Conteggi convocazioni + stats per ogni partita.
     // NB: Supabase in caso di errore ritorna {data:null, error:...} SENZA rejectare Promise.all,
@@ -542,6 +546,8 @@ export function ManagerDashboard({ firstName }: { firstName: string }) {
       // (fallback 2×45 dentro makeMatchDuration se qui sono null)
       team_match_periods_count: teamMatchDuration?.periodsCount ?? null,
       team_match_period_duration_min: teamMatchDuration?.periodDurationMin ?? null,
+      // M30: default supplementari pre-compilato nel report
+      team_extra_time_minutes: teamExtraTimeMinutes,
     })
   }
 

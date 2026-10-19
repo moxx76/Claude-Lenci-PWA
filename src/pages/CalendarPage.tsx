@@ -336,18 +336,19 @@ export function CalendarPage() {
   // Se la query fallisce, ritorna i due campi null → PostMatchSheet cadrà sul default 2×45=90'.
   // Serve perché PostMatchData.team_match_periods_count/team_match_period_duration_min sono opzionali
   // ma senza di essi la Timeline mostra sempre 90' anche per categorie con tempi diversi.
-  const fetchTeamDuration = async (teamId: string): Promise<{ periods: number | null; dur: number | null }> => {
+  const fetchTeamDuration = async (teamId: string): Promise<{ periods: number | null; dur: number | null; extraTime: number | null }> => {
     try {
       const { data } = await supabase.from('teams')
-        .select('match_periods_count, match_period_duration_min')
+        .select('match_periods_count, match_period_duration_min, extra_time_minutes')
         .eq('id', teamId)
         .maybeSingle()
       return {
         periods: (data as any)?.match_periods_count ?? null,
         dur: (data as any)?.match_period_duration_min ?? null,
+        extraTime: (data as any)?.extra_time_minutes ?? null,
       }
     } catch {
-      return { periods: null, dur: null }
+      return { periods: null, dur: null, extraTime: null }
     }
   }
 
@@ -369,6 +370,8 @@ export function CalendarPage() {
       away_score: event.raw.away_score ?? null,
       team_match_periods_count: teamDur.periods,
       team_match_period_duration_min: teamDur.dur,
+      // M30: default supplementari per questa squadra (pre-compila il campo nel report)
+      team_extra_time_minutes: teamDur.extraTime,
     })
     setPostMatchOpen(true)
   }
@@ -941,7 +944,7 @@ export function CalendarPage() {
         onOpenReport={async (matchId) => {
           // Fetch match e apri PostMatchSheet
           const { data } = await supabase.from('matches')
-            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
+            .select('id, opponent, match_date, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, team:teams(name, category, color, match_periods_count, match_period_duration_min, extra_time_minutes)')
             .eq('id', matchId).maybeSingle()
           if (data) {
             const teamObj = Array.isArray((data as any).team) ? (data as any).team[0] : (data as any).team
@@ -966,6 +969,8 @@ export function CalendarPage() {
               // Durata partita: la Timeline live nel recap la usa per scalare la barra 0'-N'
               team_match_periods_count: teamObj?.match_periods_count ?? null,
               team_match_period_duration_min: teamObj?.match_period_duration_min ?? null,
+              // M30: default supplementari della squadra
+              team_extra_time_minutes: teamObj?.extra_time_minutes ?? null,
             })
             setPostMatchOpen(true)
           }

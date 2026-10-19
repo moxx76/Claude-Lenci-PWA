@@ -3,6 +3,16 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.158',
+    date: '2026-10-19',
+    title: 'Durata dei tempi supplementari configurabile per squadra',
+    features: [
+      "Nel pannello Modifica squadra è stato aggiunto il campo opzionale 'Durata tempi supplementari'. Si imposta una volta sola per ogni squadra con tre preset rapidi (2×15, 2×10, 2×5) o un valore libero in minuti totali. Suggeriti dai regolamenti FIGC: U14 10′, U16/U17 20′, Juniores/Prima 30′.",
+      "Nel report post-gara, quando spunti 'Giocati tempi supplementari', il campo durata è ora pre-compilato automaticamente con il valore della squadra invece del fisso 30′. Resta modificabile per quella singola partita se il regolamento del torneo prevede qualcosa di diverso.",
+      "Se il campo squadra è lasciato vuoto, il report usa il default globale 30′ come prima (compatibile all'indietro).",
+    ],
+  },
+  {
     version: '1.9.157',
     date: '2026-10-18',
     title: 'Fix: card storico, dashboard allenatore, referti e scheda giocatore ora riconoscono rigori e supplementari',

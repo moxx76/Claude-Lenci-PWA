@@ -29,6 +29,8 @@ export interface PostMatchData {
   extra_time_minutes?: number | null
   team_match_periods_count?: number | null
   team_match_period_duration_min?: number | null
+  /** M30: durata default supplementari della squadra (minuti totali). Null = usa default globale 30'. */
+  team_extra_time_minutes?: number | null
 }
 
 interface Player {
@@ -327,10 +329,15 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       setShootoutKicks([])
     }
     // M29: tempi supplementari — hadExtraTime = true solo se extra_time_minutes > 0
+    // M30: default pre-compilato dalla squadra (es. U14 → 10'), fallback globale 30'
     const dbExtra = match.extra_time_minutes
     const hasExtra = dbExtra != null && dbExtra > 0
+    const teamDefaultExtra = match.team_extra_time_minutes
+    const defaultExtraStr = teamDefaultExtra != null && teamDefaultExtra > 0
+      ? String(teamDefaultExtra)
+      : '30'
     setHadExtraTime(hasExtra)
-    setExtraTimeMinutes(hasExtra ? String(dbExtra) : '30')
+    setExtraTimeMinutes(hasExtra ? String(dbExtra) : defaultExtraStr)
 
     // Check bozza in localStorage per questo match
     if (draftKey) {

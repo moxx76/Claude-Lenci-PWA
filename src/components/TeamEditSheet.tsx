@@ -31,6 +31,8 @@ interface ExistingTeam {
   public_presence_enabled?: boolean | null
   match_periods_count?: number | null
   match_period_duration_min?: number | null
+  /** M30: durata totale dei tempi supplementari (minuti) per questa squadra. NULL = default 30. */
+  extra_time_minutes?: number | null
 }
 
 interface Props {
@@ -70,6 +72,9 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
   // Durata partita: 2×45 default (retrocompatibile con vecchio hardcoded)
   const [periodsCount, setPeriodsCount] = useState<number>(2)
   const [periodDuration, setPeriodDuration] = useState<number>(45)
+  // M30: durata di default dei supplementari per questa squadra.
+  // '' = non impostato (verrà usato il default 30' nel report post-gara); altrimenti minuti totali.
+  const [extraTimeMinutes, setExtraTimeMinutes] = useState<string>('')
   const [coaches, setCoaches] = useState<Profile[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -108,6 +113,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setPublicPresence(!!existingTeam.public_presence_enabled)
       setPeriodsCount(existingTeam.match_periods_count ?? 2)
       setPeriodDuration(existingTeam.match_period_duration_min ?? 45)
+      setExtraTimeMinutes(existingTeam.extra_time_minutes != null ? String(existingTeam.extra_time_minutes) : '')
     } else {
       setName('')
       setCategory('U-13')
@@ -128,6 +134,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
       setPublicPresence(false)
       setPeriodsCount(2)
       setPeriodDuration(45)
+      setExtraTimeMinutes('')
     }
     setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,7 +146,7 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
     if (!open || !existingTeam?.id) return
     if (existingTeam.home_shirt_color != null && existingTeam.assistant_coach_id !== undefined) return
     supabase.from('teams')
-      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, match_periods_count, match_period_duration_min, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, third_manager_id, masseur_id')
+      .select('home_shirt_color, home_gk_shirt_color, away_shirt_color, away_gk_shirt_color, default_shirt_color, default_gk_shirt_color, public_presence_enabled, match_periods_count, match_period_duration_min, extra_time_minutes, head_coach_id, team_manager_id, assistant_coach_id, helper_coach_id, linesman_id, second_manager_id, third_manager_id, masseur_id')
       .eq('id', existingTeam.id)
       .single()
       .then(({ data }) => {
@@ -151,6 +158,8 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         setPublicPresence(!!data.public_presence_enabled)
         if ((data as any).match_periods_count != null) setPeriodsCount((data as any).match_periods_count)
         if ((data as any).match_period_duration_min != null) setPeriodDuration((data as any).match_period_duration_min)
+        // M30: pre-compila il default dei supplementari se già salvato
+        setExtraTimeMinutes((data as any).extra_time_minutes != null ? String((data as any).extra_time_minutes) : '')
         if (data.head_coach_id) setHeadCoachId(data.head_coach_id)
         if (data.team_manager_id) setTeamManagerId(data.team_manager_id)
         if (data.assistant_coach_id) setAssistantCoachId(data.assistant_coach_id)
@@ -218,6 +227,11 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
         public_presence_enabled: publicPresence,
         match_periods_count: periodsCount,
         match_period_duration_min: periodDuration,
+        // M30: durata default supplementari — null se vuoto, altrimenti il numero (0..60)
+        extra_time_minutes: (() => {
+          const v = parseInt(extraTimeMinutes, 10)
+          return extraTimeMinutes.trim() === '' || !Number.isFinite(v) ? null : Math.max(0, Math.min(60, v))
+        })(),
       }
       if (isEdit) {
         const { data, error: err } = await supabase.from('teams').update(payload).eq('id', existingTeam!.id).select('id')
@@ -543,6 +557,55 @@ export function TeamEditSheet({ open, onClose, clubId, existingTeam, canDelete =
             fontSize: 11.5, fontWeight: 700, color: '#005f98', textAlign: 'center',
           }}>
             Totale partita: <strong>{periodsCount} × {periodDuration}′ = {periodsCount * periodDuration} minuti</strong>
+          </div>
+
+          {/* M30: durata di default dei tempi supplementari — per quando una gara di torneo o
+              coppa prevede l'extra time in caso di parità. Si pre-compila nel report post-gara. */}
+          <div style={{
+            marginTop: 10, padding: '10px 12px',
+            background: '#fff5e6', border: '1px solid #ffd98f', borderRadius: 8,
+          }}>
+            <label style={{ fontSize: 10.5, fontWeight: 700, color: '#404751', display: 'block', marginBottom: 4 }}>
+              Durata tempi supplementari (opzionale)
+            </label>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="number" min={0} max={60} step={1}
+                value={extraTimeMinutes}
+                onChange={e => setExtraTimeMinutes(e.target.value)}
+                placeholder="es. 10"
+                style={{
+                  width: 90, padding: '8px 10px', border: '1px solid #cfd4de', borderRadius: 8,
+                  fontSize: 12.5, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+              <span style={{ fontSize: 11.5, color: '#707882' }}>min totali</span>
+              <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                {[
+                  { v: '10', label: '2×5' },
+                  { v: '20', label: '2×10' },
+                  { v: '30', label: '2×15' },
+                ].map(preset => (
+                  <button
+                    key={preset.v}
+                    type="button"
+                    onClick={() => setExtraTimeMinutes(preset.v)}
+                    style={{
+                      padding: '4px 8px', borderRadius: 999,
+                      border: '1px solid #c9a65c',
+                      background: extraTimeMinutes === preset.v ? '#8e6300' : 'transparent',
+                      color: extraTimeMinutes === preset.v ? '#fff' : '#8e6300',
+                      fontSize: 10.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ fontSize: 10.5, color: '#8e6300', marginTop: 6 }}>
+              Pre-compilato nel report post-gara quando spunti "Giocati tempi supplementari". Lascia vuoto per usare il default globale (30′). Suggeriti: U14 10′, U16/U17 20′, Juniores 30′.
+            </div>
           </div>
         </div>
 

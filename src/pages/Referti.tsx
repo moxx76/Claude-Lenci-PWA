@@ -50,6 +50,8 @@ interface RefertoRow {
   team_color: string | null
   team_match_periods_count: number | null
   team_match_period_duration_min: number | null
+  // M30: durata default supplementari della squadra
+  team_extra_time_minutes: number | null
   home_score: number | null
   away_score: number | null
   // M27/M29: campi per esito corretto con rigori e supplementari
@@ -115,7 +117,7 @@ export function Referti() {
         // Per coach: filtro .in('team_id', myTeamIds)
         let query = supabase
           .from('matches')
-          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, exclude_from_stats, team:teams(name, category, color, match_periods_count, match_period_duration_min)')
+          .select('id, match_date, opponent, venue, competition, team_id, home_score, away_score, shootout_home_score, shootout_away_score, extra_time_minutes, exclude_from_stats, team:teams(name, category, color, match_periods_count, match_period_duration_min, extra_time_minutes)')
           .lt('match_date', new Date().toISOString())
           .order('match_date', { ascending: false })
           .limit(200)
@@ -160,6 +162,8 @@ export function Referti() {
             team_color: t?.color || null,
             team_match_periods_count: t?.match_periods_count ?? null,
             team_match_period_duration_min: t?.match_period_duration_min ?? null,
+            // M30: default supplementari per la squadra
+            team_extra_time_minutes: (t as any)?.extra_time_minutes ?? null,
             home_score: m.home_score,
             away_score: m.away_score,
             shootout_home_score: (m as any).shootout_home_score ?? null,
@@ -259,6 +263,7 @@ export function Referti() {
       extra_time_minutes: r.extra_time_minutes,
       // Passo i campi durata così la Timeline nel recap si scala correttamente per la categoria
       team_match_periods_count: r.team_match_periods_count,
+      team_extra_time_minutes: r.team_extra_time_minutes,
       team_match_period_duration_min: r.team_match_period_duration_min,
     })
   }
