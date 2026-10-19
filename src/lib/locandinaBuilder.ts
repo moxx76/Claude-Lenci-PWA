@@ -55,6 +55,16 @@ export interface LocandinaData {
   opponentGoalMinutes: number[]
   /** Sostituzioni effettuate */
   sostituzioni: Sostituzione[]
+  /** M29: minuti totali di supplementari giocati (null/0 = non giocati) */
+  extraTimeMinutes?: number | null
+  /** M27: lotteria rigori — true se la gara è finita ai rigori */
+  hadShootout?: boolean
+  /** M27: nostri rigori segnati (dal punto di vista Lenci) */
+  ourShootoutScore?: number
+  /** M27: rigori avversari segnati */
+  theirShootoutScore?: number
+  /** M28: sequenza dei nostri tiratori + esito */
+  shootoutKicks?: Array<{ name: string; scored: boolean }>
 }
 
 /**
@@ -80,7 +90,15 @@ export async function buildLocandinaPngDataUrl(
   const cambiLines = data.sostituzioni.length > 0
     ? wrapEstimate(formatCambiString(data.sostituzioni), CANVAS_W - 80, 22)
     : 0
-  const footerH = Math.max(FOOTER_MIN_H, 80 + (marcatoriLines + cambiLines) * 28 + 60)
+  // M28: righe aggiuntive per la sintesi lotteria rigori (se presente)
+  const rigoriLines = (data.hadShootout && data.shootoutKicks && data.shootoutKicks.length > 0)
+    ? wrapEstimate(
+        data.shootoutKicks.map((k, i) => `${i + 1}. ${k.name} ${k.scored ? '✓' : '✗'}`).join('   '),
+        CANVAS_W - 80,
+        22,
+      ) + 1 /* header */
+    : 0
+  const footerH = Math.max(FOOTER_MIN_H, 80 + (marcatoriLines + cambiLines + rigoriLines) * 28 + 60)
 
   const CANVAS_H = HEADER_H + pitchHeight + footerH
 
@@ -219,14 +237,30 @@ function drawHeader(ctx: CanvasRenderingContext2D, w: number, h: number, data: L
 
   // Score al centro dentro un badge scuro
   const scoreText = `${homeScore} - ${awayScore}`
+  // M27/M29: badge con etichette aggiuntive sotto il punteggio quando c'è stato dts o lotteria rigori
+  const hadExtra = data.extraTimeMinutes != null && data.extraTimeMinutes > 0
+  const hadShootout = !!data.hadShootout
+  const subLabels: string[] = []
+  if (hadExtra) subLabels.push('d.t.s.')
+  if (hadShootout) {
+    const sh = isHome ? (data.ourShootoutScore ?? 0) : (data.theirShootoutScore ?? 0)
+    const sa = isHome ? (data.theirShootoutScore ?? 0) : (data.ourShootoutScore ?? 0)
+    subLabels.push(`${sh}-${sa} d.c.r.`)
+  }
+  const hasSub = subLabels.length > 0
+  const scoreBoxH = hasSub ? 108 : 82
   ctx.font = '900 54px "Anybody", system-ui, -apple-system, sans-serif'
   ctx.textAlign = 'center'
   ctx.fillStyle = 'rgba(0,0,0,0.4)'
-  const scoreW = 180
-  const scoreBoxH = 82
+  const scoreW = 200
   ctx.fillRect(w / 2 - scoreW / 2, centerY - scoreBoxH / 2, scoreW, scoreBoxH)
   ctx.fillStyle = '#fff'
-  ctx.fillText(scoreText, w / 2, centerY + 4)
+  ctx.fillText(scoreText, w / 2, centerY - (hasSub ? 10 : 0) + 4)
+  if (hasSub) {
+    ctx.font = '700 15px system-ui, -apple-system, sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'
+    ctx.fillText(subLabels.join('  ·  '), w / 2, centerY + scoreBoxH / 2 - 14)
+  }
 }
 
 /** Disegna il footer con marcatori, sostituzioni, modulo */
@@ -272,6 +306,25 @@ function drawFooter(
     ctx.font = '400 17px system-ui, sans-serif'
     const cambiStr = formatCambiString(data.sostituzioni)
     const lines = wrapText(ctx, cambiStr, w - padding * 2)
+    for (const l of lines) {
+      ctx.fillText(l, padding, y)
+      y += 26
+    }
+    y += 8
+  }
+
+  // M27 + M28: sintesi lotteria rigori (compare solo se c'è stata)
+  if (data.hadShootout && data.shootoutKicks && data.shootoutKicks.length > 0) {
+    ctx.fillStyle = '#8e0000'
+    ctx.font = '800 15px system-ui, sans-serif'
+    ctx.fillText('🥅 LOTTERIA RIGORI (noi)', padding, y)
+    y += 24
+    ctx.fillStyle = '#181c20'
+    ctx.font = '400 17px system-ui, sans-serif'
+    const kicksStr = data.shootoutKicks
+      .map((k, i) => `${i + 1}. ${k.name} ${k.scored ? '✓' : '✗'}`)
+      .join('   ')
+    const lines = wrapText(ctx, kicksStr, w - padding * 2)
     for (const l of lines) {
       ctx.fillText(l, padding, y)
       y += 26

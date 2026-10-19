@@ -3,6 +3,21 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.159',
+    date: '2026-10-19',
+    title: 'Recap WhatsApp e locandina post-partita: supplementari, rigori e gol avversari',
+    features: [
+      "Nel messaggio copiabile del recap post-partita (quello che si incolla su WhatsApp) il risultato ora mostra correttamente il suffisso ' dts' quando si sono giocati i tempi supplementari e '(X-Y d.c.r.)' quando si è andati ai rigori. Formato esteso: '1-1 dts (4-5 d.c.r.)' per una gara pareggiata ai regolamentari, bloccata ai supplementari e persa ai rigori.",
+      "Aggiunta la riga 'Giocati tempi supplementari (N′)' nel recap quando il toggle è attivo nel report.",
+      "Aggiunta la sintesi lotteria rigori: punteggio aggregato + sequenza dei NOSTRI tiratori con esito gol/errore (es. '1. Rossi — ✓ gol / 2. Bianchi — ✗ errore'). I rigori avversari restano aggregati nel punteggio.",
+      "I gol avversari segnati contro di noi (con minuto registrato nel campo 'Minuti gol subiti') compaiono ora nella timeline cronologica del recap con icona 🔴. Prima apparivano solo i nostri marcatori e gli autogol — ora anche i gol regolari degli avversari.",
+      "Lo stesso trattamento è stato applicato alla locandina PNG scaricabile: badge punteggio con etichetta 'd.t.s. · 5-4 d.c.r.' sotto lo score quando applicabile, più la sezione footer '🥅 Lotteria rigori (noi)' con la sequenza completa dei tiratori.",
+    ],
+    notes: [
+      "Compatibile all'indietro: le partite senza supplementari e senza rigori mostrano il recap identico a prima. Il blocco rigori nel footer della locandina compare solo se la lotteria è stata effettivamente registrata.",
+    ],
+  },
+  {
     version: '1.9.158',
     date: '2026-10-19',
     title: 'Durata dei tempi supplementari configurabile per squadra',

@@ -1682,6 +1682,14 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
               opponentGoalMinutes={opponentGoalMinutes}
               ourScore={parseInt(ourScore, 10) || 0}
               theirScore={parseInt(theirScore, 10) || 0}
+              // M29: supplementari — passa i minuti solo se il toggle è on, altrimenti null
+              extraTimeMinutes={hadExtraTime ? (parseInt(extraTimeMinutes, 10) || 0) : null}
+              // M27: lotteria rigori — toggle + punteggio dal punto di vista Lenci
+              hadShootout={hadShootout}
+              ourShootoutScore={parseInt(ourShootoutScore, 10) || 0}
+              theirShootoutScore={parseInt(theirShootoutScore, 10) || 0}
+              // M28: sequenza nostri tiratori
+              shootoutKicks={shootoutKicks}
               captainPlayerId={captainPlayerId}
               viceCaptainPlayerId={viceCaptainPlayerId}
               clubShortName={clubShortName}
@@ -1875,19 +1883,36 @@ function buildRecapMessage(args: {
   stats: Record<string, Stats>
   opponentOwnGoals: number
   opponentOwnGoalMinutes: number[]
+  /** M29/M30: minuti dei gol SEGNATI DAGLI AVVERSARI contro di noi (non autogol). */
+  opponentGoalMinutes: number[]
   ourScore: number
   theirScore: number
+  /** M29: minuti totali di supplementari giocati (null/0 = non giocati). */
+  extraTimeMinutes: number | null
+  /** M27: lotteria rigori — se true, aggiunge "(X-Y d.c.r.)" al risultato. */
+  hadShootout: boolean
+  ourShootoutScore: number
+  theirShootoutScore: number
+  /** M28: sequenza dei NOSTRI rigori nella lotteria (player_id + scored). */
+  shootoutKicks: Array<{ player_id: string | null; scored: boolean }>
   captainPlayerId: string | null
   viceCaptainPlayerId: string | null
   captainChangeMinute: number | null
 }): string {
-  const { match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, ourScore, theirScore,
+  const { match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes,
+    ourScore, theirScore, extraTimeMinutes, hadShootout, ourShootoutScore, theirShootoutScore, shootoutKicks,
     captainPlayerId, viceCaptainPlayerId, captainChangeMinute } = args
   const isHome = match.venue === 'home'
   const lenci = 'Lenci Poirino'
+  // M29: suffisso " dts" se giocati i supplementari
+  const dtsSuffix = (extraTimeMinutes != null && extraTimeMinutes > 0) ? ' dts' : ''
+  // M27: suffisso " (X-Y d.c.r.)" se finita ai rigori — dal punto di vista Lenci (noi-loro)
+  const dcrSuffix = hadShootout
+    ? ` (${ourShootoutScore}-${theirShootoutScore} d.c.r.)`
+    : ''
   const line1 = isHome
-    ? `🏆 ${lenci} ${ourScore}-${theirScore} ${match.opponent}`
-    : `🏆 ${match.opponent} ${theirScore}-${ourScore} ${lenci}`
+    ? `🏆 ${lenci} ${ourScore}-${theirScore}${dtsSuffix}${dcrSuffix} ${match.opponent}`
+    : `🏆 ${match.opponent} ${theirScore}-${ourScore}${dtsSuffix}${dcrSuffix} ${lenci}`
   const dateFmt = new Date(match.match_date).toLocaleDateString('it-IT', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
   })
@@ -1939,6 +1964,10 @@ function buildRecapMessage(args: {
   for (let i = 0; i < oogAvvNoMin; i++) {
     events.push({ min: Infinity, text: `⚽ aut. avversario`, hasMin: false })
   }
+  // M29/M30: GOL avversari (loro gol segnati contro di noi, con minuto). Icona rossa.
+  // Prima questi non comparivano nella timeline del recap WhatsApp — ora sì.
+  const oppGoalMin = opponentGoalMinutes || []
+  oppGoalMin.forEach(m => events.push({ min: m, text: `${m}' 🔴 gol ${match.opponent}`, hasMin: true }))
   events.sort((a, b) => a.min - b.min)
 
   const recapLines: string[] = [meta.join('\n')]
@@ -1995,6 +2024,27 @@ function buildRecapMessage(args: {
     }
   }
 
+  // M29: nota sui tempi supplementari (se giocati)
+  if (extraTimeMinutes != null && extraTimeMinutes > 0) {
+    recapLines.push('')
+    recapLines.push(`⏱️ Giocati tempi supplementari (${extraTimeMinutes}′)`)
+  }
+
+  // M27 + M28: sintesi lotteria rigori — punteggio aggregato + sequenza dei nostri tiri
+  if (hadShootout) {
+    recapLines.push('')
+    recapLines.push(`🥅 Lotteria rigori: ${lenci} ${ourShootoutScore}-${theirShootoutScore} ${match.opponent}`)
+    if (shootoutKicks && shootoutKicks.length > 0) {
+      recapLines.push('Nostri tiratori:')
+      shootoutKicks.forEach((k, idx) => {
+        const n = idx + 1
+        const player = k.player_id ? nameOf(k.player_id) : '— (?)'
+        const esito = k.scored ? '✓ gol' : '✗ errore'
+        recapLines.push(`  ${n}. ${player} — ${esito}`)
+      })
+    }
+  }
+
   // Cartellini
   const yellows = Object.values(stats).filter(s => (s.yellow_cards ?? 0) > 0)
   const reds = Object.values(stats).filter(s => s.red_card)
@@ -2011,7 +2061,9 @@ function buildRecapMessage(args: {
 
 function RecapExport({
   match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes,
-  ourScore, theirScore, captainPlayerId, viceCaptainPlayerId, clubShortName,
+  ourScore, theirScore,
+  extraTimeMinutes, hadShootout, ourShootoutScore, theirShootoutScore, shootoutKicks,
+  captainPlayerId, viceCaptainPlayerId, clubShortName,
 }: {
   match: PostMatchData | null
   formation: string
@@ -2022,6 +2074,12 @@ function RecapExport({
   opponentGoalMinutes: number[]
   ourScore: number
   theirScore: number
+  // M27/M28/M29: supplementari + rigori
+  extraTimeMinutes: number | null
+  hadShootout: boolean
+  ourShootoutScore: number
+  theirShootoutScore: number
+  shootoutKicks: Array<{ player_id: string | null; scored: boolean }>
   captainPlayerId: string | null
   viceCaptainPlayerId: string | null
   clubShortName: string | null
@@ -2041,8 +2099,10 @@ function RecapExport({
     }
   }
   const message = buildRecapMessage({
-    match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes,
-    ourScore, theirScore, captainPlayerId, viceCaptainPlayerId, captainChangeMinute,
+    match, formation, players, stats, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes,
+    ourScore, theirScore,
+    extraTimeMinutes, hadShootout, ourShootoutScore, theirShootoutScore, shootoutKicks,
+    captainPlayerId, viceCaptainPlayerId, captainChangeMinute,
   })
 
   // Costruisco i PitchPlayer per il campo grafico dell'export PNG (solo se distinta valida)
@@ -2167,6 +2227,12 @@ function RecapExport({
     }
     sostituzioni.sort((a, b) => a.minute - b.minute)
 
+    // M28: trasformo gli shootoutKicks (player_id-based) nel formato richiesto dalla locandina (name-based)
+    const shootoutKicksForLocandina = (shootoutKicks || []).map(k => ({
+      name: k.player_id ? nameOf(k.player_id) : '— (?)',
+      scored: !!k.scored,
+    }))
+
     return {
       teamClubName: clubShortName,
       teamName: match!.team_name,
@@ -2182,6 +2248,12 @@ function RecapExport({
       opponentOwnGoalMinutes,
       opponentGoalMinutes,
       sostituzioni,
+      // M27/M28/M29: supplementari + rigori nel header e nel footer della locandina
+      extraTimeMinutes,
+      hadShootout,
+      ourShootoutScore,
+      theirShootoutScore,
+      shootoutKicks: shootoutKicksForLocandina,
     }
   }
 
