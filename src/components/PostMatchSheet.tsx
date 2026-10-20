@@ -498,6 +498,34 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     return perDur + 1
   }
 
+  // Durata totale della gara in minuti, inclusi i supplementari se attivi.
+  // Fallback 2x45=90 se la squadra non ha configurato periods/duration (match.team_* null).
+  const totalMatchMinutes = (): number => {
+    const periods = match?.team_match_periods_count ?? 2
+    const perDur = match?.team_match_period_duration_min ?? 45
+    const base = Math.max(0, (periods ?? 2) * (perDur ?? 45))
+    const et = hadExtraTime ? (parseInt(extraTimeMinutes, 10) || 0) : 0
+    return base + Math.max(0, et)
+  }
+
+  // Minuti effettivi in campo per un giocatore, dato il record stats e la durata totale.
+  // - Titolare non sostituito → tutta la partita
+  // - Titolare sostituito → fino al minuto d'uscita
+  // - Subentrato → dalla sua entrata fino al minuto d'uscita (o fine gara)
+  // - Non entrato → 0 (il chiamante decide di non mostrare il chip)
+  const computePlayerMinutes = (s: Stats | undefined, totalMin: number): number => {
+    if (!s) return 0
+    if (s.was_starter) {
+      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
+      return Math.max(0, outAt)
+    }
+    if (s.minute_in != null && s.minute_in > 0) {
+      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
+      return Math.max(0, outAt - s.minute_in)
+    }
+    return 0
+  }
+
   const setPlayerRole = (pid: string, role: 'starter' | 'sub' | 'out') => {
     if (role === 'starter') {
       updateStat(pid, { was_starter: true, minute_in: 0, minute_out: null, _uiRole: 'starter' })
@@ -1385,6 +1413,24 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                           )}
                           {roleOf(s) === 'out' && <span style={{ opacity: 0.6 }}>Non entrato</span>}
                           {s.minute_out != null && <span>fino {s.minute_out}'</span>}
+                          {/* Chip minuti effettivi giocati — compare per titolari e subentrati.
+                              Risolve l'ambiguita' "Titolare = quanti minuti ha giocato?" quando
+                              non c'e' un minute_out (fino a fine partita). Es.: titolare non
+                              sostituito su gara 2x35 → "⏱ 70′". */}
+                          {roleOf(s) !== 'out' && (() => {
+                            const mins = computePlayerMinutes(s, totalMatchMinutes())
+                            if (mins <= 0) return null
+                            return (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                padding: '1px 7px', borderRadius: 999,
+                                background: 'rgba(0,95,152,0.10)', color: '#005f98',
+                                fontWeight: 800, fontSize: 10.5,
+                              }}>
+                                ⏱ {mins}′
+                              </span>
+                            )
+                          })()}
                           {s.goals > 0 && <span>⚽ {s.goals}</span>}
                           {s.penalties_scored > 0 && <span>🎯 {s.penalties_scored}rig</span>}
                           {s.assists > 0 && <span>🅰️ {s.assists}</span>}

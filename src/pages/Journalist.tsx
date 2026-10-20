@@ -783,6 +783,41 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     return n ? `#${n}` : ''
   }
 
+  // Durata totale della gara in minuti (regolamentare + eventuali supplementari).
+  // Legge la squadra via join (match.team.*) con fallback 2x45 e aggiunge extra_time_minutes.
+  const totalMatchMinutes = (): number => {
+    const teamRow = (match as any)?.team
+    const periods = teamRow?.match_periods_count ?? 2
+    const perDur = teamRow?.match_period_duration_min ?? 45
+    const base = Math.max(0, periods * perDur)
+    const et = (match as any)?.extra_time_minutes ?? 0
+    return base + Math.max(0, et)
+  }
+  // Minuti effettivi giocati da un singolo (titolare o subentrato); 0 se non entrato.
+  const computePlayerMinutes = (s: Stats | undefined, totalMin: number): number => {
+    if (!s) return 0
+    if (s.was_starter) {
+      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
+      return Math.max(0, outAt)
+    }
+    if (s.minute_in != null && s.minute_in > 0) {
+      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
+      return Math.max(0, outAt - s.minute_in)
+    }
+    return 0
+  }
+  // Chip minuti in campo riusabile. Compatta per non rompere il layout delle righe.
+  const MinutesChip = ({ mins }: { mins: number }) => (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      padding: '2px 8px', borderRadius: 999,
+      background: 'rgba(0,95,152,0.10)', color: '#005f98',
+      fontWeight: 800, fontSize: 11,
+    }}>
+      ⏱ {mins}′
+    </span>
+  )
+
   return (
     <BottomSheet open={open} onClose={onClose} title="Dettaglio partita">
       {loading ? (
@@ -1099,6 +1134,11 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                   {s?.minute_out != null && (
                     <span style={{ fontSize: 11, color: '#707882' }}>→ uscito {s.minute_out}'</span>
                   )}
+                  {/* Chip minuti effettivi — rende esplicito "titolare non sostituito = tutta la gara" */}
+                  {(() => {
+                    const mins = computePlayerMinutes(s, totalMatchMinutes())
+                    return mins > 0 ? <MinutesChip mins={mins} /> : null
+                  })()}
                 </div>
               )
             })}
@@ -1124,9 +1164,14 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
                     <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
                       {nome(c.player_id)}{viceBadge}
                     </span>
-                    {s?.minute_in != null && (
+                    {s?.minute_in != null && s.minute_in > 0 && (
                       <span style={{ fontSize: 11, color: '#707882' }}>entrato {s.minute_in}'</span>
                     )}
+                    {/* Chip minuti effettivi — mostra 0 solo se non entrato (non lo rendiamo) */}
+                    {(() => {
+                      const mins = computePlayerMinutes(s, totalMatchMinutes())
+                      return mins > 0 ? <MinutesChip mins={mins} /> : null
+                    })()}
                   </div>
                 )
               })}

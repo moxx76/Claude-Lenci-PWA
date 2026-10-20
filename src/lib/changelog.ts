@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.161',
+    date: '2026-10-20',
+    title: 'Report post-gara e vista giornalista: chip con minuti effettivi in campo',
+    features: [
+      "Accanto a ciascun giocatore nel report post-gara e nella vista giornalista compare ora un chip ⏱ N′ con i minuti effettivi giocati, calcolati sulla durata della squadra più eventuali supplementari. Prima un titolare non sostituito mostrava solo 'Titolare' nudo e creava confusione su quanti minuti avesse davvero giocato; ora si vede 'Titolare ⏱ 70′' a colpo d'occhio.",
+      "La formula tiene conto di: durata base (periodi × durata) + supplementari se giocati; sottrae il minuto d'ingresso per i subentrati; se un titolare è stato sostituito mostra solo i minuti effettivi in campo (non la durata piena). Es.: subentrato al 47′ su gara 2×35+10 di supplementari rimasto fino alla fine → ⏱ 33′.",
+      "Il chip non compare per chi è segnato come 'Non entrato'.",
+    ],
+    notes: [
+      "Chiude un dubbio di UX segnalato dallo staff U14 ('alcuni giocatori sembravano senza minutaggio anche se avevano giocato'): i dati erano corretti, mancava solo l'indicatore visivo. Il totale aggregato di stagione resta disponibile nella scheda giocatore come prima.",
+    ],
+  },
+  {
     version: '1.9.160',
     date: '2026-10-19',
     title: 'Vista giornalista: sezioni dedicate ai supplementari e alla lotteria rigori',
