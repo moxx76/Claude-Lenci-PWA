@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.162',
+    date: '2026-10-23',
+    title: 'Nuova pagina pubblica Lenci Pass per l\'ingresso gratuito alle partite casalinghe',
+    features: [
+      "È online la nuova pagina pubblica /pass (lenci-poirino-app.netlify.app/pass) che mostra a chiunque — senza bisogno di login — l'elenco dei titolari del Lenci Pass, che vale come ingresso gratuito a tutte le partite casalinghe della Lenci Poirino. Pensata per essere consultata al varco di ingresso: nome, cognome, badge 'Attivo' e nota opzionale (ruolo/motivo del pass).",
+      "Grafica dedicata in tinta bordeaux/nero coerente con il brand Lenci, titolo '🎟️ Lenci Pass', contatore totale pass attivi, avatar con iniziali per ogni titolare.",
+      "L'elenco iniziale contiene due titolari di prova precaricati dalla segreteria. Nuove aggiunte, sospensioni temporanee e rimozioni si gestiscono via admin sulla tabella lenci_pass_holders (RLS: lettura pubblica, scrittura solo admin).",
+    ],
+    notes: [
+      "La UI di amministrazione dentro Lenci LAB verrà aggiunta in un rilascio successivo se emerge il bisogno. Per ora: nuovo pass → segreteria apre un ticket a Davide o modifica diretta via Supabase.",
+    ],
+  },
+  {
     version: '1.9.161',
     date: '2026-10-20',
     title: 'Report post-gara e vista giornalista: chip con minuti effettivi in campo',

@@ -21,6 +21,7 @@ const MarketingPage     = lazy(() => import('./pages/Marketing').then(m => ({ de
 const JournalistPage    = lazy(() => import('./pages/Journalist').then(m => ({ default: m.JournalistPage })))
 const ComunicatiPage    = lazy(() => import('./pages/Comunicati').then(m => ({ default: m.ComunicatiPage })))
 const Referti           = lazy(() => import('./pages/Referti').then(m => ({ default: m.Referti })))
+const LenciPass         = lazy(() => import('./pages/LenciPass').then(m => ({ default: m.LenciPass })))
 const EserciziPage      = lazy(() => import('./pages/EserciziPage').then(m => ({ default: m.EserciziPage })))
 const Moduli            = lazy(() => import('./pages/Moduli').then(m => ({ default: m.Moduli })))
 const Inventario        = lazy(() => import('./pages/Inventario').then(m => ({ default: m.Inventario })))
@@ -112,6 +113,9 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Lenci Pass: pagina pubblica (fuori da ProtectedRoute e Layout) con l'elenco
+            dei titolari del pass di ingresso gratuito alle partite casalinghe. */}
+        <Route path="/pass" element={<LenciPass />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
         <Route path="/foglio-partita/:matchId" element={
           <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>
