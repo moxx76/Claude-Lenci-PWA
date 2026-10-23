@@ -99,6 +99,19 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/**
+ * M32: guard per l'utente cassa.
+ * Il cassiere (profiles.is_cashier=true) ha accesso SOLO alla pagina pubblica /pass
+ * (lista) e /pass/v/:token (verifica NFC). Qualunque altra route protetta viene
+ * reindirizzata a /pass. Serve per il tablet/smartphone sempre loggato al varco:
+ * se un operatore ci clicca distrattamente su un'altra sezione, torna a /pass.
+ */
+function CashierGuard({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
+  if (profile?.is_cashier) return <Navigate to="/pass" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   const init = useAuth(s => s.init)
   useEffect(() => { init() }, [init])
@@ -129,7 +142,9 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <Layout />
+              <CashierGuard>
+                <Layout />
+              </CashierGuard>
             </ProtectedRoute>
           }
         >

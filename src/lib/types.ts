@@ -23,8 +23,15 @@ export interface Profile {
   is_supervisor: boolean | null
   is_readonly: boolean | null
   is_journalist?: boolean | null
+  /** M32: utente cassa — accesso limitato alla sola area Lenci Pass per la verifica al varco. */
+  is_cashier?: boolean | null
   created_at: string
   updated_at: string
+}
+
+/** M32: helper per identificare l'utente cassa (accesso limitato al Lenci Pass). */
+export function isCashier(profile?: Pick<Profile, 'is_cashier'> | null): boolean {
+  return !!profile?.is_cashier
 }
 
 export interface RecruitmentLead {

@@ -3,6 +3,16 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.164',
+    date: '2026-10-23',
+    title: 'Account cassa dedicato per la verifica Lenci Pass al varco',
+    features: [
+      "Creato account dedicato cassa@lenci.it (ruolo 'public' + flag is_cashier) con accesso limitato alla sola area Lenci Pass. Dopo il login finisce automaticamente su /pass; qualunque altra route protetta lo reindirizza lì (CashierGuard). Utile per lasciare il telefono/tablet della cassa sempre loggato senza preoccuparsi che qualcuno acceda per sbaglio a sezioni gestionali.",
+      "Aggiunto flag opzionale profiles.is_cashier (default false) per distinguere questi utenti operativi dagli altri profili.",
+      "La pagina /pass/v/:token di verifica NFC resta pubblica senza bisogno di login — il cassiere non deve autenticarsi per far funzionare la scansione del tag, l'account serve solo come ‘ancoraggio’ dell'app alla sola area pass.",
+    ],
+  },
+  {
     version: '1.9.163',
     date: '2026-10-23',
     title: 'Lenci Pass: verifica automatica tramite tag NFC + pannello admin con QR',
