@@ -3,6 +3,20 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.163',
+    date: '2026-10-23',
+    title: 'Lenci Pass: verifica automatica tramite tag NFC + pannello admin con QR',
+    features: [
+      "Nuova pagina pubblica /pass/v/:token — URL che verrà scritto dentro i tag NFC fisici: quando il cassiere avvicina lo smartphone al tag, si apre direttamente una schermata fullscreen 'a semaforo' leggibile da lontano: verde ✓ VALIDO con nome/ruolo del titolare, giallo ⚠ SOSPESO, rosso ✗ NON VALIDO. Autoreturn alla lista dopo 10 secondi + feedback vibrazione sul telefono della cassa.",
+      "Nuova pagina admin /admin/pass (riservata agli admin) con tutti i titolari del pass, QR code di ciascun URL pronto per essere scannerizzato dall'app NFC Tools durante la programmazione del tag, pulsanti Copia URL / Sospendi / Riattiva / Rimuovi + form per aggiungere nuovi titolari al volo. Compare in fondo alla pagina una mini-guida 'Come programmare un tag NFC in 5 passi'.",
+      "Migration M32: aggiunta colonna lenci_pass_holders.nfc_token (UUID univoco auto-generato per ogni titolare, già popolata per i titolari esistenti) e lenci_pass_holders.nfc_tag_uid opzionale per tracciare l'UID hardware del chip associato.",
+    ],
+    notes: [
+      "Modello di sicurezza: ogni titolare ha un UUID segreto che diventa l'URL del tag. Chi non ha il tag non può indovinare l'URL. Se un tag viene smarrito/clonato basta disabilitare il titolare da /admin/pass per far diventare 'NON VALIDO' sia l'originale che l'eventuale clone. Adeguato per il caso d'uso (varco di una partita giovanile).",
+      "Hardware consigliato: tag NTAG213 (25mm, ~€6 ogni 50 su Amazon) incapsulabili in supporti 3D stampati in casa.",
+    ],
+  },
+  {
     version: '1.9.162',
     date: '2026-10-23',
     title: 'Nuova pagina pubblica Lenci Pass per l\'ingresso gratuito alle partite casalinghe',

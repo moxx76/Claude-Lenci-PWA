@@ -22,6 +22,8 @@ const JournalistPage    = lazy(() => import('./pages/Journalist').then(m => ({ d
 const ComunicatiPage    = lazy(() => import('./pages/Comunicati').then(m => ({ default: m.ComunicatiPage })))
 const Referti           = lazy(() => import('./pages/Referti').then(m => ({ default: m.Referti })))
 const LenciPass         = lazy(() => import('./pages/LenciPass').then(m => ({ default: m.LenciPass })))
+const LenciPassVerify   = lazy(() => import('./pages/LenciPassVerify').then(m => ({ default: m.LenciPassVerify })))
+const AdminPass         = lazy(() => import('./pages/AdminPass').then(m => ({ default: m.AdminPass })))
 const EserciziPage      = lazy(() => import('./pages/EserciziPage').then(m => ({ default: m.EserciziPage })))
 const Moduli            = lazy(() => import('./pages/Moduli').then(m => ({ default: m.Moduli })))
 const Inventario        = lazy(() => import('./pages/Inventario').then(m => ({ default: m.Inventario })))
@@ -116,6 +118,9 @@ export default function App() {
         {/* Lenci Pass: pagina pubblica (fuori da ProtectedRoute e Layout) con l'elenco
             dei titolari del pass di ingresso gratuito alle partite casalinghe. */}
         <Route path="/pass" element={<LenciPass />} />
+        {/* Verifica NFC: URL scritto nel tag che il cassiere scansiona.
+            Mostra schermata a semaforo valido/sospeso/non trovato. */}
+        <Route path="/pass/v/:token" element={<LenciPassVerify />} />
         {/* Foglio partita stampabile: fuori dal Layout per stampa pulita (no sidebar/topbar) */}
         <Route path="/foglio-partita/:matchId" element={
           <ProtectedRoute><MatchSheetPrint /></ProtectedRoute>
@@ -146,6 +151,8 @@ export default function App() {
           <Route path="inventario" element={<NotForJournalist><Inventario /></NotForJournalist>} />
           <Route path="incombenze" element={<NotForJournalist><Incombenze /></NotForJournalist>} />
           <Route path="import-figc" element={<NotForJournalist><ImportFigc /></NotForJournalist>} />
+          {/* Admin Lenci Pass: gestione titolari + QR per programmare i tag NFC */}
+          <Route path="admin/pass" element={<NotForJournalist><AdminPass /></NotForJournalist>} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>
