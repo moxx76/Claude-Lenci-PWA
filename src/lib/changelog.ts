@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.165',
+    date: '2026-10-25',
+    title: 'Fix: giocatore espulso ha minutaggio tagliato al minuto del rosso',
+    fixes: [
+      "Il chip '⏱ N′' con i minuti giocati non teneva conto dell'espulsione: un titolare espulso al 50′ su una gara di 70′ risultava comunque con 70′ in campo. Esempio reale segnalato dallo staff U14: Genna espulso al 50° nella gara di oggi vs Andezeno mostrava 70′. Ora mostra 50′ (fino al minuto del rosso).",
+      "Fix applicato sia al report post-gara sia alla vista giornalista: il computePlayerMinutes prende come fine partita del singolo il minimo tra la durata totale, il minute_out (sostituzione) e il red_card_minute (espulsione). Lo stesso vale per un subentrato espulso prima della fine.",
+    ],
+    notes: [
+      "I minutaggi aggregati di stagione (presenze, media minuti, classifica rotazione) verranno automaticamente ricalcolati su questo nuovo criterio alla prossima lettura — nessun intervento manuale richiesto, nessun dato da sistemare in DB.",
+    ],
+  },
+  {
     version: '1.9.164',
     date: '2026-10-23',
     title: 'Account cassa dedicato per la verifica Lenci Pass al varco',

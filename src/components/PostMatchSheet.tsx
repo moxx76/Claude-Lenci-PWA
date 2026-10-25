@@ -509,20 +509,22 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   }
 
   // Minuti effettivi in campo per un giocatore, dato il record stats e la durata totale.
-  // - Titolare non sostituito → tutta la partita
-  // - Titolare sostituito → fino al minuto d'uscita
-  // - Subentrato → dalla sua entrata fino al minuto d'uscita (o fine gara)
+  // - Titolare non sostituito → tutta la partita (o fino al rosso, se preso)
+  // - Titolare sostituito → fino al minuto d'uscita (o fino al rosso, se piu' precoce)
+  // - Subentrato → dalla sua entrata fino al minuto d'uscita (o fine gara, o rosso)
   // - Non entrato → 0 (il chiamante decide di non mostrare il chip)
+  //
+  // Fix 25/10/2026: un giocatore espulso finisce li' la sua partita. Prima il chip
+  // mostrava 70' anche per un titolare rosso al 50° (es. Genna U14 vs Andezeno).
   const computePlayerMinutes = (s: Stats | undefined, totalMin: number): number => {
     if (!s) return 0
-    if (s.was_starter) {
-      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
-      return Math.max(0, outAt)
-    }
-    if (s.minute_in != null && s.minute_in > 0) {
-      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
-      return Math.max(0, outAt - s.minute_in)
-    }
+    // Cap effettivo di uscita: min(fine partita, min_out, red_card_minute se espulso)
+    const candidates: number[] = [totalMin]
+    if (s.minute_out != null) candidates.push(s.minute_out)
+    if (s.red_card && s.red_card_minute != null) candidates.push(s.red_card_minute)
+    const outAt = Math.min(...candidates)
+    if (s.was_starter) return Math.max(0, outAt)
+    if (s.minute_in != null && s.minute_in > 0) return Math.max(0, outAt - s.minute_in)
     return 0
   }
 

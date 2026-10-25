@@ -794,16 +794,16 @@ function MatchJournalistSheet({ matchId, open, onClose }: { matchId: string; ope
     return base + Math.max(0, et)
   }
   // Minuti effettivi giocati da un singolo (titolare o subentrato); 0 se non entrato.
+  // Fix 25/10/2026: tiene conto dell'espulsione — un giocatore col rosso finisce li'
+  // la sua partita (es. Genna U14 vs Andezeno espulso al 50° su 70′ totali = 50′).
   const computePlayerMinutes = (s: Stats | undefined, totalMin: number): number => {
     if (!s) return 0
-    if (s.was_starter) {
-      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
-      return Math.max(0, outAt)
-    }
-    if (s.minute_in != null && s.minute_in > 0) {
-      const outAt = s.minute_out != null ? Math.min(s.minute_out, totalMin) : totalMin
-      return Math.max(0, outAt - s.minute_in)
-    }
+    const candidates: number[] = [totalMin]
+    if (s.minute_out != null) candidates.push(s.minute_out)
+    if (s.red_card && s.red_card_minute != null) candidates.push(s.red_card_minute)
+    const outAt = Math.min(...candidates)
+    if (s.was_starter) return Math.max(0, outAt)
+    if (s.minute_in != null && s.minute_in > 0) return Math.max(0, outAt - s.minute_in)
     return 0
   }
   // Chip minuti in campo riusabile. Compatta per non rompere il layout delle righe.
