@@ -61,6 +61,11 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
   const [locationAddress, setLocationAddress] = useState<string>('')
   const [focus, setFocus] = useState<string>('')
   const [program, setProgram] = useState<string>('')
+  // v1.9.168: flag "Solo portieri" — se true, il foglio presenze dell'allenamento
+  // mostra solo i giocatori con position=Portiere. Evita di inquinare le statistiche
+  // di presenza con assenze "automatiche" dei giocatori di movimento che non partecipano
+  // alle sedute portieri.
+  const [onlyGoalkeepers, setOnlyGoalkeepers] = useState<boolean>(false)
   // Match-specific
   const [opponent, setOpponent] = useState<string>('')
   const [venue, setVenue] = useState<'home' | 'away'>('home')
@@ -103,6 +108,7 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
         setEndTime((existingEvent.end_time || '20:30').slice(0, 5))
         setFocus(existingEvent.focus || '')
         setProgram(existingEvent.program || '')
+        setOnlyGoalkeepers(!!(existingEvent as any).only_goalkeepers)
       } else {
         // match_date è timestamptz ISO
         const mdate = existingEvent.match_date ? new Date(existingEvent.match_date) : new Date()
@@ -195,6 +201,8 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
           focus: focus || null,
           program: program || null,
           notes: notes || null,
+          // v1.9.168: flag "Solo portieri" — filtra la rosa delle presenze
+          only_goalkeepers: onlyGoalkeepers,
         }
         let createdIds: string[] = []
         if (isEditMode && existingEvent!.kind === 'training') {
@@ -473,6 +481,38 @@ export function EventEditSheet({ open, onClose, teams, defaultTeamId, existingEv
             <Field label="Focus / tema seduta">
               <input value={focus} onChange={e => setFocus(e.target.value)} placeholder="es. Possesso palla, Situazioni di gioco" style={inputStyle} />
             </Field>
+
+            {/* v1.9.168: flag "Solo portieri" — filtra la rosa delle presenze di questo allenamento */}
+            <div
+              style={{
+                background: onlyGoalkeepers ? 'linear-gradient(135deg, #fff5e0 0%, #ffe9b8 100%)' : '#f5f7fa',
+                border: `1px solid ${onlyGoalkeepers ? '#f0b04a' : '#dde4ec'}`,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                cursor: 'pointer',
+              }}
+              onClick={() => setOnlyGoalkeepers(v => !v)}
+            >
+              <input
+                type="checkbox"
+                checked={onlyGoalkeepers}
+                onChange={e => setOnlyGoalkeepers(e.target.checked)}
+                style={{ width: 20, height: 20, accentColor: '#f0b04a', cursor: 'pointer' }}
+                onClick={e => e.stopPropagation()}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#7a4a00', lineHeight: 1.2 }}>
+                  🧤 Solo portieri
+                </div>
+                <div style={{ fontSize: 11, color: '#8a5a10', marginTop: 2 }}>
+                  Nel foglio presenze mostra solo i giocatori con ruolo Portiere
+                </div>
+              </div>
+            </div>
 
             {/* Bottone composer seduta strutturata (solo in edit mode) */}
             {isEditMode && existingEvent && (

@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.168',
+    date: '2026-11-04',
+    title: 'Allenamenti portieri: foglio presenze filtrato automaticamente sui soli portieri',
+    features: [
+      "Nel form di creazione/modifica di un allenamento compare il nuovo toggle 🧤 'Solo portieri'. Quando è attivo, il foglio presenze di quell'allenamento mostra SOLO i giocatori con ruolo Portiere della/e squadra/e collegata/e all'evento. Gli altri giocatori non compaiono né come presenti né come assenti, quindi le statistiche di presenze del gruppo non si sporcano con 'assenze' giustificate di chi quell'allenamento non lo doveva nemmeno fare.",
+      "Nel titolo dell'attendance sheet compare un'icona 🧤 quando l'allenamento è flaggato 'solo portieri', così lo staff capisce subito che sta vedendo la lista ridotta e non una rosa monca per errore.",
+    ],
+    notes: [
+      "Richiesto dallo staff U14: stavano inserendo in calendario anche gli allenamenti portieri della propria annata e, senza questo filtro, le statistiche di presenza del gruppo rischiavano di risultare falsate (la squadra al completo 'assente' a un allenamento riservato ai 2-3 portieri).",
+      "Flag retrocompatibile: gli allenamenti già esistenti partono tutti con 'solo portieri' disattivato (comportamento identico a prima). Si può attivare o disattivare in qualsiasi momento dalla modifica dell'evento.",
+    ],
+  },
+  {
     version: '1.9.167',
     date: '2026-11-04',
     title: 'Planner settimanale: titolo dell\'allenamento per distinguere più sedute nello stesso giorno',

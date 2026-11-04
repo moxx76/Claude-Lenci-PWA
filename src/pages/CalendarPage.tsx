@@ -274,16 +274,25 @@ export function CalendarPage() {
     const teamIds = etData && etData.length > 0
       ? etData.map(r => r.team_id)
       : [event.teamId]
-    const rosterKey = teamIds.slice().sort().join(',')
+
+    // v1.9.168: flag "Solo portieri" — quando attivo, la rosa mostra
+    // solo i giocatori con position='Portiere'. Serve per gli allenamenti
+    // dei portieri, così le statistiche di presenze del gruppo non si
+    // sporcano con assenze "giustificate" degli altri ruoli.
+    const onlyGK = !!(event.raw as any)?.only_goalkeepers
+    // Chiave cache include il flag GK per non collidere con la rosa completa
+    const rosterKey = teamIds.slice().sort().join(',') + (onlyGK ? '|gk' : '')
     if (!rosterMap[rosterKey]) {
-      const { data } = await supabase.from('players')
+      let q = supabase.from('players')
         .select('id, first_name, last_name, position')
-        .in('team_id', teamIds).order('last_name')
+        .in('team_id', teamIds)
+      if (onlyGK) q = q.eq('position', 'Portiere')
+      const { data } = await q.order('last_name')
       setRosterMap(m => ({ ...m, [rosterKey]: (data ?? []) as any }))
     }
     setAttendanceEvent({
       id: trainingId,
-      title: event.title || event.focus || 'Allenamento',
+      title: (event.title || event.focus || 'Allenamento') + (onlyGK ? ' 🧤' : ''),
       date: event.date,
       time: event.startTime,
       teamId: rosterKey,  // riusa il campo come chiave della cache (anche single-team funziona)
