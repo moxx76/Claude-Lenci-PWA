@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.166',
+    date: '2026-11-04',
+    title: 'Fix: planner settimanale per squadra ora include anche gli eventi MISTI',
+    fixes: [
+      "Quando si filtrava il planner settimanale su una squadra specifica (es. Under 14), un allenamento o una partita MISTA la cui squadra principale era un'altra (es. 'Allenamento Portieri' con primary=Prima Squadra e misto=Under 14) NON compariva. Ora il planner guarda anche i collegamenti in event_teams: se la squadra selezionata è secondaria dell'evento misto, l'evento viene incluso lo stesso.",
+      "Lo stesso fix si applica alle partite: se c'è una gara MISTA registrata su più squadre, il planner filtrato per una qualunque di esse la mostra.",
+    ],
+    notes: [
+      "Segnalato dallo staff U14: l'Allenamento Portieri del mercoledì creato in condivisione con la Prima Squadra non appariva nel planner U14 pur essendo marcato MISTO nel calendario. Il fix è trasparente: nessuna modifica ai dati, solo al calcolo del planner.",
+    ],
+  },
+  {
     version: '1.9.165',
     date: '2026-10-25',
     title: 'Fix: giocatore espulso ha minutaggio tagliato al minuto del rosso',

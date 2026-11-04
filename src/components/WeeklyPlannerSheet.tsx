@@ -102,20 +102,52 @@ export function WeeklyPlannerSheet({ open, onClose, teamFilter, teams }: Props) 
 
   const buildPlannerData = useCallback(async (): Promise<WeeklyPlannerData> => {
     const weekEnd = addDays(weekStart, 6)
+
+    // Fix 04/11/2026: quando c'è un teamFilter, bisogna includere anche gli eventi MISTI
+    // dove la squadra filtrata e' secondaria (es. Allenamento Portieri primary=Prima Squadra,
+    // misto con Under 14). Prima venivano persi perche' filtravamo solo su team_id = primary.
+    // Soluzione: fetch gli event_id da event_teams per quel teamFilter e aggiungo un OR.
+    let extraTrainingIds: string[] = []
+    let extraMatchIds: string[] = []
+    if (teamFilter) {
+      const { data: etRows } = await supabase.from('event_teams')
+        .select('event_id, event_kind')
+        .eq('team_id', teamFilter)
+        .in('event_kind', ['training', 'match'])
+      for (const r of (etRows ?? [])) {
+        if (!r.event_id) continue
+        if (r.event_kind === 'training') extraTrainingIds.push(r.event_id)
+        else if (r.event_kind === 'match') extraMatchIds.push(r.event_id)
+      }
+    }
+
     // Fetch allenamenti + partite della settimana
     let tq = supabase.from('trainings')
       .select('id, training_date, start_time, end_time, location, team_id, team:teams(name, color, category, age_range)')
       .gte('training_date', weekStart)
       .lte('training_date', weekEnd)
       .order('training_date').order('start_time')
-    if (teamFilter) tq = tq.eq('team_id', teamFilter)
+    if (teamFilter) {
+      // OR su: team_id primary = filtro, OPPURE id presente negli extra (eventi misti collegati)
+      const orParts = [`team_id.eq.${teamFilter}`]
+      if (extraTrainingIds.length > 0) {
+        orParts.push(`id.in.(${extraTrainingIds.join(',')})`)
+      }
+      tq = tq.or(orParts.join(','))
+    }
 
     let mq = supabase.from('matches')
       .select('id, match_date, opponent, venue, competition, location, location_address, team_id, team:teams(name, color, category, age_range)')
       .gte('match_date', `${weekStart}T00:00:00`)
       .lte('match_date', `${weekEnd}T23:59:59`)
       .order('match_date')
-    if (teamFilter) mq = mq.eq('team_id', teamFilter)
+    if (teamFilter) {
+      const orParts = [`team_id.eq.${teamFilter}`]
+      if (extraMatchIds.length > 0) {
+        orParts.push(`id.in.(${extraMatchIds.join(',')})`)
+      }
+      mq = mq.or(orParts.join(','))
+    }
 
     const [tRes, mRes] = await Promise.all([tq, mq])
     if (tRes.error) throw tRes.error
