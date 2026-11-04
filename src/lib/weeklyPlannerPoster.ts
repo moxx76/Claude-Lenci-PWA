@@ -17,6 +17,9 @@ export interface PlannerEvent {
   /** Indirizzo esteso (matches.location_address) — serve per estrarre la città in chiaro (v1.9.106). */
   locationAddress?: string | null
   competition?: string | null
+  /** v1.9.167: titolo/focus dell'allenamento (es. "Allenamento Portieri", "Allenamento a regime").
+      Usato per distinguere a colpo d'occhio due training della stessa squadra nello stesso giorno. */
+  focus?: string | null
 }
 
 export interface WeeklyPlannerData {
@@ -473,10 +476,29 @@ function drawEvent(
       : `${icon} vs ${ev.opponent || '—'}`
     drawTruncatedText(ctx, compactLine, textX, line2Y, textMaxW)
   } else {
-    // Allenamento o fallback
-    ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    drawTruncatedText(ctx, ev.location || 'Allenamento', textX, line2Y, textMaxW)
+    // Allenamento (o fallback).
+    // v1.9.167: se c'e' un focus (es. "Allenamento Portieri") lo mostriamo sulla line 2
+    // per distinguere a colpo d'occhio due allenamenti della stessa squadra nello stesso giorno.
+    // La location passa in line 3 solo se c'e' un unico evento nel giorno (spazio sufficiente).
+    const focusText = (ev.focus || '').trim()
+    if (focusText) {
+      // Line 2: focus (bianco pieno, leggibilita' alta)
+      ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
+      ctx.fillStyle = COL.white
+      drawTruncatedText(ctx, focusText, textX, line2Y, textMaxW)
+      // Line 3 (solo totalEvs === 1): location sotto, piccola e opaca
+      if (totalEvs === 1 && ev.location) {
+        const line3YLoc = cy + 30
+        ctx.font = `500 12px system-ui, Arial, sans-serif`
+        ctx.fillStyle = 'rgba(255,255,255,0.65)'
+        drawTruncatedText(ctx, ev.location, textX, line3YLoc, textMaxW)
+      }
+    } else {
+      // Allenamento senza focus → comportamento precedente: location in line 2
+      ctx.font = `600 ${descSize}px system-ui, Arial, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      drawTruncatedText(ctx, ev.location || 'Allenamento', textX, line2Y, textMaxW)
+    }
   }
 }
 

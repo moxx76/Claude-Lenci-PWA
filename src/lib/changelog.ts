@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.167',
+    date: '2026-11-04',
+    title: 'Planner settimanale: titolo dell\'allenamento per distinguere più sedute nello stesso giorno',
+    features: [
+      "Nel poster del planner settimanale, quando un allenamento ha un titolo (campo focus — es. 'Allenamento Portieri', 'Allenamento a regime', 'Scarico', 'Tattica'), ora compare in evidenza sulla riga sotto il nome squadra. Prima due sedute della stessa annata nello stesso giorno sembravano identiche ('Under 14 annata 2013 — Campo Sportivo Poirino' × 2); ora si leggono come 'Under 14 annata 2013' + 'Allenamento Portieri' e 'Under 14 annata 2013' + 'Allenamento a regime'.",
+      "La location passa alla terza riga quando il giorno ha un solo allenamento (c'è spazio); nei giorni densi resta sottintesa (il campo di default è Campo Sportivo Poirino).",
+    ],
+    notes: [
+      "Compatibile all'indietro: gli allenamenti senza focus valorizzato mostrano la location come prima.",
+    ],
+  },
+  {
     version: '1.9.166',
     date: '2026-11-04',
     title: 'Fix: planner settimanale per squadra ora include anche gli eventi MISTI',

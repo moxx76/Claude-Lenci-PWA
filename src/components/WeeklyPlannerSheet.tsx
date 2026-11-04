@@ -123,7 +123,7 @@ export function WeeklyPlannerSheet({ open, onClose, teamFilter, teams }: Props) 
 
     // Fetch allenamenti + partite della settimana
     let tq = supabase.from('trainings')
-      .select('id, training_date, start_time, end_time, location, team_id, team:teams(name, color, category, age_range)')
+      .select('id, training_date, start_time, end_time, location, focus, team_id, team:teams(name, color, category, age_range)')
       .gte('training_date', weekStart)
       .lte('training_date', weekEnd)
       .order('training_date').order('start_time')
@@ -177,6 +177,8 @@ export function WeeklyPlannerSheet({ open, onClose, teamFilter, teams }: Props) 
         teamName: formatTeamLabel(team),
         teamColor: team?.color ?? null,
         location: t.location ?? null,
+        // v1.9.167: focus (titolo breve) usato per distinguere nel poster piu' training stesso giorno
+        focus: t.focus ?? null,
       })
     }
     for (const m of (mRes.data ?? []) as any[]) {
