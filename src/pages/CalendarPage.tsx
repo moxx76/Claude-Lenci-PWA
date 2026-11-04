@@ -49,11 +49,13 @@ function groupByDate(events: CalendarEvent[]): Array<{ date: string; events: Cal
   return Array.from(map.entries()).map(([date, events]) => ({ date, events }))
 }
 
-type FilterKey = 'all' | 'training' | 'match' | 'meeting'
+type FilterKey = 'all' | 'training' | 'training_gk' | 'match' | 'meeting'
 
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Tutti', icon: 'apps' },
   { key: 'training', label: 'Allenamenti', icon: 'fitness_center' },
+  // v1.9.169: chip dedicata per gli allenamenti flaggati "solo portieri"
+  { key: 'training_gk', label: '🧤 Portieri', icon: 'sports_handball' },
   { key: 'match', label: 'Partite', icon: 'sports_soccer' },
   { key: 'meeting', label: 'Riunioni', icon: 'groups' },
 ]
@@ -72,7 +74,7 @@ export function CalendarPage() {
   const [searchParams] = useSearchParams()
   const initialFilter: FilterKey = (() => {
     const q = searchParams.get('filter')
-    return q === 'training' || q === 'match' || q === 'meeting' ? q : 'all'
+    return q === 'training' || q === 'training_gk' || q === 'match' || q === 'meeting' ? q : 'all'
   })()
   const [filter, setFilter] = useState<FilterKey>(initialFilter)
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
@@ -181,9 +183,11 @@ export function CalendarPage() {
 
   const filtered = useMemo(() => {
     let list = events
-    // Filtro per tipo evento (Tutti/Allenamenti/Partite/Riunioni)
+    // Filtro per tipo evento (Tutti/Allenamenti/Portieri/Partite/Riunioni)
     if (filter !== 'all') {
       if (filter === 'match') list = list.filter(e => e.kind === 'match' || e.kind === 'tournament')
+      // v1.9.169: 'training_gk' → solo allenamenti con il flag only_goalkeepers
+      else if (filter === 'training_gk') list = list.filter(e => e.kind === 'training' && !!(e.raw as any)?.only_goalkeepers)
       else list = list.filter(e => e.kind === filter)
     }
     // Filtro weekend: solo eventi con event.date in [sabato, domenica]

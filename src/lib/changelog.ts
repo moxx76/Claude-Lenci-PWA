@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.169',
+    date: '2026-11-04',
+    title: 'Calendario: chip di filtro dedicata "🧤 Portieri" per gli allenamenti dei soli portieri',
+    features: [
+      "Nella barra filtri in cima al Calendario, tra 'Allenamenti' e 'Partite', c'è una nuova chip '🧤 Portieri'. Attivata, mostra SOLO gli allenamenti flaggati 'solo portieri' (feature introdotta in v1.9.168), nascondendo tutto il resto: allenamenti di gruppo, partite, riunioni e marketing.",
+      "Combinabile con il filtro squadra: scegliendo prima una squadra (es. Under 14) e poi la chip '🧤 Portieri' si vedono solo gli allenamenti dei portieri di quell'annata.",
+      "Il parametro URL `?filter=training_gk` apre direttamente il calendario già filtrato sugli allenamenti portieri (utile per shortcut o link condivisi allo staff).",
+    ],
+    notes: [
+      "Nessun impatto su chi non usa il flag: gli allenamenti normali continuano a comparire sotto 'Allenamenti' / 'Tutti' come prima.",
+    ],
+  },
+  {
     version: '1.9.168',
     date: '2026-11-04',
     title: 'Allenamenti portieri: foglio presenze filtrato automaticamente sui soli portieri',
