@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.170',
+    date: '2026-11-05',
+    title: 'Calendario: chip Partite spostata prima di 🧤 Portieri',
+    features: [
+      "Nella barra filtri del Calendario l'ordine delle chip è ora Tutti → Allenamenti → Partite → 🧤 Portieri → Riunioni. 'Partite' torna al suo posto storico subito dopo 'Allenamenti', perché è il filtro usato molto più spesso nel quotidiano; '🧤 Portieri' resta disponibile ma a seguire, come filtro di nicchia.",
+    ],
+    notes: [
+      "Nessuna modifica funzionale: cambia solo l'ordine di visualizzazione dei chip.",
+    ],
+  },
+  {
     version: '1.9.169',
     date: '2026-11-04',
     title: 'Calendario: chip di filtro dedicata "🧤 Portieri" per gli allenamenti dei soli portieri',

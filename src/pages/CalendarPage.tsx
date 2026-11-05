@@ -54,9 +54,9 @@ type FilterKey = 'all' | 'training' | 'training_gk' | 'match' | 'meeting'
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Tutti', icon: 'apps' },
   { key: 'training', label: 'Allenamenti', icon: 'fitness_center' },
-  // v1.9.169: chip dedicata per gli allenamenti flaggati "solo portieri"
-  { key: 'training_gk', label: '🧤 Portieri', icon: 'sports_handball' },
   { key: 'match', label: 'Partite', icon: 'sports_soccer' },
+  // v1.9.170: Partite prima di Portieri (più usata nel quotidiano).
+  { key: 'training_gk', label: '🧤 Portieri', icon: 'sports_handball' },
   { key: 'meeting', label: 'Riunioni', icon: 'groups' },
 ]
 
