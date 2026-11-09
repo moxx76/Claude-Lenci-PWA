@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.171',
+    date: '2026-11-09',
+    title: 'Fix barra di navigazione mobile che a volte compariva a metà schermo',
+    features: [
+      "Risolto un bug di layout per cui la barra di navigazione in fondo (Dashboard · Squadra · Calendario · Bacheca · Comunicati · Profilo) ogni tanto, su alcuni telefoni, compariva fluttuante a metà schermo anziché ancorata al bordo inferiore, coprendo in parte le card del calendario o degli altri elenchi.",
+    ],
+    notes: [
+      "Causa: la barra era annidata dentro il contenitore di scroll del contenuto principale; su alcuni browser mobile, quando la barra URL si nascondeva/riappariva o cambiava l'orientamento, il position:fixed si ri-agganciava al genitore sbagliato invece che al viewport, lasciando la nav 'congelata' a mezz'altezza.",
+      "Fix: la barra è stata spostata fuori dal contenitore di scroll (figlia diretta del wrapper radice) e le è stato forzato un compositing layer dedicato (transform: translateZ(0) + contain: layout) così resta sempre ancorata al viewport, qualunque cosa succeda alla finestra.",
+    ],
+  },
+  {
     version: '1.9.170',
     date: '2026-11-05',
     title: 'Calendario: chip Partite spostata prima di 🧤 Portieri',

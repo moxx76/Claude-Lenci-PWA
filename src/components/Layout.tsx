@@ -199,10 +199,14 @@ export function Layout() {
           <PushAutoPromptBanner />
           <Outlet />
         </div>
-
-        {/* Bottom navigation mobile */}
-        <BottomNav tabs={MOBILE_TABS} />
       </main>
+
+      {/* Bottom navigation mobile — v1.9.171: spostata FUORI da <main> per
+          evitare che il flex-container con overflow-hidden rompa il
+          position:fixed su mobile browser (bug "barra a metà schermo"
+          segnalato da Davide). Ora è figlia diretta del wrapper root,
+          quindi davvero ancorata al viewport. */}
+      <BottomNav tabs={MOBILE_TABS} />
 
       {/* Modals & floating UIs */}
       <ViewModeChooser />
@@ -224,6 +228,13 @@ function BottomNav({ tabs }: { tabs: NavTab[] }) {
         borderRadius: '20px 20px 0 0',
         padding: '6px 6px 14px',
         boxShadow: '0 -4px 14px rgba(0,0,0,0.05)',
+        // v1.9.171: forza un compositing layer dedicato così il browser
+        // mobile tiene la nav sempre ancorata al viewport anche quando
+        // l'URL bar si nasconde/mostra o cambia l'orientamento.
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        willChange: 'transform',
+        contain: 'layout',
       }}
     >
       {tabs.map(t => {
