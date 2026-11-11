@@ -18,6 +18,10 @@ export interface ClubSettings {
   firmatario_nome: string | null
   firmatario_ruolo: string | null
   logo_data_uri: string | null
+  // v1.9.173: valori di default e etichetta voucher
+  default_annual_fee?: number | null
+  default_voucher_amount?: number | null
+  voucher_label?: string | null
 }
 
 export interface ReceiptData {
@@ -125,6 +129,13 @@ export function generateReceiptPDF(opts: ReceiptData): jsPDF {
   if (s.iban && (opts.metodo.toLowerCase().includes('bonific'))) {
     doc.setFontSize(9); doc.setTextColor(90)
     doc.text(`Accreditato su: ${s.iban}`, marginX, y); y += 6
+    doc.setFontSize(11); doc.setTextColor(0)
+  }
+  // v1.9.173: se saldato con voucher sportivo, aggiungi riga descrittiva
+  if (opts.metodo.toLowerCase().includes('voucher')) {
+    doc.setFontSize(9); doc.setTextColor(90)
+    const voucherLine = s.voucher_label || 'Voucher Sportivo del Comune di Poirino'
+    doc.text(`Importo coperto da: ${voucherLine}`, marginX, y); y += 6
     doc.setFontSize(11); doc.setTextColor(0)
   }
 

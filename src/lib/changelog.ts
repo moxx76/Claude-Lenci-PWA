@@ -3,6 +3,21 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.173',
+    date: '2026-11-11',
+    title: 'Quota annuale, sconti e Voucher Sportivo del Comune di Poirino',
+    features: [
+      "Nel pannello Pagamenti quote della scheda giocatore compare in cima un nuovo riquadro '📊 Quota annuale' che mostra la quota piena (310€ di default, modificabile per singolo giocatore), un eventuale sconto con motivo (es. '2° figlio', 'convenzione'), il Voucher Sportivo del Comune di Poirino (toggle on/off, importo 220€ default modificabile, codice/protocollo opzionale), e un riepilogo automatico 'Quota piena − Sconto = Quota da saldare · Acconto versato · Saldo versato · Residuo' che diventa verde quando il giocatore è saldato o rosso finché c'è un residuo.",
+      "Nuovo metodo di pagamento 'Voucher Sportivo' tra le opzioni del saldo: selezionandolo, importo saldo e flag voucher si auto-compilano con i valori del giocatore (o con i default di società) e nel PDF ricevuta compare la riga 'Importo coperto da: Voucher Sportivo Comune di Poirino' al posto dell'IBAN.",
+      "Pagina /admin/impostazioni-societa estesa con la sezione 'Quote e voucher': quota annua piena di default (310€), importo voucher di default (220€), etichetta esatta del voucher che apparirà nel pannello e nei PDF. Serve a cambiare gli importi anno per anno senza toccare il codice.",
+    ],
+    notes: [
+      "Nuove colonne DB: players.annual_fee, players.fee_discount, players.fee_discount_reason, players.has_voucher, players.voucher_amount, players.voucher_code; club_settings.default_annual_fee (310), club_settings.default_voucher_amount (220), club_settings.voucher_label ('Voucher Sportivo Comune di Poirino').",
+      "Il riepilogo è un calcolo live sui valori del form: se modifichi importo saldo o attivi il voucher, 'Residuo' si aggiorna all'istante, senza bisogno di salvare.",
+      "Se un giocatore paga parte in voucher + parte in contanti, la logica attuale prevede un unico metodo per il saldo. Se diventa un caso ricorrente possiamo aggiungere un secondo metodo complementare — per ora si può gestire mettendo la differenza nelle note pagamento.",
+    ],
+  },
+  {
     version: '1.9.172',
     date: '2026-11-11',
     title: 'Ricevute pagamento quote: metodo, numero e PDF scaricabile',

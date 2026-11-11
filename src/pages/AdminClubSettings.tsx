@@ -19,12 +19,19 @@ interface Settings {
   firmatario_nome: string
   firmatario_ruolo: string
   logo_data_uri: string
+  // v1.9.173: default quote e voucher sportivo
+  default_annual_fee: string
+  default_voucher_amount: string
+  voucher_label: string
 }
 
 const EMPTY: Settings = {
   denominazione: '', codice_fiscale: '', partita_iva: '',
   sede_via: '', sede_cap: '', sede_citta: '', sede_provincia: '',
   iban: '', firmatario_nome: '', firmatario_ruolo: '', logo_data_uri: '',
+  // v1.9.173
+  default_annual_fee: '310', default_voucher_amount: '220',
+  voucher_label: 'Voucher Sportivo Comune di Poirino',
 }
 
 export default function AdminClubSettings() {
@@ -61,9 +68,14 @@ export default function AdminClubSettings() {
     setSaving(true); setErr(null); setMsg(null)
     try {
       const payload: any = { id: 1 }
+      const NUMERIC_KEYS = new Set(['default_annual_fee', 'default_voucher_amount'])
       Object.keys(EMPTY).forEach(k => {
         const v = (s as any)[k].trim()
-        payload[k] = v || null
+        if (NUMERIC_KEYS.has(k)) {
+          payload[k] = v ? parseFloat(v) : null
+        } else {
+          payload[k] = v || null
+        }
       })
       payload.updated_at = new Date().toISOString()
       const { error } = await supabase.from('club_settings').upsert(payload).eq('id', 1)
@@ -157,6 +169,33 @@ export default function AdminClubSettings() {
             <div style={{ fontSize: 11, color: '#707882', marginTop: 4 }}>PNG o JPG · max 300KB · consigliato 200×200px</div>
           </div>
         )}
+      </div>
+
+      {/* v1.9.173: default quote e voucher sportivo */}
+      <div style={{ background: '#fff', border: '1px solid #e6e8ee', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#00838f', textTransform: 'uppercase', marginBottom: 10 }}>Quote e voucher</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            {label('Quota annua piena (€)')}
+            <input type="number" step="0.01" min="0" value={s.default_annual_fee}
+              onChange={e => upd('default_annual_fee', e.target.value)}
+              placeholder="310.00" style={input} />
+            <div style={{ fontSize: 10.5, color: '#707882', marginTop: 4 }}>Valore proposto in automatico su ogni nuovo giocatore</div>
+          </div>
+          <div>
+            {label('Voucher sportivo — importo default (€)')}
+            <input type="number" step="0.01" min="0" value={s.default_voucher_amount}
+              onChange={e => upd('default_voucher_amount', e.target.value)}
+              placeholder="220.00" style={input} />
+            <div style={{ fontSize: 10.5, color: '#707882', marginTop: 4 }}>Comune di Poirino — aggiornabile anno per anno</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          {label('Etichetta voucher (mostrata nel pannello giocatore e nei PDF)')}
+          <input type="text" value={s.voucher_label}
+            onChange={e => upd('voucher_label', e.target.value)}
+            placeholder="Voucher Sportivo Comune di Poirino" style={input} />
+        </div>
       </div>
 
       <button onClick={save} disabled={saving}

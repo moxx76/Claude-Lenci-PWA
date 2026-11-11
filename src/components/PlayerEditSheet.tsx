@@ -10,7 +10,8 @@ import { todayIT, dateIT } from '../lib/dateIT'
 // v1.9.172: generatore PDF ricevute quote
 import { downloadReceipt, type ClubSettings } from '../lib/receiptPdf'
 
-const PAYMENT_METHODS = ['Contanti', 'Bonifico', 'POS', 'Assegno', 'Carta', 'Altro'] as const
+// v1.9.173: 'Voucher Sportivo' aggiunto come metodo saldo (Comune di Poirino)
+const PAYMENT_METHODS = ['Contanti', 'Bonifico', 'POS', 'Assegno', 'Carta', 'Voucher Sportivo', 'Altro'] as const
 
 interface PlayerEditSheetProps {
   open: boolean
@@ -57,6 +58,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
   // v1.9.172: cache impostazioni società (per il PDF)
   const [clubSettings, setClubSettings] = useState<ClubSettings | null>(null)
   const [generatingReceipt, setGeneratingReceipt] = useState<'acconto' | 'saldo' | null>(null)
+  // v1.9.173: quota annuale, sconti e voucher sportivo del Comune
+  const [annualFee, setAnnualFee] = useState<string>('')          // quota annua giocatore (es. 310)
+  const [feeDiscount, setFeeDiscount] = useState<string>('')      // sconto (es. 50 per 2° figlio)
+  const [feeDiscountReason, setFeeDiscountReason] = useState<string>('')
+  const [hasVoucher, setHasVoucher] = useState<boolean>(false)    // voucher sportivo assegnato?
+  const [voucherAmount, setVoucherAmount] = useState<string>('')  // importo voucher (default 220)
+  const [voucherCode, setVoucherCode] = useState<string>('')      // codice/protocollo voucher
   const [parentName, setParentName] = useState('')
   const [parentPhone, setParentPhone] = useState('')
   const [parentEmail, setParentEmail] = useState('')
@@ -117,6 +125,8 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
         ? 'registration_paid, registration_paid_at, registration_amount, registration_receipt_no, registration_payment_method, '
           + 'balance_paid, balance_paid_at, balance_amount, balance_receipt_no, balance_payment_method, '
           + 'payment_notes, '
+          // v1.9.173: quota annuale + sconto + voucher
+          + 'annual_fee, fee_discount, fee_discount_reason, has_voucher, voucher_amount, voucher_code, '
         : ''
       supabase.from('players')
         .select(paymentCols + 'notes, parent_profile_id, parent_name, parent_phone, parent_email')
@@ -135,6 +145,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
               setBalanceMethod((data as any).balance_payment_method || '')
               setBalanceReceiptNo((data as any).balance_receipt_no || '')
               setPaymentNotes((data as any).payment_notes || '')
+              // v1.9.173: quota annuale, sconto, voucher
+              setAnnualFee((data as any).annual_fee != null ? String((data as any).annual_fee) : '')
+              setFeeDiscount((data as any).fee_discount != null ? String((data as any).fee_discount) : '')
+              setFeeDiscountReason((data as any).fee_discount_reason || '')
+              setHasVoucher(!!(data as any).has_voucher)
+              setVoucherAmount((data as any).voucher_amount != null ? String((data as any).voucher_amount) : '')
+              setVoucherCode((data as any).voucher_code || '')
             }
             setNotes((data as any).notes || '')
             setParentProfileId((data as any).parent_profile_id || '')
@@ -156,6 +173,9 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
       setBalancePaid(false); setBalancePaidAt(''); setBalanceAmount('')
       setBalanceMethod(''); setBalanceReceiptNo('')
       setPaymentNotes('')
+      // v1.9.173: quota annuale, sconto, voucher
+      setAnnualFee(''); setFeeDiscount(''); setFeeDiscountReason('')
+      setHasVoucher(false); setVoucherAmount(''); setVoucherCode('')
       setParentName(''); setParentPhone(''); setParentEmail('')
     }
     setError(null)
@@ -252,6 +272,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
           balance_payment_method: balancePaid ? (balanceMethod || null) : null,
           balance_receipt_no: balancePaid ? (balanceReceiptNo.trim() || null) : null,
           payment_notes: paymentNotes.trim() || null,
+          // v1.9.173: quota annuale + sconto + voucher
+          annual_fee: annualFee ? parseFloat(annualFee) : null,
+          fee_discount: feeDiscount ? parseFloat(feeDiscount) : 0,
+          fee_discount_reason: feeDiscountReason.trim() || null,
+          has_voucher: hasVoucher,
+          voucher_amount: hasVoucher && voucherAmount ? parseFloat(voucherAmount) : null,
+          voucher_code: hasVoucher ? (voucherCode.trim() || null) : null,
         } : {}),
       }
       if (isEdit) {
@@ -573,6 +600,109 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
             </span>
           </div>
 
+          {/* v1.9.173: QUOTA ANNUALE + SCONTI + VOUCHER + RIEPILOGO
+              Default quota viene da club_settings.default_annual_fee (310€).
+              Sconto p.es. per iscrizione del secondo figlio.
+              Voucher sportivo del Comune di Poirino (default 220€), editabile. */}
+          {(() => {
+            const defaultFee = Number(clubSettings?.default_annual_fee ?? 310)
+            const defaultVoucher = Number(clubSettings?.default_voucher_amount ?? 220)
+            const fee = annualFee ? parseFloat(annualFee) : defaultFee
+            const disc = feeDiscount ? parseFloat(feeDiscount) : 0
+            const vA = hasVoucher ? (voucherAmount ? parseFloat(voucherAmount) : defaultVoucher) : 0
+            const paidReg = registrationPaid && registrationAmount ? parseFloat(registrationAmount) : 0
+            const paidBal = balancePaid && balanceAmount ? parseFloat(balanceAmount) : 0
+            const netQuota = Math.max(0, fee - disc)
+            const totPaid = paidReg + paidBal
+            const residuo = netQuota - totPaid
+            return (
+              <div style={{
+                background: '#fffaf0', border: '1px dashed #e8b96b',
+                borderRadius: 10, padding: 10, marginBottom: 12,
+              }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: '#8a5a10', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  📊 Quota annuale
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Quota €</div>
+                    <input type="number" step="0.01" min="0" value={annualFee}
+                      onChange={e => setAnnualFee(e.target.value)}
+                      placeholder={String(defaultFee)}
+                      style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Sconto €</div>
+                    <input type="number" step="0.01" min="0" value={feeDiscount}
+                      onChange={e => setFeeDiscount(e.target.value)}
+                      placeholder="0"
+                      style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                  </div>
+                  {disc > 0 && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Motivo sconto</div>
+                      <input type="text" value={feeDiscountReason}
+                        onChange={e => setFeeDiscountReason(e.target.value)}
+                        placeholder="es. 2° figlio, convenzione, ecc."
+                        style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Voucher Sportivo Comune */}
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e8b96b' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={hasVoucher}
+                      onChange={e => {
+                        const v = e.target.checked
+                        setHasVoucher(v)
+                        // auto-popola importo con default quando si spunta per la prima volta
+                        if (v && !voucherAmount) setVoucherAmount(String(defaultVoucher))
+                      }}
+                      style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#e8b96b' }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: '#181c20' }}>
+                      🎟 {clubSettings?.voucher_label || 'Voucher Sportivo Comune di Poirino'}
+                    </span>
+                  </label>
+                  {hasVoucher && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, paddingLeft: 26, marginTop: 6 }}>
+                      <div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Importo €</div>
+                        <input type="number" step="0.01" min="0" value={voucherAmount}
+                          onChange={e => setVoucherAmount(e.target.value)}
+                          placeholder={String(defaultVoucher)}
+                          style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Codice / protocollo (opz.)</div>
+                        <input type="text" value={voucherCode}
+                          onChange={e => setVoucherCode(e.target.value)}
+                          placeholder="es. VS-2026-00123"
+                          style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Riepilogo */}
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #e8b96b', fontSize: 11.5, color: '#404751', display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 3 }}>
+                  <div>Quota piena</div><div style={{ textAlign: 'right' }}>€ {fee.toFixed(2)}</div>
+                  {disc > 0 && (<><div style={{ color: '#2e7d32' }}>− Sconto{feeDiscountReason ? ` (${feeDiscountReason})` : ''}</div><div style={{ textAlign: 'right', color: '#2e7d32' }}>− € {disc.toFixed(2)}</div></>)}
+                  <div style={{ fontWeight: 800 }}>Quota da saldare</div><div style={{ textAlign: 'right', fontWeight: 800 }}>€ {netQuota.toFixed(2)}</div>
+                  {paidReg > 0 && (<><div style={{ color: '#707882' }}>· Acconto versato</div><div style={{ textAlign: 'right', color: '#707882' }}>€ {paidReg.toFixed(2)}</div></>)}
+                  {paidBal > 0 && (<><div style={{ color: '#707882' }}>· Saldo versato{hasVoucher && (balanceMethod || '').toLowerCase().includes('voucher') ? ' (voucher)' : ''}</div><div style={{ textAlign: 'right', color: '#707882' }}>€ {paidBal.toFixed(2)}</div></>)}
+                  <div style={{ fontWeight: 800, color: residuo <= 0 ? '#2e7d32' : '#c62828', borderTop: '1px solid #e8b96b', paddingTop: 4, marginTop: 2 }}>
+                    {residuo <= 0 ? '✓ Saldato' : 'Residuo'}
+                  </div>
+                  <div style={{ textAlign: 'right', fontWeight: 800, color: residuo <= 0 ? '#2e7d32' : '#c62828', borderTop: '1px solid #e8b96b', paddingTop: 4, marginTop: 2 }}>
+                    € {Math.max(0, residuo).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* ACCONTO / ISCRIZIONE */}
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 6 }}>
@@ -683,10 +813,23 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                     placeholder="300.00"
                     style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
                 </div>
-                {/* v1.9.172: metodo pagamento */}
+                {/* v1.9.172/173: metodo pagamento — selezionando 'Voucher Sportivo'
+                    auto-popola importo con il voucher del giocatore (o il default club_settings),
+                    e marca has_voucher a true se non lo era già. */}
                 <div>
                   <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Metodo</div>
-                  <select value={balanceMethod} onChange={e => setBalanceMethod(e.target.value)}
+                  <select value={balanceMethod} onChange={e => {
+                    const m = e.target.value
+                    setBalanceMethod(m)
+                    if (m === 'Voucher Sportivo') {
+                      if (!hasVoucher) setHasVoucher(true)
+                      const defV = Number(clubSettings?.default_voucher_amount ?? 220)
+                      const v = voucherAmount ? parseFloat(voucherAmount) : defV
+                      // Se l'importo saldo è vuoto o zero, metti il voucher; altrimenti rispetta
+                      if (!balanceAmount || parseFloat(balanceAmount) === 0) setBalanceAmount(String(v))
+                      if (!voucherAmount) setVoucherAmount(String(defV))
+                    }
+                  }}
                     style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }}>
                     <option value="">— seleziona —</option>
                     {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
