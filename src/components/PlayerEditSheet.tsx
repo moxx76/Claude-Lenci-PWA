@@ -7,6 +7,10 @@ import { AvatarUploader } from './AvatarUploader'
 import { useAuth } from '../store/auth'
 import { isAdmin } from '../lib/types'
 import { todayIT, dateIT } from '../lib/dateIT'
+// v1.9.172: generatore PDF ricevute quote
+import { downloadReceipt, type ClubSettings } from '../lib/receiptPdf'
+
+const PAYMENT_METHODS = ['Contanti', 'Bonifico', 'POS', 'Assegno', 'Carta', 'Altro'] as const
 
 interface PlayerEditSheetProps {
   open: boolean
@@ -40,10 +44,19 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
   const [registrationPaid, setRegistrationPaid] = useState(false)
   const [registrationPaidAt, setRegistrationPaidAt] = useState('')
   const [registrationAmount, setRegistrationAmount] = useState('')
+  // v1.9.172: metodo pagamento + numero ricevuta per acconto
+  const [registrationMethod, setRegistrationMethod] = useState<string>('')
+  const [registrationReceiptNo, setRegistrationReceiptNo] = useState<string>('')
   const [balancePaid, setBalancePaid] = useState(false)
   const [balancePaidAt, setBalancePaidAt] = useState('')
   const [balanceAmount, setBalanceAmount] = useState('')
+  // v1.9.172: metodo pagamento + numero ricevuta per saldo
+  const [balanceMethod, setBalanceMethod] = useState<string>('')
+  const [balanceReceiptNo, setBalanceReceiptNo] = useState<string>('')
   const [paymentNotes, setPaymentNotes] = useState('')
+  // v1.9.172: cache impostazioni società (per il PDF)
+  const [clubSettings, setClubSettings] = useState<ClubSettings | null>(null)
+  const [generatingReceipt, setGeneratingReceipt] = useState<'acconto' | 'saldo' | null>(null)
   const [parentName, setParentName] = useState('')
   const [parentPhone, setParentPhone] = useState('')
   const [parentEmail, setParentEmail] = useState('')
@@ -61,7 +74,12 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
     if (!open) return
     supabase.from('profiles').select('id, full_name, email').eq('role', 'parent').order('full_name')
       .then(({ data }) => setParents(data ?? []))
-  }, [open])
+    // v1.9.172: carico impostazioni società per il PDF ricevuta
+    if (canSeePayments) {
+      supabase.from('club_settings').select('*').eq('id', 1).maybeSingle()
+        .then(({ data }) => setClubSettings(data as any))
+    }
+  }, [open, canSeePayments])
 
   useEffect(() => {
     if (!open) return
@@ -96,7 +114,9 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
       // rendering omesso in UI non equivale a non trasmettere il dato lato wire.
       // Ora chi non è admin NON riceve le colonne pagamento dal server.
       const paymentCols = canSeePayments
-        ? 'registration_paid, registration_paid_at, registration_amount, balance_paid, balance_paid_at, balance_amount, payment_notes, '
+        ? 'registration_paid, registration_paid_at, registration_amount, registration_receipt_no, registration_payment_method, '
+          + 'balance_paid, balance_paid_at, balance_amount, balance_receipt_no, balance_payment_method, '
+          + 'payment_notes, '
         : ''
       supabase.from('players')
         .select(paymentCols + 'notes, parent_profile_id, parent_name, parent_phone, parent_email')
@@ -107,9 +127,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
               setRegistrationPaid(!!(data as any).registration_paid)
               setRegistrationPaidAt((data as any).registration_paid_at || '')
               setRegistrationAmount((data as any).registration_amount != null ? String((data as any).registration_amount) : '')
+              setRegistrationMethod((data as any).registration_payment_method || '')
+              setRegistrationReceiptNo((data as any).registration_receipt_no || '')
               setBalancePaid(!!(data as any).balance_paid)
               setBalancePaidAt((data as any).balance_paid_at || '')
               setBalanceAmount((data as any).balance_amount != null ? String((data as any).balance_amount) : '')
+              setBalanceMethod((data as any).balance_payment_method || '')
+              setBalanceReceiptNo((data as any).balance_receipt_no || '')
               setPaymentNotes((data as any).payment_notes || '')
             }
             setNotes((data as any).notes || '')
@@ -128,7 +152,9 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
       setParentProfileId('')
       setAvatarUrl(null)
       setRegistrationPaid(false); setRegistrationPaidAt(''); setRegistrationAmount('')
+      setRegistrationMethod(''); setRegistrationReceiptNo('')
       setBalancePaid(false); setBalancePaidAt(''); setBalanceAmount('')
+      setBalanceMethod(''); setBalanceReceiptNo('')
       setPaymentNotes('')
       setParentName(''); setParentPhone(''); setParentEmail('')
     }
@@ -136,6 +162,60 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
   }, [player, open])
 
   if (!open || (!player && !createInTeamId)) return null
+
+  // v1.9.172: chiede al server il prossimo numero ricevuta progressivo dell'anno.
+  // Progressivo globale su tutta la società (acconti + saldi), formato NNNN/YYYY.
+  // Se l'anno di riferimento è quello della data del pagamento (altrimenti oggi).
+  const requestAutoReceiptNo = async (tipo: 'acconto' | 'saldo'): Promise<string | null> => {
+    const refDate = tipo === 'acconto' ? registrationPaidAt : balancePaidAt
+    const year = (refDate && /^\d{4}-/.test(refDate)) ? parseInt(refDate.slice(0, 4), 10) : new Date().getFullYear()
+    const { data, error } = await supabase.rpc('next_receipt_number', { p_year: year })
+    if (error) { console.error(error); return null }
+    return typeof data === 'string' ? data : null
+  }
+
+  // v1.9.172: scarica la ricevuta PDF di acconto o saldo
+  const handleDownloadReceipt = async (tipo: 'acconto' | 'saldo') => {
+    if (!clubSettings) {
+      setError('Impostazioni società non caricate — apri /admin/impostazioni-societa per configurarle')
+      return
+    }
+    const isAcconto = tipo === 'acconto'
+    const receiptNo = isAcconto ? registrationReceiptNo : balanceReceiptNo
+    const paidAt = isAcconto ? registrationPaidAt : balancePaidAt
+    const amount = isAcconto ? registrationAmount : balanceAmount
+    const method = isAcconto ? registrationMethod : balanceMethod
+    if (!receiptNo.trim()) { setError('Manca il numero ricevuta'); return }
+    if (!paidAt) { setError('Manca la data di pagamento'); return }
+    if (!amount || parseFloat(amount) <= 0) { setError('Importo non valido'); return }
+    if (!method) { setError('Specifica il metodo di pagamento'); return }
+    setGeneratingReceipt(tipo)
+    try {
+      // Stagione sportiva: se mese >= 7 → anno/anno+1, altrimenti anno-1/anno
+      const d = new Date(paidAt)
+      const y = d.getFullYear()
+      const stagione = d.getMonth() >= 6 ? `${y}/${y + 1}` : `${y - 1}/${y}`
+      // Nome squadra: dall'oggetto player se disponibile (in creazione non esiste)
+      const squadra = (player as any)?.teamName || (player as any)?.team?.name || 'Settore giovanile'
+      downloadReceipt({
+        tipo,
+        numero: receiptNo.trim(),
+        data: paidAt,
+        importo: parseFloat(amount),
+        metodo: method,
+        giocatoreNome: firstName.trim(),
+        giocatoreCognome: lastName.trim(),
+        giocatoreCF: fiscalCode.trim() || null,
+        squadra,
+        stagione,
+        settings: clubSettings,
+      })
+    } catch (e: any) {
+      setError('Errore generazione PDF: ' + (e?.message || String(e)))
+    } finally {
+      setGeneratingReceipt(null)
+    }
+  }
 
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim() || !birthDate) {
@@ -164,9 +244,13 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
           registration_paid: registrationPaid,
           registration_paid_at: registrationPaid && registrationPaidAt ? registrationPaidAt : null,
           registration_amount: registrationAmount ? parseFloat(registrationAmount) : null,
+          registration_payment_method: registrationPaid ? (registrationMethod || null) : null,
+          registration_receipt_no: registrationPaid ? (registrationReceiptNo.trim() || null) : null,
           balance_paid: balancePaid,
           balance_paid_at: balancePaid && balancePaidAt ? balancePaidAt : null,
           balance_amount: balanceAmount ? parseFloat(balanceAmount) : null,
+          balance_payment_method: balancePaid ? (balanceMethod || null) : null,
+          balance_receipt_no: balancePaid ? (balanceReceiptNo.trim() || null) : null,
           payment_notes: paymentNotes.trim() || null,
         } : {}),
       }
@@ -519,6 +603,52 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                     placeholder="150.00"
                     style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
                 </div>
+                {/* v1.9.172: metodo pagamento */}
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Metodo</div>
+                  <select value={registrationMethod} onChange={e => setRegistrationMethod(e.target.value)}
+                    style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }}>
+                    <option value="">— seleziona —</option>
+                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                {/* v1.9.172: numero ricevuta + bottone auto */}
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>N° Ricevuta</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input type="text" value={registrationReceiptNo}
+                      onChange={e => setRegistrationReceiptNo(e.target.value)}
+                      placeholder="0001/2026"
+                      style={{ ...inputStyle, padding: '8px 10px', fontSize: 12, flex: 1 }} />
+                    <button type="button" onClick={async () => {
+                      const n = await requestAutoReceiptNo('acconto')
+                      if (n) setRegistrationReceiptNo(n)
+                    }}
+                      style={{
+                        padding: '8px 10px', fontSize: 11, fontWeight: 700,
+                        background: '#005f98', color: '#fff', border: 0, borderRadius: 8,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                      title="Genera il prossimo numero progressivo dell'anno">
+                      Auto
+                    </button>
+                  </div>
+                </div>
+                {/* v1.9.172: pulsante download PDF ricevuta */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <button type="button"
+                    onClick={() => handleDownloadReceipt('acconto')}
+                    disabled={generatingReceipt === 'acconto' || !registrationReceiptNo || !registrationPaidAt || !registrationAmount || !registrationMethod}
+                    style={{
+                      width: '100%', padding: '9px 10px', fontSize: 12, fontWeight: 700,
+                      background: '#00838f', color: '#fff', border: 0, borderRadius: 8,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      opacity: (!registrationReceiptNo || !registrationPaidAt || !registrationAmount || !registrationMethod) ? 0.5 : 1,
+                    }}>
+                    <Icon name="picture_as_pdf" size={14} color="#fff" />
+                    {generatingReceipt === 'acconto' ? 'Generazione…' : 'Scarica ricevuta PDF (acconto)'}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -552,6 +682,52 @@ export function PlayerEditSheet({ open, onClose, player, createInTeamId, onSaved
                     onChange={e => setBalanceAmount(e.target.value)}
                     placeholder="300.00"
                     style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }} />
+                </div>
+                {/* v1.9.172: metodo pagamento */}
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>Metodo</div>
+                  <select value={balanceMethod} onChange={e => setBalanceMethod(e.target.value)}
+                    style={{ ...inputStyle, padding: '8px 10px', fontSize: 12 }}>
+                    <option value="">— seleziona —</option>
+                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                {/* v1.9.172: numero ricevuta + bottone auto */}
+                <div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#707882', textTransform: 'uppercase', marginBottom: 3 }}>N° Ricevuta</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input type="text" value={balanceReceiptNo}
+                      onChange={e => setBalanceReceiptNo(e.target.value)}
+                      placeholder="0002/2026"
+                      style={{ ...inputStyle, padding: '8px 10px', fontSize: 12, flex: 1 }} />
+                    <button type="button" onClick={async () => {
+                      const n = await requestAutoReceiptNo('saldo')
+                      if (n) setBalanceReceiptNo(n)
+                    }}
+                      style={{
+                        padding: '8px 10px', fontSize: 11, fontWeight: 700,
+                        background: '#005f98', color: '#fff', border: 0, borderRadius: 8,
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                      title="Genera il prossimo numero progressivo dell'anno">
+                      Auto
+                    </button>
+                  </div>
+                </div>
+                {/* v1.9.172: pulsante download PDF ricevuta */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <button type="button"
+                    onClick={() => handleDownloadReceipt('saldo')}
+                    disabled={generatingReceipt === 'saldo' || !balanceReceiptNo || !balancePaidAt || !balanceAmount || !balanceMethod}
+                    style={{
+                      width: '100%', padding: '9px 10px', fontSize: 12, fontWeight: 700,
+                      background: '#00838f', color: '#fff', border: 0, borderRadius: 8,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      opacity: (!balanceReceiptNo || !balancePaidAt || !balanceAmount || !balanceMethod) ? 0.5 : 1,
+                    }}>
+                    <Icon name="picture_as_pdf" size={14} color="#fff" />
+                    {generatingReceipt === 'saldo' ? 'Generazione…' : 'Scarica ricevuta PDF (saldo)'}
+                  </button>
                 </div>
               </div>
             )}

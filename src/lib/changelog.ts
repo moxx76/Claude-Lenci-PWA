@@ -3,6 +3,21 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.172',
+    date: '2026-11-11',
+    title: 'Ricevute pagamento quote: metodo, numero e PDF scaricabile',
+    features: [
+      "Pannello Pagamenti quote (scheda giocatore, visibile solo agli admin) esteso: per acconto e saldo, oltre a data e importo, ora si inseriscono anche METODO di pagamento (Contanti · Bonifico · POS · Assegno · Carta · Altro) e NUMERO RICEVUTA. Entrambi i campi compaiono solo quando la relativa casella 'versata' è spuntata.",
+      "Pulsante 'Auto' accanto a ogni numero ricevuta: chiama il server e assegna il prossimo progressivo annuale (formato 0001/2026, 0002/2026…). Il contatore è unico per tutta la società e scansiona sia acconti che saldi per non assegnare due volte lo stesso numero. Si può comunque sovrascrivere manualmente (es. per matchare con un blocco cartaceo).",
+      "Pulsante '📄 Scarica ricevuta PDF' (uno per acconto, uno per saldo): genera una ricevuta formato A4 con intestazione ASD, numero + data, nome e C.F. del tesserato, causale precompilata (Quota associativa acconto/saldo — settore X — stagione YYYY/YYYY+1), importo in evidenza, modalità di pagamento, IBAN se bonifico, spazio firma e timbro del firmatario configurato, clausola fiscale ex art. 4 DPR 633/72 · D.Lgs. 36/2021.",
+      "Nuova pagina /admin/impostazioni-societa dove configurare una volta per tutte denominazione completa, codice fiscale, P.IVA, sede legale, IBAN, firmatario (nome + ruolo) e logo opzionale. I PDF ricevuta pescano da qui, così si cambiano senza toccare il codice.",
+    ],
+    notes: [
+      "Nuove colonne aggiunte al DB: players.registration_receipt_no, players.registration_payment_method, players.balance_receipt_no, players.balance_payment_method; nuova tabella club_settings (singleton riga id=1, RLS: lettura per tutti gli utenti autenticati, scrittura solo admin); nuova RPC next_receipt_number(p_year) per il progressivo.",
+      "Primo passaggio: andare su /admin/impostazioni-societa e compilare i campi (almeno denominazione, CF/P.IVA, sede, nome del firmatario). Senza questo, il PDF viene lo stesso ma con intestazione minimale.",
+    ],
+  },
+  {
     version: '1.9.171',
     date: '2026-11-09',
     title: 'Fix barra di navigazione mobile che a volte compariva a metà schermo',

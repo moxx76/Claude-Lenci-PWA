@@ -24,6 +24,7 @@ const Referti           = lazy(() => import('./pages/Referti').then(m => ({ defa
 const LenciPass         = lazy(() => import('./pages/LenciPass').then(m => ({ default: m.LenciPass })))
 const LenciPassVerify   = lazy(() => import('./pages/LenciPassVerify').then(m => ({ default: m.LenciPassVerify })))
 const AdminPass         = lazy(() => import('./pages/AdminPass').then(m => ({ default: m.AdminPass })))
+const AdminClubSettings = lazy(() => import('./pages/AdminClubSettings'))
 const EserciziPage      = lazy(() => import('./pages/EserciziPage').then(m => ({ default: m.EserciziPage })))
 const Moduli            = lazy(() => import('./pages/Moduli').then(m => ({ default: m.Moduli })))
 const Inventario        = lazy(() => import('./pages/Inventario').then(m => ({ default: m.Inventario })))
@@ -168,6 +169,8 @@ export default function App() {
           <Route path="import-figc" element={<NotForJournalist><ImportFigc /></NotForJournalist>} />
           {/* Admin Lenci Pass: gestione titolari + QR per programmare i tag NFC */}
           <Route path="admin/pass" element={<NotForJournalist><AdminPass /></NotForJournalist>} />
+          {/* v1.9.172: impostazioni società per intestazione PDF ricevuta pagamento */}
+          <Route path="admin/impostazioni-societa" element={<NotForJournalist><AdminClubSettings /></NotForJournalist>} />
           <Route path="stats" element={<Navigate to="/" replace />} />
           <Route path="profilo" element={<Profile />} />
         </Route>
