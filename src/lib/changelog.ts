@@ -3,6 +3,22 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.178',
+    date: '2026-11-24',
+    title: '🏆 Nuova pagina Classifica — auto-aggiornata dal sito LND, zero interazione umana',
+    features: [
+      "Nuova voce 'Classifica' nel menu desktop (icona 🏆, accanto a Comunicati). Mostra la classifica aggiornata del campionato della squadra selezionata con filtro a chip in cima: scegli la squadra e vedi la sua classifica.",
+      "Vista tabellare completa: posizione (con badge blu top-3 e badge rosso ultime 2), nome squadra (evidenziata in oro con icona 🏠 quando è Lenci Poirino), Punti, Partite Giocate, Vittorie, Nulli, Perse, Gol Fatti, Gol Subiti, e penalizzazione mostrata tra parentesi dove presente.",
+      "Link '📄 PDF ufficiale' in alto a destra della classifica: apre il PDF originale del Comitato Regionale Piemonte-VdA LND nella scheda del browser, utile per verifiche o stampe.",
+      "Sync automatico 2x a settimana (lunedì sera e giovedì sera) tramite cron. Zero interazione umana richiesta: appena LND pubblica una nuova classifica, viene rilevata e scaricata al prossimo ciclo.",
+    ],
+    notes: [
+      "Backend tecnico: nuova tabella lnd_classifiche + edge function sync-lnd-classifiche che scarica i PDF dal sito piemontevda.lnd.it, estrae le righe con unpdf e un parser testuale robusto (gestisce il layout LND con pipe separate e righe PDF spezzate), e salva in DB. pg_cron schedula l'invocazione lun+gio 22:00 UTC.",
+      "Categorie coperte: U14 Girone D, U16 Girone C, Juniores, U18, U19 (tutti i gironi disponibili), Prima Categoria (tutti i gironi). Alcune categorie giovanili (Esordienti, Pulcini, Primi Calci) non pubblicano classifiche LND scaricabili.",
+      "Alla prima visualizzazione, i dati mostrati sono quelli della stagione 2025/2026 (ultima stagione pubblicata su LND in formato scaricabile). La stagione 2026/2027 in corso verrà popolata automaticamente non appena il CR Piemonte-VdA pubblicherà il primo PDF classifica stagionale.",
+    ],
+  },
+  {
     version: '1.9.177',
     date: '2026-11-24',
     title: 'Foglio stampa distinta: finalmente il cognome compare sotto ogni cerchio',

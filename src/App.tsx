@@ -20,6 +20,7 @@ const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage').then(m 
 const MarketingPage     = lazy(() => import('./pages/Marketing').then(m => ({ default: m.MarketingPage })))
 const JournalistPage    = lazy(() => import('./pages/Journalist').then(m => ({ default: m.JournalistPage })))
 const ComunicatiPage    = lazy(() => import('./pages/Comunicati').then(m => ({ default: m.ComunicatiPage })))
+const Classifica        = lazy(() => import('./pages/Classifica'))
 const Referti           = lazy(() => import('./pages/Referti').then(m => ({ default: m.Referti })))
 const LenciPass         = lazy(() => import('./pages/LenciPass').then(m => ({ default: m.LenciPass })))
 const LenciPassVerify   = lazy(() => import('./pages/LenciPassVerify').then(m => ({ default: m.LenciPassVerify })))
@@ -160,6 +161,7 @@ export default function App() {
           <Route path="esercizi" element={<NotForJournalist><TeamAssignedGuard><EserciziPage /></TeamAssignedGuard></NotForJournalist>} />
           <Route path="annunci" element={<NotForJournalist><TeamAssignedGuard><AnnouncementsPage /></TeamAssignedGuard></NotForJournalist>} />
           <Route path="comunicati" element={<NotForJournalist><TeamAssignedGuard><ComunicatiPage /></TeamAssignedGuard></NotForJournalist>} />
+          <Route path="classifica" element={<NotForJournalist><TeamAssignedGuard><Classifica /></TeamAssignedGuard></NotForJournalist>} />
           <Route path="referti" element={<NotForJournalist><TeamAssignedGuard><Referti /></TeamAssignedGuard></NotForJournalist>} />
           <Route path="marketing" element={<NotForJournalist><MarketingPage /></NotForJournalist>} />
           <Route path="giornalisti" element={<JournalistPage />} />

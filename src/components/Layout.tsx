@@ -35,6 +35,8 @@ const DESKTOP_TABS_BASE: NavTab[] = [
 
 const MARKETING_TAB: NavTab = { to: '/marketing', label: 'Marketing', icon: 'campaign', accent: '#7a0071' }
 const COMUNICATI_TAB: NavTab = { to: '/comunicati', label: 'Comunicati LND', labelShort: 'Comunicati', icon: 'article', accent: '#005f98' }
+// v1.9.178: pagina Classifica con sync automatico PDF LND
+const CLASSIFICA_TAB: NavTab = { to: '/classifica', label: 'Classifica', icon: 'emoji_events', accent: '#b8860b' }
 const ESERCIZI_TAB: NavTab = { to: '/esercizi', label: 'Catalogo esercizi', labelShort: 'Esercizi', icon: 'fitness_center', accent: '#c73434' }
 const MODULI_TAB: NavTab = { to: '/moduli', label: 'Moduli e documenti', labelShort: 'Moduli', icon: 'folder', accent: '#8b6f47' }
 // M21 — Inventario materiale per squadra (maglie/pettorine/borsa medica/materiale allenamento)
@@ -114,6 +116,8 @@ export function Layout() {
         ...(isStaff ? [REFERTI_TAB] : []),
         ...(isStaff ? [ESERCIZI_TAB] : []),
         ...(isStaff ? [COMUNICATI_TAB] : []),
+        // v1.9.178: Classifica (staff + genitori, è di interesse generale)
+        ...(!isJournalist ? [CLASSIFICA_TAB] : []),
         ...(canSeeModuli ? [MODULI_TAB] : []),
         ...(canSeeInventario ? [INVENTARIO_TAB] : []),
         ...(canSeeImportFigc ? [IMPORT_FIGC_TAB] : []),
