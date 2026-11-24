@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useState, useMemo, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { isAdmin, isCoach, isParent, isAthlete } from '../lib/types'
 import { useCalendarEvents, eventBadgeStyle, type CalendarEvent } from '../hooks/useCalendarEvents'
@@ -72,6 +72,7 @@ export function CalendarPage() {
   const { myTeam, myTeams } = useMyTeam()
   const { showToast } = useToast()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const initialFilter: FilterKey = (() => {
     const q = searchParams.get('filter')
     return q === 'training' || q === 'training_gk' || q === 'match' || q === 'meeting' ? q : 'all'
@@ -681,6 +682,20 @@ export function CalendarPage() {
           <span style={{ marginLeft: 'auto' }}>›</span>
         </button>
       )}
+
+      {/* v1.9.179: Bottone Classifica subito dopo Report presenze.
+          Naviga a /classifica con team pre-selezionato se c'è un filtro attivo. */}
+      <button
+        onClick={() => {
+          if (teamFilter) navigate(`/classifica?team=${teamFilter}`)
+          else navigate('/classifica')
+        }}
+        style={historyBtnStyle('#b8860b')}
+      >
+        <Icon name="emoji_events" size={16} color="#fff" />
+        Classifica{teamFilter && teams.find(t => t.id === teamFilter) ? ` — ${teams.find(t => t.id === teamFilter)!.name}` : ''}
+        <span style={{ marginLeft: 'auto' }}>›</span>
+      </button>
 
       {/* Bottone "Vedi storico" contestuale al filtro attivo */}
       {isStaff && filter === 'training' && (

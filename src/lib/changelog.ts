@@ -3,6 +3,18 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.179',
+    date: '2026-11-24',
+    title: 'Classifica raggiungibile anche dal menu squadra del Calendario (mobile-friendly)',
+    features: [
+      "Nel Calendario, tra i bottoni Report presenze e i vari Storici, compare un nuovo bottone '🏆 Classifica — <nome squadra>' che porta direttamente alla classifica del girone della squadra selezionata. Utile su mobile dove il menu di navigazione principale non ha abbastanza spazio per tutte le voci, e si rimane nel contesto 'squadra' per vedere subito la posizione.",
+      "Il bottone passa il team_id come query param `?team=<id>` e la pagina Classifica lo legge in input, pre-selezionando la squadra. Con il filtro squadra già impostato si vede subito la classifica di quel campionato senza altri tap.",
+    ],
+    notes: [
+      "Girone configurati automaticamente dal sync: Prima Categoria=E, U14=D, U16=C, U18=B, U19=B, Juniores=B. Se cambia un girone nel corso stagione, basta aggiornare la lista TARGETS nell'edge function sync-lnd-classifiche.",
+    ],
+  },
+  {
     version: '1.9.178',
     date: '2026-11-24',
     title: '🏆 Nuova pagina Classifica — auto-aggiornata dal sito LND, zero interazione umana',

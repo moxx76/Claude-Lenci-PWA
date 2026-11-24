@@ -3,6 +3,7 @@
 // letta dalla tabella lnd_classifiche. I dati sono aggiornati automaticamente
 // 2x a settimana da edge function sync-lnd-classifiche.
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Icon } from '../components/Icon'
 import { sortTeamsByAge } from '../lib/teamOrder'
@@ -49,10 +50,13 @@ interface GironeInfo {
 }
 
 export function Classifica() {
+  const [searchParams] = useSearchParams()
+  // v1.9.179: ?team=<id> da link del menu squadra del Calendario
+  const initialTeamId = searchParams.get('team')
   const [teams, setTeams] = useState<TeamLite[]>([])
   const [categorie, setCategorie] = useState<CategoriaLnd[]>([])
   const [teamToCategoria, setTeamToCategoria] = useState<Record<string, string>>({})
-  const [teamFilter, setTeamFilter] = useState<string | null>(null)
+  const [teamFilter, setTeamFilter] = useState<string | null>(initialTeamId)
   const [girone, setGirone] = useState<GironeInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -74,9 +78,12 @@ export function Classifica() {
           if (r.team_id) map[r.team_id] = r.categoria_codice
         }
         setTeamToCategoria(map)
-        // Pre-seleziona la prima squadra con una categoria LND associata
-        const firstWithLnd = (tRes.data ?? []).find((t: any) => map[t.id]) as TeamLite | undefined
-        if (firstWithLnd) setTeamFilter(firstWithLnd.id)
+        // Pre-seleziona la prima squadra con una categoria LND associata,
+        // solo se non è già impostato un teamId via URL (?team=…).
+        if (!initialTeamId) {
+          const firstWithLnd = (tRes.data ?? []).find((t: any) => map[t.id]) as TeamLite | undefined
+          if (firstWithLnd) setTeamFilter(firstWithLnd.id)
+        }
       } catch (e: any) {
         setErr('Errore caricamento squadre: ' + (e?.message || String(e)))
       } finally {
