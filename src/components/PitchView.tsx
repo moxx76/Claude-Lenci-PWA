@@ -148,23 +148,23 @@ export function PitchView({
                   strokeDasharray="1.5,1"
                 />
               )}
-              {/* Nome sotto */}
+              {/* Nome sotto — v1.9.175: ingrandito da 2.6 a 4.2 (prima era quasi illeggibile) */}
               {showNames && player && (
                 <text
                   x={cx}
-                  y={cy + 8}
+                  y={cy + 9}
                   textAnchor="middle"
-                  fontSize={2.6}
-                  fontWeight={700}
+                  fontSize={4.2}
+                  fontWeight={800}
                   fill="#fff"
-                  stroke="rgba(0,0,0,0.4)"
-                  strokeWidth={0.15}
+                  stroke="rgba(0,0,0,0.6)"
+                  strokeWidth={0.4}
                   paintOrder="stroke"
                   style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                 >
                   {player.last_name}
                   {(isCap || isVice) && (
-                    <tspan fontSize={2.2} fill={isCap ? '#ffd100' : '#8ecdff'}>
+                    <tspan fontSize={3.6} fill={isCap ? '#ffd100' : '#8ecdff'}>
                       {' '}({isCap ? 'C' : 'VC'})
                     </tspan>
                   )}
@@ -176,13 +176,13 @@ export function PitchView({
                   {/* Riga min di uscita in giallo */}
                   <text
                     x={cx}
-                    y={cy + 11.5}
+                    y={cy + 13.5}
                     textAnchor="middle"
-                    fontSize={2.2}
-                    fontWeight={700}
+                    fontSize={3.4}
+                    fontWeight={800}
                     fill="#ffd100"
-                    stroke="rgba(0,0,0,0.5)"
-                    strokeWidth={0.15}
+                    stroke="rgba(0,0,0,0.6)"
+                    strokeWidth={0.3}
                     paintOrder="stroke"
                     style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                   >
@@ -191,13 +191,13 @@ export function PitchView({
                   {/* Nome del subentrato */}
                   <text
                     x={cx}
-                    y={cy + 14.5}
+                    y={cy + 17.5}
                     textAnchor="middle"
-                    fontSize={2.3}
-                    fontWeight={600}
+                    fontSize={3.6}
+                    fontWeight={700}
                     fill="#fff"
-                    stroke="rgba(0,0,0,0.5)"
-                    strokeWidth={0.15}
+                    stroke="rgba(0,0,0,0.6)"
+                    strokeWidth={0.3}
                     paintOrder="stroke"
                     style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                   >
@@ -209,9 +209,9 @@ export function PitchView({
               {showNames && !player && (
                 <text
                   x={cx}
-                  y={cy + 8}
+                  y={cy + 9}
                   textAnchor="middle"
-                  fontSize={2.4}
+                  fontSize={3.8}
                   fill="rgba(255,255,255,0.6)"
                   style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                 >

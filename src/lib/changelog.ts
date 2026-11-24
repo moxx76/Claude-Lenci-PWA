@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.175',
+    date: '2026-11-24',
+    title: 'Distinta tattica: cognomi dei giocatori ora leggibili sul campo',
+    fixes: [
+      "Sulla mappa dello schieramento della distinta tattica i cognomi dei giocatori erano scritti in caratteri così piccoli da risultare praticamente invisibili (font size 2.6 su viewBox 100×140 → ~5.6 pixel effettivi). Ora il font è stato portato a 4.2 con contorno nero più marcato per assicurare leggibilità anche a schermo piccolo e in stampa della distinta.",
+      "Rifiniti anche i label delle sostituzioni (minuto di uscita in giallo + nome del subentrato) per restare coerenti con il nuovo font.",
+    ],
+  },
+  {
     version: '1.9.174',
     date: '2026-11-24',
     title: 'Statistiche presenze: gli allenamenti "solo portieri" non contano più per i giocatori di movimento',
