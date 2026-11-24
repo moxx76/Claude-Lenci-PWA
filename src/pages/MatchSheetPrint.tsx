@@ -438,11 +438,14 @@ function MiniPitch({ starters, teamColor }: { starters: StarterRow[]; teamColor:
           </text>
         </>
       )}
-      {/* Giocatori: cerchi coi numeri */}
+      {/* Giocatori: cerchi coi numeri + cognome sotto (v1.9.177) */}
       {starters.map((s, i) => {
         const cx = s.x
         const cy = 140 - s.y * 1.4  // Convert y=0-100 to 140-0 (invertito)
         const isGK = s.slot_key === 'GK'
+        // Cognome: troncato se lungo (max ~12 chars per non sforare)
+        const cognome = (s.last_name || '').toUpperCase()
+        const cognomeShort = cognome.length > 14 ? cognome.slice(0, 13) + '.' : cognome
         return (
           <g key={i}>
             <circle cx={cx} cy={cy} r={5}
@@ -458,6 +461,19 @@ function MiniPitch({ starters, teamColor }: { starters: StarterRow[]; teamColor:
               fill="#fff"
               style={{ fontFamily: 'system-ui, sans-serif' }}
             >{s.jersey ?? '?'}</text>
+            {/* v1.9.177: cognome sotto il cerchio */}
+            <text
+              x={cx} y={cy + 9}
+              textAnchor="middle"
+              fontSize={2.6}
+              fontWeight={700}
+              fill="#181c20"
+              style={{ fontFamily: 'system-ui, sans-serif' }}
+            >
+              {cognomeShort}
+              {s.is_captain && <tspan fontSize={2.2} fill="#c08a00"> (C)</tspan>}
+              {s.is_vice_captain && <tspan fontSize={2.2} fill="#005f98"> (VC)</tspan>}
+            </text>
           </g>
         )
       })}

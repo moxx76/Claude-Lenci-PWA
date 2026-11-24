@@ -3,6 +3,15 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.177',
+    date: '2026-11-24',
+    title: 'Foglio stampa distinta: finalmente il cognome compare sotto ogni cerchio',
+    fixes: [
+      "Nel foglio stampa della distinta (il PDF/pagina pronta per la stampa con titolari, panchina, ammonizioni) il mini-campo di schieramento mostrava solo il numero di maglia nel cerchio del giocatore, senza il cognome accanto. La correzione v1.9.175 aveva sistemato la UI interattiva (PitchView.tsx) ma il foglio di stampa usa un renderer SVG indipendente (MatchSheetPrint.tsx) che non era stato toccato. Ora anche la stampa ha il cognome in grassetto sotto ogni cerchio, con (C) o (VC) in colore distinto per capitano e vice.",
+      "Cognomi lunghi oltre 14 caratteri vengono troncati con un punto per non sforare lo spazio tra due posizioni ravvicinate sul campo.",
+    ],
+  },
+  {
     version: '1.9.176',
     date: '2026-11-24',
     title: 'Referto finale: campo "Espulsioni avversari" nel report partita',
