@@ -186,10 +186,10 @@ export function Classifica() {
 
       {!loading && teamFilter && girone && girone.rows.length === 0 && (
         <div style={{ padding: 20, background: '#fff8e1', border: '1px solid #ffd54f', borderRadius: 10, color: '#7a5a00' }}>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>Classifica non ancora disponibile</div>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Classifica stagione 2026/2027 non ancora pubblicata</div>
           <div style={{ fontSize: 13 }}>
-            Il Comitato Regionale Piemonte-Valle d'Aosta non ha ancora pubblicato una classifica scaricabile per <b>{girone.categoria_nome}</b> della stagione corrente.
-            La prima pubblicazione verrà rilevata automaticamente dal lunedì/giovedì successivo e comparirà qui.
+            Il Comitato Regionale Piemonte-Valle d'Aosta non ha ancora rilasciato il PDF classifica di <b>{girone.categoria_nome}</b> per la stagione in corso.
+            Appena disponibile (di solito dopo le prime giornate di campionato) verrà scaricata e mostrata qui in automatico — nessuna azione richiesta.
           </div>
         </div>
       )}

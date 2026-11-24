@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { RecruitmentLead, LeadStatus } from '../lib/types'
 import { STATUS_LABEL, STATUS_STYLE, categoryStyle, avatarBg, isAdmin, isCoach } from '../lib/types'
@@ -431,6 +432,8 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
   const [showRoster, setShowRoster] = useState(false)
   // Se l'utente clicca su un KPI risultato, apro sheet dettaglio partite filtrate
   const [kpiFilter, setKpiFilter] = useState<'won' | 'drawn' | 'lost' | null>(null)
+  // v1.9.180: bottone Classifica nel menu squadra
+  const navigate = useNavigate()
 
   useEffect(() => { load() }, [team.id, reloadTick])
   const load = async () => {
@@ -512,6 +515,19 @@ function CoachRoster({ team, onSelect, canManage, reloadTick, onEditTeam, onOpen
             Storico
           </button>
         )}
+        {/* v1.9.180: bottone Classifica nel menu squadra, dopo Storico */}
+        <button
+          onClick={() => navigate(`/classifica?team=${team.id}`)}
+          style={{
+            flex: 1, background: '#fff', border: '1px solid #b8860b',
+            borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            fontSize: 12, fontWeight: 800, color: '#b8860b', fontFamily: 'inherit',
+          }}
+        >
+          <Icon name="emoji_events" size={15} color="#b8860b" />
+          Classifica
+        </button>
         {onOpenInventory && (
           <button
             onClick={onOpenInventory}

@@ -3,6 +3,14 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.180',
+    date: '2026-11-24',
+    title: 'Pagina Squadra: bottone 🏆 Classifica nella toolbar accanto a Rosa / Presenze / Storico',
+    features: [
+      "Nella pagina Squadra la toolbar con Rosa / Presenze / Storico / Inventario ora ha anche il bottone '🏆 Classifica' (bordo oro, posizionato subito dopo Storico). Un tap porta alla classifica del campionato di quella squadra già pre-selezionata, senza passare dal menu principale dell'app. È il percorso più breve per vedere la classifica di U14, U16, Juniores ecc. direttamente dalla loro scheda.",
+    ],
+  },
+  {
     version: '1.9.179',
     date: '2026-11-24',
     title: 'Classifica raggiungibile anche dal menu squadra del Calendario (mobile-friendly)',
