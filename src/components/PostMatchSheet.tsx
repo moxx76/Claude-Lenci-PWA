@@ -169,6 +169,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
   const [opponentOwnGoals, setOpponentOwnGoals] = useState<number>(0)
   const [opponentOwnGoalMinutes, setOpponentOwnGoalMinutes] = useState<number[]>([])
   const [opponentGoalMinutes, setOpponentGoalMinutes] = useState<number[]>([])
+  // v1.9.176: espulsioni avversari (per la cronaca del referto)
+  const [opponentRedCards, setOpponentRedCards] = useState<number>(0)
+  const [opponentRedCardMinutes, setOpponentRedCardMinutes] = useState<number[]>([])
   // Id del capitano dei convocati (dalla convocazione): serve per calcolare captain_change_minute
   const [captainPlayerId, setCaptainPlayerId] = useState<string | null>(null)
   // Id del vice capitano dei convocati (per notazione recap "Capitano dal X'")
@@ -225,13 +228,16 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
     let loadedOpponentGoalMinutesCount = 0  // serve dopo per decidere l'autoTheirScore
     try {
       const { data: oogData } = await supabase.from('matches')
-        .select('opponent_own_goals, opponent_own_goal_minutes, opponent_goal_minutes, effective_formation, formation_change_minute, lineup_completed_at')
+        .select('opponent_own_goals, opponent_own_goal_minutes, opponent_goal_minutes, opponent_red_cards, opponent_red_card_minutes, effective_formation, formation_change_minute, lineup_completed_at')
         .eq('id', match.id)
         .maybeSingle()
-      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; opponent_goal_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null; lineup_completed_at?: string | null } | null
+      const oogRow = oogData as { opponent_own_goals?: number | null; opponent_own_goal_minutes?: number[] | null; opponent_goal_minutes?: number[] | null; opponent_red_cards?: number | null; opponent_red_card_minutes?: number[] | null; effective_formation?: string | null; formation_change_minute?: number | null; lineup_completed_at?: string | null } | null
       setOpponentOwnGoals(oogRow?.opponent_own_goals ?? 0)
       setOpponentOwnGoalMinutes(oogRow?.opponent_own_goal_minutes ?? [])
       setOpponentGoalMinutes(oogRow?.opponent_goal_minutes ?? [])
+      // v1.9.176: espulsioni avversari
+      setOpponentRedCards(oogRow?.opponent_red_cards ?? 0)
+      setOpponentRedCardMinutes(oogRow?.opponent_red_card_minutes ?? [])
       loadedOpponentGoalMinutesCount = (oogRow?.opponent_goal_minutes ?? []).length
       setEffectiveFormation(oogRow?.effective_formation ?? '')
       setFormationChangeMinute(oogRow?.formation_change_minute != null ? String(oogRow.formation_change_minute) : '')
@@ -416,6 +422,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           opponentOwnGoals,
           opponentOwnGoalMinutes,
           opponentGoalMinutes,
+          // v1.9.176
+          opponentRedCards,
+          opponentRedCardMinutes,
           stats,
         }
         localStorage.setItem(draftKey, JSON.stringify(payload))
@@ -429,7 +438,7 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
         draftSaveTimerRef.current = null
       }
     }
-  }, [isLoaded, draftKey, saving, savedOk, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes, stats])
+  }, [isLoaded, draftKey, saving, savedOk, formation, effectiveFormation, formationChangeMinute, reportPositive, reportNegative, reportGeneral, weather, refereeNotes, publishedForJournalists, ourScore, theirScore, autoScore, opponentOwnGoals, opponentOwnGoalMinutes, opponentGoalMinutes, opponentRedCards, opponentRedCardMinutes, stats])
 
   // Recupera bozza da localStorage e applica tutto lo state
   const recoverDraft = () => {
@@ -453,6 +462,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
       if (p.opponentOwnGoals != null) setOpponentOwnGoals(p.opponentOwnGoals)
       if (p.opponentOwnGoalMinutes != null) setOpponentOwnGoalMinutes(p.opponentOwnGoalMinutes)
       if (p.opponentGoalMinutes != null) setOpponentGoalMinutes(p.opponentGoalMinutes)
+      // v1.9.176: espulsioni avversari
+      if (p.opponentRedCards != null) setOpponentRedCards(p.opponentRedCards)
+      if (p.opponentRedCardMinutes != null) setOpponentRedCardMinutes(p.opponentRedCardMinutes)
       if (p.stats) setStats(p.stats)
       setDraftMeta(null)
     } catch (err) {
@@ -675,6 +687,9 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
           opponent_own_goals: opponentOwnGoals,
           opponent_own_goal_minutes: opponentOwnGoalMinutes,
           opponent_goal_minutes: opponentGoalMinutes,
+          // v1.9.176: espulsioni avversari
+          opponent_red_cards: opponentRedCards,
+          opponent_red_card_minutes: opponentRedCardMinutes,
           captain_change_minute: captainChangeMinute,
           effective_formation: effectiveFormation.trim() || null,
           formation_change_minute: formationChangeMinute.trim() ? (parseInt(formationChangeMinute, 10) || null) : null,
@@ -1358,6 +1373,48 @@ export function PostMatchSheet({ open, onClose, match, onSaved }: PostMatchSheet
                     label="Minuti (facoltativi)"
                     value={opponentOwnGoalMinutes}
                     onChange={setOpponentOwnGoalMinutes}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* v1.9.176: Espulsioni dell'avversario — utili per cronaca, convocazioni
+                future (chi di loro era espulso), e per un referto più completo. */}
+            <div style={{
+              marginBottom: 12, padding: 12,
+              background: opponentRedCards > 0 ? '#fff3f3' : '#f8f9fc',
+              border: `1px solid ${opponentRedCards > 0 ? '#c62828' : '#e0e2e9'}`,
+              borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#c62828' }}>block</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#181c20' }}>
+                    Espulsioni avversari
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#707882', marginTop: 1 }}>
+                    Cartellini rossi comminati ai giocatori avversari durante la gara.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                <Counter
+                  label="Numero"
+                  value={opponentRedCards}
+                  onChange={n => {
+                    setOpponentRedCards(n)
+                    if (n < opponentRedCardMinutes.length) {
+                      setOpponentRedCardMinutes(opponentRedCardMinutes.slice(0, n))
+                    }
+                  }}
+                  icon="block"
+                  color="#c62828"
+                />
+                {opponentRedCards > 0 && (
+                  <MinutesInput
+                    label="Minuti (facoltativi)"
+                    value={opponentRedCardMinutes}
+                    onChange={setOpponentRedCardMinutes}
                   />
                 )}
               </div>

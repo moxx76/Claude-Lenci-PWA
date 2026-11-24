@@ -3,6 +3,17 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.176',
+    date: '2026-11-24',
+    title: 'Referto finale: campo "Espulsioni avversari" nel report partita',
+    features: [
+      "Nel report post-gara (sezione 'Cronaca avversari') c'è un nuovo riquadro '🚫 Espulsioni avversari': numero di cartellini rossi comminati ai giocatori avversari + minuti facoltativi di ciascuna espulsione. Si salva come matches.opponent_red_cards + opponent_red_card_minutes.",
+    ],
+    notes: [
+      "I dati non modificano in alcun modo le statistiche dei nostri giocatori — sono puri dati di cronaca partita utili per il resoconto tecnico e per il report giornalista.",
+    ],
+  },
+  {
     version: '1.9.175',
     date: '2026-11-24',
     title: 'Distinta tattica: cognomi dei giocatori ora leggibili sul campo',
