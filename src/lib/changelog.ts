@@ -3,6 +3,19 @@
 import type { Release } from "./version"
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.174',
+    date: '2026-11-24',
+    title: 'Statistiche presenze: gli allenamenti "solo portieri" non contano più per i giocatori di movimento',
+    fixes: [
+      "Fix segnalato dallo staff U14: con gli allenamenti separati dei portieri (introdotti in v1.9.168) i giocatori di movimento risultavano 'assenti' a 2 allenamenti settimanali in più ciascuno, con la loro percentuale di presenza che crollava artificialmente di 15-20 punti.",
+      "Ora le statistiche presenze (in scheda giocatore nella rosa, nel dettaglio del singolo giocatore, e nel trend mensile della squadra) distinguono per ruolo: i giocatori di movimento vedono SOLO gli allenamenti normali di squadra; i portieri continuano a vedere TUTTO (normali + 🧤 solo portieri). Esempio reale U14 novembre: i movimento ora hanno 11 allenamenti totali nel mese invece di 16; i portieri Barranca e Mitrione continuano a vedere i loro 16.",
+    ],
+    notes: [
+      "Fix lato DB: aggiornate 4 funzioni Supabase (team_attendance_stats, team_attendance_matrix, team_attendance_monthly_trend, player_attendance_timeline). Non serve ricaricare: la prossima apertura della scheda giocatore mostra i numeri corretti.",
+      "Interessa solo gli allenamenti con flag 'Solo portieri' attivo. Nessuna modifica sulle allenamenti di gruppo normali.",
+    ],
+  },
+  {
     version: '1.9.173',
     date: '2026-11-11',
     title: 'Quota annuale, sconti e Voucher Sportivo del Comune di Poirino',
